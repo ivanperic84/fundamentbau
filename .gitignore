@@ -1,0 +1,20 @@
+# .gitignore
+*.pdf
+# Windows-Herkunftsvermerke. Der Doppelpunkt im Namen ist kein echter — die
+# Dateien tragen ein Ersatzzeichen, darum ohne Trenner mustern.
+*Zone.Identifier
+Backup/
+.claude/
+
+# Projektunterlagen bleiben lokal. Das Repository ist oeffentlich; die
+# Fundamentliste und die Ausschreibungsunterlagen gehoeren nicht dorthin.
+Grundlagen/
+
+# Frühere Fassungen von index.html — die Historie führt git
+index-44.html
+index-backup-*.html
+*.bak-storage
+index.zip
+
+# Einmalige Hilfsskripte aus der Aufräumphase
+finddup*.js

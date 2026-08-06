@@ -1,0 +1,19 @@
+# Zeilenenden vereinheitlichen.
+#
+# Dasselbe Verzeichnis wird von Windows und aus WSL heraus bearbeitet. Ohne
+# diese Angabe drehte git je nach Zugriffsweg die Zeilenenden und meldete
+# ganze Dateien als geaendert, obwohl inhaltlich nichts anders war.
+#
+# text=auto  — git entscheidet je Datei, ob sie Text ist
+# eol=lf     — im Arbeitsverzeichnis wie im Repository durchgehend LF
+* text=auto eol=lf
+
+# Binaerdateien nie anfassen
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.xlsx binary
+*.xlsm binary
+*.zip  binary

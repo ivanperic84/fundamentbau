@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benutzerhandbuch – Fundamentbau App</title>
+<style>
+  :root {
+    --brand: #1a3a5c;
+    --brand-light: #2a5080;
+    --bg: #f0f2f5;
+    --white: #ffffff;
+    --border: #e0e4ea;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --subtle: #9ca3af;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    background: var(--brand);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.22);
+  }
+  .page-header-inner {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 13px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .page-header h1 { font-size: 16px; font-weight: 700; }
+  .page-header p  { font-size: 11px; opacity: 0.55; margin-top: 2px; }
+  .header-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 10px;
+    background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 20px; white-space: nowrap;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px 24px;
+    display: grid;
+    grid-template-columns: 210px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  /* ── Sidebar Nav ── */
+  .sidebar {
+    position: sticky;
+    top: 64px;
+    background: white;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .sidebar-title {
+    padding: 9px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: #f9fafb;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar nav a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.1s, color 0.1s;
+  }
+  .sidebar nav a:last-child { border-bottom: none; }
+  .sidebar nav a:hover { background: #f1f5f9; color: var(--brand); }
+  .sidebar nav a .nav-num {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    background: #f3f4f6;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* ── Main Content ── */
+  .content { min-width: 0; }
+
+  /* ── Section ── */
+  .section {
+    background: white;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .section-header {
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fafbfc;
+  }
+  .section-num {
+    width: 32px; height: 32px;
+    background: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-header h2 { font-size: 14px; font-weight: 700; color: var(--brand); }
+  .section-header p  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .section-body { padding: 16px 20px; }
+  .section-body > * + * { margin-top: 14px; }
+
+  /* ── Subsection ── */
+  .sub { margin-top: 18px; }
+  .sub h3 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .sub h3::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Info boxes ── */
+  .info-box {
+    padding: 10px 13px; border-radius: 7px;
+    font-size: 12px; line-height: 1.55;
+    display: flex; gap: 9px; align-items: flex-start;
+  }
+  .ib-icon {
+    font-size: 11px; font-weight: 700;
+    width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .info-tip  { background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; }
+  .info-tip  .ib-icon { background: #334155; color: white; }
+  .info-warn { background: #fafaf0; border: 1px solid #d4d058; color: #4a4a0a; }
+  .info-warn .ib-icon { background: #78716c; color: white; }
+  .info-ok   { background: #f0faf4; border: 1px solid #bbddc9; color: #1a4a2e; }
+  .info-ok   .ib-icon { background: #374151; color: white; }
+
+  /* ── Two column ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* ── Feature card ── */
+  .feat-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 11px 13px; background: #fafbfc;
+  }
+  .feat-card h4 { font-size: 12px; font-weight: 700; color: var(--brand); margin-bottom: 4px; }
+  .feat-card p  { font-size: 12px; color: #4b5563; line-height: 1.5; }
+
+  /* ── Step list ── */
+  .steps { list-style: none; counter-reset: steps; }
+  .steps li {
+    counter-increment: steps;
+    display: flex; gap: 11px;
+    padding: 9px 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 13px;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(steps);
+    min-width: 22px; height: 22px;
+    background: var(--brand); color: white;
+    border-radius: 50%; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .steps li strong { display: block; font-size: 12px; color: var(--brand); margin-bottom: 2px; }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th {
+    background: var(--brand); color: white;
+    padding: 7px 10px; text-align: left; font-size: 11px; font-weight: 700;
+  }
+  .data-table td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:nth-child(even) td { background: #f9fafb; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 1px 7px; border-radius: 10px;
+    font-size: 11px; font-weight: 700;
+    background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;
+  }
+  .badge-phase {
+    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700;
+    background: #1a3a5c; color: white;
+  }
+
+  /* ── Mockup UI ── */
+  .mockup {
+    border: 1px solid var(--border);
+    border-radius: 9px; overflow: hidden;
+    background: var(--bg); margin: 10px 0;
+    font-size: 12px;
+  }
+  .mockup-bar {
+    background: var(--brand);
+    padding: 9px 13px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .mockup-bar-title { color: white; font-size: 12px; font-weight: 700; }
+  .mockup-bar-sub   { color: rgba(255,255,255,0.55); font-size: 10px; }
+  .mockup-btn {
+    background: rgba(255,255,255,0.13);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: white; padding: 3px 9px; border-radius: 5px;
+    font-size: 10px; font-weight: 700;
+  }
+  .mockup-body { padding: 10px 13px; }
+
+  /* ── Inline code ── */
+  code {
+    background: #f3f4f6; border: 1px solid #e5e7eb;
+    padding: 1px 5px; border-radius: 4px;
+    font-size: 11px; font-family: 'Courier New', monospace;
+    color: var(--brand);
+  }
+
+  /* ── Progress demo ── */
+  .prog-bar {
+    height: 9px; background: #e5e7eb; border-radius: 5px; overflow: hidden;
+    display: flex; margin: 5px 0;
+  }
+  .pb-g { background: #374151; }
+  .pb-a { background: #9ca3af; }
+
+  /* ── Phase chip row ── */
+  .phase-row {
+    display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0;
+  }
+  .phase-chip {
+    padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    border: 1px solid #d1d5db; background: white; color: #374151;
+  }
+  .phase-chip.active {
+    background: var(--brand); color: white; border-color: var(--brand);
+  }
+
+  /* ── Gantt demo bar ── */
+  .gantt-demo {
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    font-size: 11px; background: white;
+  }
+  .gantt-header {
+    background: var(--brand); color: white;
+    display: grid; grid-template-columns: 90px repeat(8,1fr);
+    font-size: 10px; font-weight: 700;
+  }
+  .gantt-header div { padding: 5px 4px; border-right: 1px solid rgba(255,255,255,0.15); text-align: center; }
+  .gantt-header div:first-child { text-align: left; padding-left: 8px; }
+  .gantt-row {
+    display: grid; grid-template-columns: 90px repeat(8,1fr);
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .gantt-row:last-child { border-bottom: none; }
+  .gantt-cell { padding: 5px 4px; border-right: 1px solid #f3f4f6; }
+  .gantt-cell:first-child { font-weight: 600; color: #374151; padding-left: 8px; }
+  .gantt-bar {
+    height: 16px; border-radius: 3px; background: var(--brand);
+    opacity: 0.65; margin: 2px 0;
+  }
+  .gantt-bar.sat { opacity: 0.9; }
+
+  /* ── Responsive ── */
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; padding: 14px; gap: 14px; }
+    .sidebar { position: static; }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+  }
+
+  /* ── Footer ── */
+  .page-footer {
+    max-width: 980px; margin: 0 auto;
+    padding: 16px 24px 40px;
+    text-align: center; font-size: 11px; color: var(--subtle);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1>Benutzerhandbuch</h1>
+      <p>Fundamentbau App — Planung, Bauprojekt &amp; Ausführung</p>
+    </div>
+    <span class="header-badge">v2.0</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ══════════ NAV ══════════ -->
+  <div class="sidebar">
+    <div class="sidebar-title">Inhaltsverzeichnis</div>
+    <nav>
+      <a href="#uebersicht">Übersicht<span class="nav-num">1</span></a>
+      <a href="#phasen">Phasen<span class="nav-num">2</span></a>
+      <a href="#standorte">Standorte<span class="nav-num">3</span></a>
+      <a href="#detailansicht">Detailansicht<span class="nav-num">4</span></a>
+      <a href="#begehung">Begehung &amp; Fotos<span class="nav-num">5</span></a>
+      <a href="#termine">Termine<span class="nav-num">6</span></a>
+      <a href="#zugang">Zugang &amp; Abklärung<span class="nav-num">7</span></a>
+      <a href="#bauprojekt">Bauprojekt<span class="nav-num">8</span></a>
+      <a href="#baugrund">Baugrundphase<span class="nav-num">9</span></a>
+      <a href="#ausfplanung">Ausführungsplanung<span class="nav-num">10</span></a>
+      <a href="#bauprogramm">Bauprogramm / Gantt<span class="nav-num">11</span></a>
+      <a href="#fundamenttypen">Fundamenttypen<span class="nav-num">12</span></a>
+      <a href="#karte">Karte<span class="nav-num">13</span></a>
+      <a href="#projekte">Projekte<span class="nav-num">14</span></a>
+      <a href="#export">Export &amp; Backup<span class="nav-num">15</span></a>
+      <a href="#einstellungen">Einstellungen<span class="nav-num">16</span></a>
+      <a href="#daten">Datenspeicherung<span class="nav-num">17</span></a>
+    </nav>
+  </div>
+
+  <!-- ══════════ CONTENT ══════════ -->
+  <div class="content">
+
+    <!-- 1 · ÜBERSICHT -->
+    <div class="section" id="uebersicht">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <div><h2>Übersicht</h2><p>Startbildschirm und allgemeine Bedienung</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die App zeigt beim Start die <strong>Übersicht</strong> aller Fundamentstandorte. Oben befindet sich die Kopfzeile mit Projekttitel, Phase und Fortschrittsbalken.</p>
+
+        <div class="mockup">
+          <div class="mockup-bar">
+            <div>
+              <div class="mockup-bar-title">FsE O 710 ZUE SK Etappe B ✎</div>
+              <div class="mockup-bar-sub">17 Standorte · ISP 1164803</div>
+            </div>
+            <div style="display:flex;gap:5px;">
+              <div class="mockup-btn">PHASE &nbsp;Bauprojekt ▾</div>
+              <div class="mockup-btn">?</div>
+              <div class="mockup-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+              <div class="mockup-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+            </div>
+          </div>
+          <div class="mockup-body">
+            <div style="display:flex;gap:14px;align-items:center;padding:10px;background:white;border-radius:7px;border:1px solid var(--border);margin-bottom:8px;">
+              <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#374151;">8</div><div style="font-size:9px;color:#9ca3af;">Geplant</div></div>
+              <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#9ca3af;">0</div><div style="font-size:9px;color:#9ca3af;">In Abklärung</div></div>
+              <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#4b5563;">0</div><div style="font-size:9px;color:#9ca3af;">Abgeschlossen</div></div>
+              <div style="flex:1;">
+                <div style="font-size:10px;color:#9ca3af;margin-bottom:3px;">Fortschritt: 0 / 8</div>
+                <div class="prog-bar"><div class="pb-g" style="width:0;"></div><div class="pb-a" style="width:0;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Kopfzeile</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>✎ Projekttitel</h4><p>Auf den Titel tippen um ihn umzubenennen. Der Name wird lokal gespeichert.</p></div>
+            <div class="feat-card"><h4>PHASE ▾</h4><p>Wechselt zwischen Baugrund, Bauprojekt und Ausführung — passt die sichtbaren Tabs und Sidebar-Inhalte an.</p></div>
+            <div class="feat-card"><h4>? Handbuch</h4><p>Öffnet dieses Benutzerhandbuch in einem neuen Tab.</p></div>
+            <div class="feat-card"><h4>↺ App neu laden</h4><p>Lädt die App neu und kehrt zur zuletzt geöffneten Ansicht zurück — ohne Datenverlust.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Ansichtsmodi</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>Kacheln</h4><p>Übersicht aller Standorte als Kacheln mit Status, KM, Massnahme und Tags.</p></div>
+            <div class="feat-card"><h4>Liste</h4><p>Tabellarische Ansicht mit Mehrfachauswahl und Bulk-Aktionen.</p></div>
+            <div class="feat-card"><h4>Karte</h4><p>Alle Standorte auf einer Übersichtskarte. Klick auf Marker öffnet Detailinfo.</p></div>
+            <div class="feat-card"><h4>Baugrund</h4><p>Nur in Phase Baugrund sichtbar. Zeigt RS/RKS-Dateneingabe und Schichtbeschriebe.</p></div>
+            <div class="feat-card"><h4>Termine</h4><p>Kalenderansicht aller erfassten Termine über alle Standorte.</p></div>
+            <div class="feat-card"><h4>Tags</h4><p>Gruppenansicht nach definierten Tags (T1–T12 oder benutzerdefiniert).</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Statusfilter &amp; Suche</h3>
+          <p>Mit <strong>Alle / Geplant / In Abklärung / Abgeschlossen</strong> werden nur Standorte des gewählten Status angezeigt. Die Suchleiste (Lupe) filtert nach Name, KM oder Mast-Nummer.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Rückgängig</h3>
+          <p>Der Button <strong>Rückgängig</strong> macht die letzte Datenmutation rückgängig (auch <code>Ctrl+Z</code> auf Desktop). Mehrere Stufen werden gespeichert.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · PHASEN -->
+    <div class="section" id="phasen">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <div><h2>Phasen</h2><p>Baugrund · Bauprojekt · Ausführung</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die App gliedert die Arbeit in drei Projektphasen. Die aktive Phase wird im Kopf-Dropdown gewählt und steuert, welche Tabs, Sidebar-Sektionen und Datenfelder sichtbar sind.</p>
+
+        <div class="phase-row">
+          <div class="phase-chip">Baugrund</div>
+          <div class="phase-chip active">Bauprojekt</div>
+          <div class="phase-chip">Ausführung</div>
+        </div>
+
+        <table class="data-table" style="margin-top:10px;">
+          <thead><tr><th>Phase</th><th>Zweck</th><th>Sichtbare Bereiche</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Baugrund</strong></td>
+              <td>Feldkampagne: RS/RKS-Sondierungen, Zugangspermits, Begehungen</td>
+              <td>Metadaten, Begehung, Termine, Zugang &amp; Abklärung, Sicherheit, Felddaten, Baugrund-Tab</td>
+            </tr>
+            <tr>
+              <td><strong>Bauprojekt</strong></td>
+              <td>Planung: Fundamenttypen festlegen, Baugrundparameter, Statische Nachweise</td>
+              <td>Metadaten, Begehung, Termine, Bauprojekt-Felder, Baugrundprofil, Naturschutz, Statik</td>
+            </tr>
+            <tr>
+              <td><strong>Ausführung</strong></td>
+              <td>Baustelle: Schicht-Zuweisung, Aushub, Material, Abnahmen</td>
+              <td>Metadaten, Ausführungsplanung, Aushubprotokoll, Abnahmen, Bauprogramm-Tab</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="info-box info-tip" style="margin-top:12px;">
+          <span class="ib-icon">i</span>
+          <span>Die Phase kann jederzeit gewechselt werden — alle Daten bleiben erhalten. Die Sidebar der Detailansicht aktualisiert sich sofort beim Phasenwechsel.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · STANDORTE -->
+    <div class="section" id="standorte">
+      <div class="section-header">
+        <div class="section-num">3</div>
+        <div><h2>Standorte verwalten</h2><p>Erstellen, bearbeiten, importieren</p></div>
+      </div>
+      <div class="section-body">
+
+        <div class="sub">
+          <h3>Neuen Standort anlegen</h3>
+          <ol class="steps">
+            <li><strong>+ Kachel antippen</strong>In der Kachelansicht die gestrichelte Kachel «Neuer Standort» antippen.</li>
+            <li><strong>Marker setzen</strong>RS-Marker und optional RKS- und BS-Marker auf der Karte positionieren.</li>
+            <li><strong>Felder ausfüllen</strong>KM, Mast-Nr., Gleis, Tagarbeit, Tiefe Soll, Massnahme und Zugang eintragen.</li>
+            <li><strong>Speichern</strong>Der Standort erscheint sofort in der Übersicht.</li>
+          </ol>
+        </div>
+
+        <div class="sub">
+          <h3>Standort bearbeiten</h3>
+          <p>In der Kachelansicht erscheinen beim Hover drei Buttons oben rechts:</p>
+          <div class="two-col">
+            <div class="feat-card"><h4>✏ Bearbeiten</h4><p>Öffnet die Erfassungsmaske mit den bestehenden Werten.</p></div>
+            <div class="feat-card"><h4>Tag zuweisen</h4><p>Schnelles Zuweisen eines Tags direkt auf der Kachel.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Import aus Fundamentliste (Excel)</h3>
+          <p>Über <strong>Einstellungen → Import</strong> kann eine SBB-Fundamentliste (<code>.xlsx</code> / <code>.xlsm</code>) importiert werden. Die App liest KM, Mast, Gleis, Massnahme, Fundamenttyp und Bodenkennwerte. RS/RKS/BS-Koordinaten werden beim Import <strong>nicht</strong> gesetzt — diese werden separat erfasst.</p>
+          <div class="info-box info-warn" style="margin-top:8px;">
+            <span class="ib-icon">!</span>
+            <span>Bei «OK» werden bestehende Daten ersetzt. «Abbrechen» fügt die importierten Standorte zu den bestehenden hinzu.</span>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Mehrfachauswahl (Listenansicht)</h3>
+          <p>In der Listenansicht können mehrere Standorte per Checkbox ausgewählt und gemeinsam bearbeitet werden: Status setzen, Tag zuweisen, Löschen.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 · DETAILANSICHT -->
+    <div class="section" id="detailansicht">
+      <div class="section-header">
+        <div class="section-num">4</div>
+        <div><h2>Detailansicht</h2><p>Sidebar + Karte für einen Standort</p></div>
+      </div>
+      <div class="section-body">
+        <p>Ein Tippen auf eine Kachel öffnet die Detailansicht: <strong>Sidebar links</strong> (Datenfelder) und <strong>Karte rechts</strong>. Die angezeigten Sektionen hängen von der aktiven Phase ab.</p>
+
+        <div class="sub">
+          <h3>Navigation</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>◀ Zurück / Weiter ▶</h4><p>Wechselt direkt zum vorherigen oder nächsten Standort ohne Rückkehr zur Übersicht.</p></div>
+            <div class="feat-card"><h4>▾ Dropdown</h4><p>Springt direkt zu einem bestimmten Standort aus der Liste.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Sidebar-Sektionen (nach Phase)</h3>
+          <table class="data-table">
+            <thead><tr><th>Sektion</th><th>Phase</th><th>Inhalt</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Metadaten</strong></td><td>Alle</td><td>KM (RS/RKS), Mast, Gleis, Tiefe Soll, Koordinaten</td></tr>
+              <tr><td><strong>Begehung</strong></td><td>Alle</td><td>Begehungsdatum, Fotos, Notizen</td></tr>
+              <tr><td><strong>Termine</strong></td><td>Alle</td><td>Einzel- und Serientermine, Briefe, Einladungen</td></tr>
+              <tr><td><strong>Zugang &amp; Abklärung</strong></td><td>Baugrund</td><td>Parzelle, Zugangsart, Kontakt, Nutzungsanfrage</td></tr>
+              <tr><td><strong>Sicherheit</strong></td><td>Baugrund</td><td>SiWä, Gleissperrung, Fahrstrom, PSA</td></tr>
+              <tr><td><strong>Felddaten</strong></td><td>Baugrund</td><td>RS/RKS/BS Messdaten, Schichtbeschrieb, Grundwasser</td></tr>
+              <tr><td><strong>Bauprojekt</strong></td><td>Bauprojekt</td><td>Massnahme, Fundamenttyp, Bodenprofil, Naturschutz</td></tr>
+              <tr><td><strong>Ausführungsplanung</strong></td><td>Ausführung</td><td>Baupaket, Schicht, Ausrüstung, betriebliche Einschränkungen</td></tr>
+              <tr><td><strong>Aushubprotokoll</strong></td><td>Ausführung</td><td>Schichten, Massen, Grundwasser, Bemerkungen</td></tr>
+              <tr><td><strong>Abnahme</strong></td><td>Ausführung</td><td>Abnahme-Checkliste und Unterschrift</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Sektionen anpassen</h3>
+          <p>Über den Button ganz links in der Navigationsleiste der Sidebar können Sektionen ein- und ausgeblendet und per Drag-and-drop neu angeordnet werden. Die Reihenfolge wird pro Gerät gespeichert und kann jederzeit zurückgesetzt werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Autosave</h3>
+          <p>Alle Eingaben werden <strong>sofort automatisch gespeichert</strong> — ohne Speichern-Button. Ein kurzes <code>Gespeichert</code>-Feedback erscheint nach jeder Änderung.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 · BEGEHUNG & FOTOS -->
+    <div class="section" id="begehung">
+      <div class="section-header">
+        <div class="section-num">5</div>
+        <div><h2>Begehung &amp; Fotos</h2><p>Standortbesichtigung dokumentieren</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die Sektion <strong>Begehung</strong> ist in allen Phasen verfügbar und dient der Dokumentation von Standortbegehungen.</p>
+
+        <div class="sub">
+          <h3>Begehungsdaten</h3>
+          <table class="data-table">
+            <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Datum</strong></td><td>Datum der Begehung (Datumsauswahl)</td></tr>
+              <tr><td><strong>Begeher</strong></td><td>Name des Begehers (aus Kontaktliste oder Freitext)</td></tr>
+              <tr><td><strong>Befund</strong></td><td>Kurzbeschreibung der Situation vor Ort</td></tr>
+              <tr><td><strong>Notiz</strong></td><td>Weitere Bemerkungen</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Fotos</h3>
+          <p>Über den Kamera-Button in der Sektionsleiste können Fotos direkt aufgenommen oder aus der Galerie geladen werden. Fotos werden als Base64 lokal gespeichert und sind im Export enthalten.</p>
+          <div class="info-box info-tip">
+            <span class="ib-icon">i</span>
+            <span>Fotos können mit einem langen Druck (oder Hover) beschriftet und gelöscht werden. Die Anzahl gespeicherter Fotos ist durch den verfügbaren LocalStorage begrenzt.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 · TERMINE -->
+    <div class="section" id="termine">
+      <div class="section-header">
+        <div class="section-num">6</div>
+        <div><h2>Termine</h2><p>Planung von Begehungen, Briefen und Einladungen</p></div>
+      </div>
+      <div class="section-body">
+        <p>Termine können pro Standort in der Sidebar-Sektion <strong>Termine</strong> erfasst werden oder phasenübergreifend im Tab <strong>Termine</strong> der Übersicht eingesehen werden.</p>
+
+        <div class="sub">
+          <h3>Termintypen</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>Begehung</h4><p>Ortsbesichtigung mit Datum, Begeher und Notiz.</p></div>
+            <div class="feat-card"><h4>Brief</h4><p>Schreiben an Grundeigentümer oder Behörden. Datum, Empfänger, Betreff.</p></div>
+            <div class="feat-card"><h4>Einladung</h4><p>Einladung zur Besprechung oder Abnahme mit Datum und Ort.</p></div>
+            <div class="feat-card"><h4>Allgemein</h4><p>Freitexttermin für beliebige Ereignisse.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>«Auf alle Standorte übernehmen»</h3>
+          <p>Für wiederkehrende Termine (z.B. Baustellenbesprechung) kann ein Termin per Button auf alle Standorte des Projekts kopiert werden.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 · ZUGANG & ABKLÄRUNG -->
+    <div class="section" id="zugang">
+      <div class="section-header">
+        <div class="section-num">7</div>
+        <div><h2>Zugang &amp; Abklärung</h2><p>Parzellen, Bewilligungen, Kontakte</p></div>
+      </div>
+      <div class="section-body">
+        <p>Diese Sektion ist in der Phase <strong>Baugrund</strong> sichtbar und dient der Erfassung von Zugangsinformationen für die Feldkampagne.</p>
+
+        <div class="sub">
+          <h3>Felder</h3>
+          <table class="data-table">
+            <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Parzelle (AV)</strong></td><td>Parzellennummer aus amtlicher Vermessung</td></tr>
+              <tr><td><strong>Grundeigentümer</strong></td><td>Name und Kontakt aus der Kontaktliste</td></tr>
+              <tr><td><strong>Zugangsart</strong></td><td>Fremdparzelle / Gleisbereich / öffentlich / SBB-eigen</td></tr>
+              <tr><td><strong>Nutzungsanfrage</strong></td><td>Status: ausstehend / eingereicht / bewilligt / abgelehnt</td></tr>
+              <tr><td><strong>Abklärung</strong></td><td>Status und Notiz zur laufenden Abklärung</td></tr>
+              <tr><td><strong>KM-Abschnitt</strong></td><td>Streckennummer und KM-Bereich</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Betriebliche Einschränkungen</h3>
+          <p>Checkliste der Sicherheitsvoraussetzungen für die Ausführung:</p>
+          <div class="two-col">
+            <div class="feat-card"><h4>Gleisgebunden</h4><p>Gleis muss für die Ausführung gesperrt werden.</p></div>
+            <div class="feat-card"><h4>Höhenbegrenzung</h4><p>Fahrleitung eingeschaltet — Höhenbegrenzung beachten.</p></div>
+            <div class="feat-card"><h4>Abschaltung FL</h4><p>Fahrleitung muss abgeschaltet werden.</p></div>
+            <div class="feat-card"><h4>Nachbargleis</h4><p>Benachbartes Gleis in Betrieb — Sicherung nötig.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8 · BAUPROJEKT -->
+    <div class="section" id="bauprojekt">
+      <div class="section-header">
+        <div class="section-num">8</div>
+        <div><h2>Bauprojekt</h2><p>Fundamenttypen, Bodenprofil, Statische Nachweise</p></div>
+      </div>
+      <div class="section-body">
+        <p>In der Phase <strong>Bauprojekt</strong> werden die Fundamentplanung und die Baugrundparameter pro Standort festgelegt.</p>
+
+        <div class="sub">
+          <h3>Massnahme</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>Neubau</h4><p>Neues Fundament wird erstellt.</p></div>
+            <div class="feat-card"><h4>Abbruch &amp; Neubau</h4><p>Bestehendes Fundament wird abgebrochen und durch neues ersetzt.</p></div>
+            <div class="feat-card"><h4>Abbruch</h4><p>Nur Abbruch des Bestandes ohne Neubau.</p></div>
+            <div class="feat-card"><h4>Bestand erhalten</h4><p>Kein Eingriff — Standort wird in Bauprogramm ausgeblendet.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Fundamenttyp</h3>
+          <p>Dem Standort wird ein <strong>Fundamenttyp-Profil</strong> aus der zentralen FT-Bibliothek zugewiesen (siehe Kapitel 12). Die Zuweisung erfolgt über das Dropdown oder per Kachelauswahl im Tab <strong>Fundamente</strong>.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Baugrundprofil</h3>
+          <p>Das Baugrundprofil enthält die geotechnischen Kennwerte (USCS, ME-Wert, Reibungswinkel, Raumlast, Kohäsion, Grundwasserstand). Profile können aus der Fundamentliste importiert oder manuell angelegt werden und stehen projektübergreifend zur Verfügung.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Statische Nachweise</h3>
+          <p>Im Tab <strong>Statische Nachweise</strong> können Berechnungsdokumente (Typ, Datum, Bearbeiter, Link) erfasst und verwaltet werden. Pro Standort sind mehrere Nachweise möglich.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Naturschutz</h3>
+          <p>Felder zur Erfassung von Naturschutzauflagen: Lebensraum, Massnahmen, Auflagen. Relevant für den Umweltnachweis.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9 · BAUGRUNDPHASE -->
+    <div class="section" id="baugrund">
+      <div class="section-header">
+        <div class="section-num">9</div>
+        <div><h2>Baugrundphase</h2><p>RS / RKS / BS Felddaten erfassen</p></div>
+      </div>
+      <div class="section-body">
+        <p>In der Phase <strong>Baugrund</strong> werden die Felddaten der Sondierungen (RS, RKS, BS) erfasst. Jede Sondierungsart hat eigene Felder und kann unabhängig aktiviert oder deaktiviert werden.</p>
+
+        <div class="sub">
+          <h3>Sondierungstypen</h3>
+          <table class="data-table">
+            <thead><tr><th>Kürzel</th><th>Bezeichnung</th><th>Spezifische Felder</th></tr></thead>
+            <tbody>
+              <tr><td><strong>RS</strong></td><td>Rammsondierung</td><td>Tiefe Ist, Abbruchgrund, Grundwasser, Bemerkung</td></tr>
+              <tr><td><strong>RKS</strong></td><td>Rammkernsondierung</td><td>Tiefe Ist, Abbruchgrund, Kerngewinn, Grundwasser, Schichtbeschrieb</td></tr>
+              <tr><td><strong>BS</strong></td><td>Baggerschlitz / Bodensondierung</td><td>Tiefe, Befund, Bemerkung</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Abbruchgründe</h3>
+          <p>Endtiefe erreicht · Hindernis · Fels · Geräteabbruch · Zugang · Sonstiges</p>
+        </div>
+
+        <div class="sub">
+          <h3>Koordinaten RS / RKS / BS</h3>
+          <p>Die Standortkoordinaten (LV95) werden <strong>separat</strong> über den jeweiligen Dateiimport oder per manueller Eingabe erfasst — <strong>nicht</strong> über die Fundamentliste. Auf der Detailkarte werden die gesetzten Marker (RS weiss, RKS rot, BS gelb) angezeigt.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Baugrund-Tab (Übersicht)</h3>
+          <p>Im Tab <strong>Baugrund</strong> der Übersicht sind alle Standorte tabellarisch mit ihren Felddaten aufgelistet. Export als Excel über die Export-Funktion möglich.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 · AUSFÜHRUNGSPLANUNG -->
+    <div class="section" id="ausfplanung">
+      <div class="section-header">
+        <div class="section-num">10</div>
+        <div><h2>Ausführungsplanung</h2><p>Schicht-Zuweisung und Betriebsplanung</p></div>
+      </div>
+      <div class="section-body">
+        <p>In der Phase <strong>Ausführung</strong> wird jedem Standort ein <strong>Baupaket</strong> und eine <strong>Schicht-Nummer</strong> zugewiesen. Die App berechnet daraus automatisch das Ausführungsdatum.</p>
+
+        <div class="sub">
+          <h3>Schicht-Zuweisung</h3>
+          <table class="data-table">
+            <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Baupaket</strong></td><td>Zuordnung zum Baupaket (z.B. «Block / Brunnen / Fels»)</td></tr>
+              <tr><td><strong>Schicht-Nr.</strong></td><td>Nummer der Nacht/Schicht innerhalb des Pakets (1 = erste Nacht)</td></tr>
+              <tr><td><strong>Datum</strong></td><td>Wird automatisch aus Paket-Startdatum + Schicht-Nr. + Sperrmuster berechnet</td></tr>
+              <tr><td><strong>Sperrmuster</strong></td><td>Definiert erlaubte Wochentage und Arbeitszeiten (z.B. Muster A: Mo–Fr, 23:00–05:00)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Mehrfachauswahl in der Schichtzuweisungs-Tabelle</h3>
+          <p>Zeilen können per Checkbox ausgewählt werden (Shift-Klick für Bereichsauswahl). Änderungen an Baupaket, Schicht-Nr. oder Bedingungen werden für alle markierten Zeilen gleichzeitig übernommen.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Betriebliche Einschränkungen pro Schicht</h3>
+          <p>Gleissperrung, Fahrstromunterbruch, Höhenbegrenzung und Nachbargleis-Sicherung können pro Standort separat gesetzt werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Auto-Zuweisung</h3>
+          <p>Der Button <strong>Auto-Pakete</strong> verteilt alle Standorte automatisch auf Pakete und Schichten basierend auf Kapazität, Sperrmuster und Vorarbeiten. Manuelle Zuweisungen bleiben erhalten.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11 · BAUPROGRAMM / GANTT -->
+    <div class="section" id="bauprogramm">
+      <div class="section-header">
+        <div class="section-num">11</div>
+        <div><h2>Bauprogramm / Gantt</h2><p>Zeitplanung und Terminübersicht</p></div>
+      </div>
+      <div class="section-body">
+        <p>Das Bauprogramm zeigt zwei Gantt-Diagramme: die <strong>Paket-Übersicht</strong> (oben) und die <strong>Fundamentebau-Ansicht</strong> (unten, pro Standort).</p>
+
+        <div class="sub">
+          <h3>Paket-Gantt (Bauprogramm-Übersicht)</h3>
+          <p>Jede Zeile entspricht einem Baupaket. Die Balken zeigen Start, Dauer und Auslastung:</p>
+          <div class="gantt-demo">
+            <div class="gantt-header">
+              <div>Paket</div><div>KW28</div><div>KW29</div><div>KW30</div><div>KW31</div><div>KW32</div><div>KW33</div><div>KW34</div><div>KW35</div>
+            </div>
+            <div class="gantt-row">
+              <div class="gantt-cell">Block / Fels</div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar" style="width:95%;"></div></div>
+              <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
+            </div>
+            <div class="gantt-row">
+              <div class="gantt-cell">Brunnen A</div>
+              <div class="gantt-cell"></div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar sat" style="width:95%;"></div></div>
+              <div class="gantt-cell"><div class="gantt-bar" style="width:95%;"></div></div>
+              <div class="gantt-cell"></div><div class="gantt-cell"></div>
+            </div>
+          </div>
+          <p style="margin-top:6px;font-size:11px;color:var(--muted);">Dunkle Bereiche = Schichten mit zugewiesenen Standorten. Helle Bereiche = freie Kapazität.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Fundamentebau-Gantt (pro Standort)</h3>
+          <p>Jede Zeile entspricht einem Standort. Der Balken zeigt das zugewiesene Ausführungsdatum sowie den Aushärte-Zeitraum. Sortierung nach Datum, KM oder Baugruppe wählbar — Standardsortierung: Datum.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Baupaket erstellen und bearbeiten</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>+ Baupaket</h4><p>Legt ein neues Paket an. Name, Farbe, Startdatum, Anzahl Nächte und Sperrmuster definieren.</p></div>
+            <div class="feat-card"><h4>Drag &amp; Drop</h4><p>Pakete können im Gantt direkt verschoben (Balken ziehen) oder verlängert/verkürzt werden (rechter Rand).</p></div>
+            <div class="feat-card"><h4>Abhängigkeiten</h4><p>Pakete können als Nachfolger eines anderen Pakets definiert werden. Bei Verschiebung eines Vorgängers werden Nachfolger automatisch angepasst (Kaskade).</p></div>
+            <div class="feat-card"><h4>Sperrmuster</h4><p>Definiert erlaubte Wochentage und Nettostunden. Das Muster steuert welche Kalendertage als Arbeitsnächte zählen.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Zoom-Stufen</h3>
+          <p>Tag · Woche · Monat · Jahr — über die Zoom-Buttons oben rechts im Gantt wählbar.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Meilensteine</h3>
+          <p>Über <strong>+ Meilenstein</strong> können Termine (z.B. FL-Montage, Inbetriebnahme) als Rauten-Marker im Gantt eingetragen werden.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12 · FUNDAMENTTYPEN -->
+    <div class="section" id="fundamenttypen">
+      <div class="section-header">
+        <div class="section-num">12</div>
+        <div><h2>Fundamenttypen</h2><p>FT-Profile und Leistungsprofile</p></div>
+      </div>
+      <div class="section-body">
+        <p>Der Tab <strong>Fundamente</strong> (in Phase Bauprojekt und Ausführung sichtbar) enthält die zentrale Bibliothek aller Fundamenttypen und Leistungsprofile des Projekts.</p>
+
+        <div class="sub">
+          <h3>Fundamenttyp-Profile (FT)</h3>
+          <p>Jeder Fundamenttyp definiert die geometrischen und technischen Eigenschaften eines Fundamenttyps:</p>
+          <table class="data-table">
+            <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Name / Typ</strong></td><td>Bezeichnung (z.B. «Blockfundament DP1a»)</td></tr>
+              <tr><td><strong>Fundamentart</strong></td><td>Blockfundament / Bohrpfahlfundament / Brunnen / Fels / Mehrpfahl</td></tr>
+              <tr><td><strong>Tiefe Soll</strong></td><td>Planmässige Fundationstiefe in Metern</td></tr>
+              <tr><td><strong>Schrauben</strong></td><td>Schraubentyp (M30 / M36 / ohne)</td></tr>
+              <tr><td><strong>Leistungsprofil</strong></td><td>Zugeordnetes Leistungsprofil (Kapazität pro Schicht)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Leistungsprofile (LP)</h3>
+          <p>Leistungsprofile definieren die Arbeitskapazität einer Maschine/Schicht. Sie werden Fundamenttypen zugewiesen und steuern die Auto-Zuweisung im Bauprogramm:</p>
+          <table class="data-table">
+            <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Name</strong></td><td>Bezeichnung (z.B. «Blockfundament Standard»)</td></tr>
+              <tr><td><strong>FT-Intervall</strong></td><td>Stunden pro Fundament (bestimmt Anzahl Fundamente pro Schicht)</td></tr>
+              <tr><td><strong>Fundamenttyp-Zuweisung</strong></td><td>Für welche FT-Typen dieses LP gilt</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Standard-Fundamenttypen</h3>
+          <p>Die App enthält vordefinierte Standard-FT (gemäss SBB-Fundamentliste). Diese können bearbeitet, aber nicht gelöscht werden. Eigene Spezial-FT können hinzugefügt werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>FT-Zuweisung zu Standorten</h3>
+          <p>In der Kachelansicht des Fundamente-Tabs können mehrere Standard-FT gleichzeitig ausgewählt und gemeinsam ein Leistungsprofil zugewiesen werden (<strong>Alle auswählen</strong> + Bulk-Zuweisung).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13 · KARTE -->
+    <div class="section" id="karte">
+      <div class="section-header">
+        <div class="section-num">13</div>
+        <div><h2>Karte</h2><p>Übersichtskarte und Standortmarker</p></div>
+      </div>
+      <div class="section-body">
+
+        <div class="sub">
+          <h3>Detailkarte (in der Detailansicht)</h3>
+          <p>Die rechte Hälfte der Detailansicht zeigt eine interaktive Karte mit den Markern des aktuellen Standorts:</p>
+          <table class="data-table">
+            <thead><tr><th>Marker</th><th>Farbe</th><th>Bedeutung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>RS</strong></td><td>Weiss / Blau</td><td>Rammsondierung — Maststandort (Rohrstock)</td></tr>
+              <tr><td><strong>RKS</strong></td><td>Rot / Rosa</td><td>Rammkernsondierung — Bohrstandort</td></tr>
+              <tr><td><strong>BS</strong></td><td>Gelb / Orange</td><td>Baggerschlitz / Bodensondierung</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;">Marker werden per Klick auf die Karte gesetzt (Modus-Wahl: RS / RKS / BS). Position kann durch Verschieben angepasst werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Übersichtskarte</h3>
+          <p>Im Tab <strong>Karte</strong> der Übersicht sind alle Standorte auf einer gemeinsamen Karte dargestellt. Farbe und Symbol zeigen den Status. Klick auf einen Marker öffnet eine Kurzinfo mit direktem Link zur Detailansicht.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Kartenebenen</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>Swisstopo Luftbild</h4><p>Hochauflösendes Orthofoto der Schweiz (Standard).</p></div>
+            <div class="feat-card"><h4>Swisstopo Karte</h4><p>Topografische Karte der Schweiz.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Skizze</h3>
+          <p>Über den Bleistift-Button in der Detailkarte kann eine Freihand-Skizze über das Kartenbild gelegt werden (Linie, Radierer, Farbwahl). Die Skizze wird pro Standort gespeichert.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Koordinaten map.geo.admin.ch</h3>
+          <p>Der Link <strong>→ map.geo.admin.ch öffnen</strong> in den Metadaten öffnet den Standort direkt im offiziellen Geoportal des Bundes.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14 · PROJEKTE -->
+    <div class="section" id="projekte">
+      <div class="section-header">
+        <div class="section-num">14</div>
+        <div><h2>Projekte</h2><p>Mehrere Projekte verwalten</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die App unterstützt mehrere unabhängige Projekte. Der Wechsel erfolgt über das Ordner-Symbol in der Kopfzeile.</p>
+
+        <div class="sub">
+          <h3>Projektliste</h3>
+          <p>Alle gespeicherten Projekte werden mit Name, Anzahl Standorte und letztem Änderungsdatum aufgelistet. Ein Klick wechselt das aktive Projekt.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Neues Projekt</h3>
+          <ol class="steps">
+            <li><strong>«+ Neues Projekt»</strong>Button in der Projektliste antippen.</li>
+            <li><strong>Name eingeben</strong>Projektname vergeben (z.B. «FsE O 710 Etappe C»).</li>
+            <li><strong>Optional: Fundamentliste importieren</strong>Direkt beim Erstellen eine Excel-Datei laden.</li>
+          </ol>
+        </div>
+
+        <div class="sub">
+          <h3>Projekt löschen</h3>
+          <p>Löscht alle Daten des Projekts unwiderruflich. Nur nach Bestätigung mit Projektnamen möglich.</p>
+          <div class="info-box info-warn">
+            <span class="ib-icon">!</span>
+            <span>Vor dem Löschen ein Backup als JSON exportieren (Kapitel 15).</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15 · EXPORT & BACKUP -->
+    <div class="section" id="export">
+      <div class="section-header">
+        <div class="section-num">15</div>
+        <div><h2>Export &amp; Backup</h2><p>Daten sichern und weitergeben</p></div>
+      </div>
+      <div class="section-body">
+
+        <div class="sub">
+          <h3>Exportformate</h3>
+          <table class="data-table">
+            <thead><tr><th>Format</th><th>Inhalt</th><th>Verwendung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Fundamentliste (Excel)</strong></td><td>KM, Mast, Koordinaten, Bodenparameter, Fundamenttyp</td><td>SBB-Standard, Weitergabe an Planer</td></tr>
+              <tr><td><strong>Schichtzuweisung (Excel)</strong></td><td>Alle Standorte mit Baupaket, Schicht, Datum, Einschränkungen</td><td>Ausführungsplanung, Bauleitung</td></tr>
+              <tr><td><strong>Baugrund (Excel)</strong></td><td>Felddaten RS/RKS/BS, Schichtbeschriebe</td><td>Geotechnischer Bericht</td></tr>
+              <tr><td><strong>Backup (JSON)</strong></td><td>Alle Projektdaten inkl. Fotos, Einstellungen</td><td>Vollsicherung, Gerätetransfer</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Backup wiederherstellen</h3>
+          <p>Eine gespeicherte JSON-Datei kann über <strong>Einstellungen → Backup wiederherstellen</strong> importiert werden. Dies überschreibt alle bestehenden Daten des aktiven Projekts.</p>
+          <div class="info-box info-tip">
+            <span class="ib-icon">i</span>
+            <span>Für den Wechsel zwischen zwei Geräten: Auf Gerät A exportieren (JSON), auf Gerät B die Datei importieren. Alle Daten inkl. Fotos werden übertragen.</span>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>PDF-Export</h3>
+          <p>Einzelne Standorte können als PDF-Bericht exportiert werden (Button in der Detailansicht). Das PDF enthält Metadaten, Felddaten, Skizze und Fotos.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 16 · EINSTELLUNGEN -->
+    <div class="section" id="einstellungen">
+      <div class="section-header">
+        <div class="section-num">16</div>
+        <div><h2>App-Einstellungen</h2><p>Projektkonfiguration und Darstellung</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die App-Einstellungen sind über das <strong>Zahnrad-Symbol</strong> <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>  in der Kopfzeile erreichbar.</p>
+
+        <div class="sub">
+          <h3>Projekteinstellungen</h3>
+          <table class="data-table">
+            <thead><tr><th>Einstellung</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Projektname / ISP</strong></td><td>Projekttitel und ISP-Nummer</td></tr>
+              <tr><td><strong>Baubeginn</strong></td><td>Frühester möglicher Ausführungsbeginn — Pakete davor werden rot markiert</td></tr>
+              <tr><td><strong>Feiertage berücksichtigen</strong></td><td>Schweizer Feiertage werden bei der Schicht-Datumsberechnung übersprungen</td></tr>
+              <tr><td><strong>Aushärtetage</strong></td><td>Standard-Aushärtezeit für Fundamente in Tagen (Standard: 28)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sub">
+          <h3>Sidebar-Reihenfolge</h3>
+          <p>Im Tab <strong>App-Einstellungen</strong> der Sidebar (erreichbar über den Gruppen-Button in der Detailansicht) können Sidebar-Sektionen per Drag-and-drop neu angeordnet und einzeln ein-/ausgeblendet werden. Mit <strong>Zurücksetzen</strong> wird die Standard-Reihenfolge wiederhergestellt.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Kontakte</h3>
+          <p>Zentrale Kontaktliste für Grundeigentümer, SiWä-Verantwortliche und weitere Beteiligte. Kontakte können Standorten in der Sektion «Zugang &amp; Abklärung» zugewiesen werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Baugruppen</h3>
+          <p>Standorte können thematisch in Baugruppen zusammengefasst werden (z.B. nach Losabschnitt). Baugruppen sind im Bauprogramm als Gruppierungsoption verfügbar.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 17 · DATENSPEICHERUNG -->
+    <div class="section" id="daten">
+      <div class="section-header">
+        <div class="section-num">17</div>
+        <div><h2>Datenspeicherung</h2><p>Lokale Speicherung und Datensicherheit</p></div>
+      </div>
+      <div class="section-body">
+        <p>Die App speichert alle Daten <strong>lokal im Browser</strong> (LocalStorage des Geräts). Es gibt keinen Server und keine Cloud-Anbindung.</p>
+
+        <div class="sub">
+          <h3>Speicherort</h3>
+          <div class="two-col">
+            <div class="feat-card"><h4>LocalStorage</h4><p>Alle Projektdaten, Einstellungen und Fotos werden im Browserspeicher des Geräts gehalten.</p></div>
+            <div class="feat-card"><h4>Kein Server</h4><p>Daten verlassen das Gerät nur durch den manuellen JSON-Export.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Wichtige Hinweise</h3>
+          <div class="info-box info-warn">
+            <span class="ib-icon">!</span>
+            <span>Browser-Cache leeren löscht alle App-Daten unwiderruflich. Regelmässige JSON-Backups sind zwingend empfohlen.</span>
+          </div>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span>Auf mobilen Geräten kann der Browser Speicher freigeben, wenn der Systemspeicher knapp wird. Fotos als Base64 können viel Speicher belegen — regelmässig exportieren.</span>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Speicherlimit</h3>
+          <p>Browser erlauben typischerweise 5–50 MB LocalStorage. Bei sehr vielen hochauflösenden Fotos kann dieses Limit erreicht werden. Die App zeigt eine Warnung wenn der Speicher unter 10 % der verfügbaren Kapazität fällt.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Geräteübergreifend arbeiten</h3>
+          <ol class="steps">
+            <li><strong>Auf Gerät A: Backup exportieren</strong>Einstellungen → Backup (JSON) → Datei speichern.</li>
+            <li><strong>Datei übertragen</strong>Per E-Mail, USB oder Cloud-Dienst auf Gerät B übertragen.</li>
+            <li><strong>Auf Gerät B: Backup importieren</strong>Einstellungen → Backup wiederherstellen → Datei auswählen.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.content -->
+</div><!-- /.layout -->
+
+<div class="page-footer">
+  Fundamentbau App &nbsp;·&nbsp; Benutzerhandbuch v2.0 &nbsp;·&nbsp; Alle Daten werden lokal gespeichert
+</div>
+
+</body>
+</html>
