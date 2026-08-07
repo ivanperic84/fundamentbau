@@ -281,11 +281,19 @@ function bahnKmAusPunkten(e, n, punkte, optionen) {
 function _bahnKarte(welche) {
   if (welche === 'detail') return leafletMap;
   if (welche === 'create') return createMapLeaflet;
+  if (welche === 'abnahme') return typeof _ckLeafletMap !== 'undefined' ? _ckLeafletMap : null;
   return overviewMap;
 }
 
 function bahnEbeneAktiv(welche) {
   return !!_bahnEbenen[welche]?.aktiv;
+}
+
+// Wird eine Karte abgeraeumt, sind auch ihre Ebenen weg. Ohne dieses
+// Vergessen gilt die Ebene beim naechsten Oeffnen als bereits aktiv und
+// bahnStandardAnwenden() legt sie nicht neu an.
+function bahnKarteVergessen(welche) {
+  delete _bahnEbenen[welche];
 }
 
 // Quellenangabe ein-/ausblenden. Die Erfassungskarte wird ohne
@@ -323,7 +331,7 @@ function bahnStandardAnwenden(welche) {
 // Auf allen offenen Karten anwenden — nach einer Aenderung in den Optionen
 function bahnOptionenAnwenden() {
   const an = ladeKartenOptionen().bahnAn;
-  ['overview', 'detail', 'create'].forEach(welche => {
+  ['overview', 'detail', 'create', 'abnahme'].forEach(welche => {
     if (!_bahnKarte(welche)) return;
     if (an !== bahnEbeneAktiv(welche)) bahnEbeneSetzen(welche, an);
     else if (an) bahnMarkenZeichnen(welche);

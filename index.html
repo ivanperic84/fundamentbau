@@ -771,6 +771,43 @@
   }
   .detail-fab:hover { background: #244a72; }
 
+  /* Standort-Navigation am oberen Kartenrand (nur im Vollbild).
+     Rechts bleibt Platz fuer die gestapelten Knoepfe Vollbild/GPS. */
+  .karte-nav-halter {
+    display: none;
+    position: absolute; z-index: 700;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    /* links die Zoomknoepfe von Leaflet, rechts Vollbild und GPS */
+    left: 52px; right: 50px;
+    pointer-events: none;
+  }
+  .detail-layout.map-fullscreen .karte-nav-halter,
+  .karte-nav-halter.offen { display: block; }
+  /* Uebersichtskarte: rechts stehen die Knoepfe weiter innen (right:30px) */
+  #ov-nav-halter { right: 72px; }
+  /* Im Bauprogramm-Vollbild sitzt nur der GPS-Knopf rechts (right:10px) */
+  #ov-nav-halter.im-bp-vollbild { right: 52px; }
+  .karte-nav-halter .pair-nav {
+    pointer-events: auto;
+    position: static; margin: 0 auto; max-width: 380px;
+    border-bottom: none; border-radius: 10px;
+    background: rgba(255,255,255,0.96);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  /* Gruppen auf-/zuklappen und Reihenfolge zuruecksetzen betreffen die
+     Seitenleiste — im Vollbild ist sie nicht da. */
+  /* !important, weil die Knoepfe ihr display inline tragen */
+  .karte-nav-halter .nur-seitenleiste { display: none !important; }
+
+  /* Dieselbe Zeile im dunklen Kopf der Abnahme-Checkliste — dort steht sie
+     im Textfluss, nicht ueber einer Karte. */
+  .karte-nav-leiste { flex-shrink: 0; min-width: 0; }
+  .karte-nav-leiste .pair-nav {
+    position: static; margin: 0; border-bottom: none; border-radius: 8px;
+    padding: 5px 6px; gap: 4px; background: rgba(255,255,255,0.96);
+    min-width: 220px;
+  }
+
   /* Karten-Vollbildmodus in der Detailansicht */
   .detail-layout.map-fullscreen .detail-sidebar { display: none; }
   .detail-layout.map-fullscreen .detail-main {
@@ -1481,7 +1518,8 @@
     </div>
     <span style="flex:1 1 auto;min-width:8px;"></span>
     <input class="kopf-suche" id="search-input" type="search" placeholder="Suchen…"
-           title="Standort suchen (Name, KM, Mast, Notiz)" oninput="onSearchInput(this.value)">
+           title="Standort suchen — Text sucht in Bezeichnung, Strecke, Fundamenttyp, Zugang, Kommentar, Schlagwort und Notizen; Zahlen gelten als Mast-/Positionsnummer oder Kilometer"
+           oninput="onSearchInput(this.value)">
   </div>
   <div style="display:flex;align-items:center;gap:8px;padding-left:20px;">
     <!-- Verlaufs-Navigation. Der frühere Knopf «Übersicht» stand daneben und
@@ -1652,6 +1690,13 @@
   <!-- Overview map -->
   <div id="overview-map-wrap">
     <div id="overview-map"></div>
+
+    <!-- Standort-Navigation am oberen Rand. Gleiche Bedienung wie in der
+         Detailansicht, nur springt sie hier auf der Karte von Standort zu
+         Standort, statt die Ansicht zu wechseln. Bei langen Perimetern ist
+         das der einzige zumutbare Weg zu einer bestimmten Position. -->
+    <!-- Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
+    <div class="karte-nav-halter offen" id="ov-nav-halter"></div>
 
     <!-- Top-right: Vollbild + GPS -->
     <div style="position:absolute;top:10px;right:30px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
@@ -2420,7 +2465,9 @@
 <div id="detail-view">
   <div class="detail-layout">
     <div class="detail-sidebar">
-      <div class="pair-nav">
+      <!-- id, weil es seit der Uebersichtskarte mehrere .pair-nav gibt und
+           pairNavUmhaengen() genau diese Zeile verschieben muss -->
+      <div class="pair-nav" id="detail-pair-nav">
         <button class="pair-nav-btn nur-symbol" id="prev-btn" onclick="navigatePair(-1)" title="Vorheriger Standort" aria-label="Vorheriger Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
         <!-- Der Standortname oeffnet eine Liste aller Standorte der Phase mit
              Suche — bei 25 Positionen ist Blaettern sonst der einzige Weg. -->
@@ -2437,14 +2484,14 @@
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="pair-nav-btn nur-symbol" id="next-btn" onclick="navigatePair(1)" title="Nächster Standort" aria-label="Nächster Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-          <button id="sb-collapse-all-btn" onclick="toggleAllSections()"
+          <button id="sb-collapse-all-btn" class="nur-seitenleiste" onclick="toggleAllSections()"
             title="Alle Gruppen auf-/zuklappen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;">
             <svg id="sb-collapse-all-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
-          <button onclick="resetSbOrder()" title="Gruppen-Reihenfolge zurücksetzen"
+          <button onclick="resetSbOrder()" class="nur-seitenleiste" title="Gruppen-Reihenfolge zurücksetzen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;line-height:1;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
         </div>
       </div>
@@ -3588,6 +3635,10 @@
           <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;line-height:1.4;">Kein Standort gesetzt<br><span style="font-size:11px;color:#9ca3af;">Koordinaten via <b>Bearbeiten</b> erfassen</span></p>
         </div>
         <canvas id="sketch-canvas" class="sketch-canvas"></canvas>
+        <!-- Aufnahme fuer die Standort-Navigation im Vollbild. Sie steht nur
+             im Vollbild bereit; die Zeile selbst wird aus der Seitenleiste
+             hierher gehaengt (pairNavUmhaengen). -->
+        <div id="karte-nav-halter" class="karte-nav-halter"></div>
         <!-- Vollbild + GPS top-right -->
         <button id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
         <button id="btn-gps-top" onclick="toggleGPS()" title="GPS"
@@ -5744,19 +5795,9 @@ function _ladeScript(pfad) {
       <div style="font-size:14px;font-weight:700;">Abnahme-Checkliste FL-Fundamente</div>
       <div id="ck-header-sub" style="font-size:11px;opacity:0.7;margin-top:1px;">—</div>
     </div>
-    <!-- Standort-Navigation -->
-    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-      <button id="ck-nav-prev" onclick="ckNavPrev()" title="Vorheriger Standort"
-        style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:11px;font-weight:600;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Standort
-      </button>
-      <button id="ck-nav-next" onclick="ckNavNext()" title="Nächster Standort"
-        style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:11px;font-weight:600;">
-        Standort
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-    </div>
+    <!-- Standort-Navigation — gleiche Zeile wie auf den Karten,
+         Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
+    <div id="ck-nav-halter" class="karte-nav-leiste"></div>
     <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
       <button id="ck-karte-btn" onclick="toggleCkKarte()" title="Situationskarte ein-/ausblenden"
         style="display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;font-size:11px;font-weight:600;cursor:pointer;">
@@ -8157,8 +8198,9 @@ function _ladeScript(pfad) {
   </div>
   <!-- Karte oben (versteckt bis Toggle) — #overview-map wird per JS hierhin verschoben -->
   <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;">
+    <!-- Masse und Rundung wie die Kartenknoepfe der uebrigen Ansichten -->
     <button id="btn-bp-fs-gps" onclick="toggleOverviewGPS()" title="GPS"
-      style="position:absolute;top:10px;right:10px;z-index:500;width:34px;height:34px;border-radius:8px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
+      style="position:absolute;top:10px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
   </div>

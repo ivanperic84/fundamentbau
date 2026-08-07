@@ -1177,37 +1177,15 @@ let _ckLastOrt      = '';   // Carry-over: letzter eingegebener Ort
 let _ckLastAnwesend = [];   // Carry-over: letzte Personen-Liste
 
 // ── Checkliste: Standort-Navigation ──────────────────────────────────────────
+// Die frueheren zwei Textknoepfe «‹ Standort / Standort ›» konnten nur
+// blaettern. Hier steht dieselbe Zeile wie auf den Karten: Pfeile, Name und
+// Sprungliste mit Suche — bei 25 Positionen der einzige zumutbare Weg.
 function updateCkNavButtons() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  const hasPrev = idx > 0;
-  const hasNext = idx !== -1 && idx < pairs.length - 1;
-  const prevPair = hasPrev ? pairs[idx - 1] : null;
-  const nextPair = hasNext ? pairs[idx + 1] : null;
-  const pairLabel = p => p ? (p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'Nr. ' + p.id)) : '';
-
-  const prevBtn = document.getElementById('ck-nav-prev');
-  if (prevBtn) {
-    prevBtn.style.opacity = hasPrev ? '1' : '0.35';
-    prevBtn.title = hasPrev ? '← ' + pairLabel(prevPair) : 'Kein vorheriger Standort';
-  }
-  const nextBtn = document.getElementById('ck-nav-next');
-  if (nextBtn) {
-    nextBtn.style.opacity = hasNext ? '1' : '0.35';
-    nextBtn.title = hasNext ? pairLabel(nextPair) + ' →' : 'Kein nächster Standort';
-  }
-}
-
-function ckNavPrev() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  if (idx > 0) openCheckliste(pairs[idx - 1].id);
-}
-
-function ckNavNext() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  if (idx !== -1 && idx < pairs.length - 1) openCheckliste(pairs[idx + 1].id);
+  karteNavAufbauen('ck-nav-halter', {
+    liste:  () => getFilteredSorted(),
+    waehle: p => openCheckliste(p.id),
+    aktiv:  () => _ckPairId,
+  })?.aktualisieren();
 }
 
 // ── Checkliste: Situationskarte ───────────────────────────────────────────────
@@ -1227,8 +1205,12 @@ function initCkMap() {
   }
   const pair   = PAIRS.find(p => p.id === _ckPairId);
   const center = pair ? pairCenter(pair) : { lat: 47.37, lng: 8.55 };
-  _ckLeafletMap = L.map('ck-karte', { zoomControl: true, attributionControl: false }).setView([center.lat, center.lng], 19);
+  // Quellenangabe wie auf den uebrigen Karten — swisstopo und, sobald die
+  // Bahnebene dazukommt, data.sbb.ch (Nutzungsbedingungen Ziffer 4.1).
+  _ckLeafletMap = L.map('ck-karte', { zoomControl: true }).setView([center.lat, center.lng], 19);
   _ckTileLayer  = makeTile(detailBaseLayerKey || 'swiss-luft').addTo(_ckLeafletMap);
+  // Kilometrierung ist gerade auf der Abnahmekarte die nuetzlichste Ebene
+  if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('abnahme'), 60);
   _updateCkMapCenter();
 }
 
@@ -1285,6 +1267,7 @@ function destroyCkMap() {
   if (_ckPairMarker) { _ckPairMarker.remove(); _ckPairMarker = null; }
   _ckNeighbourMarkers.forEach(m => m.remove()); _ckNeighbourMarkers = [];
   if (_ckLeafletMap) { _ckLeafletMap.remove(); _ckLeafletMap = null; }
+  if (typeof bahnKarteVergessen === 'function') bahnKarteVergessen('abnahme');
   _ckTileLayer = null;
 }
 

@@ -2983,6 +2983,17 @@ function _moveFsMap() {
     initOverviewMap();
   }
   pane.insertBefore(mapEl, pane.firstChild);
+  // Die Standort-Navigation gehoert zur Karte, nicht zum Uebersichtskasten —
+  // sonst bliebe sie beim Verschieben zurueck und man koennte im Vollbild
+  // keinen Mast mehr anfahren.
+  const nav = document.getElementById('ov-nav-halter');
+  if (nav) {
+    pane.appendChild(nav);
+    nav.classList.add('im-bp-vollbild');
+    // Wer direkt ins Bauprogramm geht, hat die Uebersichtskarte nie geoeffnet
+    // — die Zeile ist dann noch leer.
+    ovNavAktualisieren();
+  }
   mapEl.style.height       = '100%';
   mapEl.style.width        = '100%';
   mapEl.style.borderRadius = '0';
@@ -3003,6 +3014,8 @@ function _restoreFsMap() {
   const wrap  = document.getElementById('overview-map-wrap');
   if (!mapEl || !wrap) return;
   wrap.insertBefore(mapEl, wrap.firstChild);
+  const nav = document.getElementById('ov-nav-halter');
+  if (nav) { wrap.appendChild(nav); nav.classList.remove('im-bp-vollbild'); }
   mapEl.style.height       = '';
   mapEl.style.width        = '';
   mapEl.style.borderRadius = '';

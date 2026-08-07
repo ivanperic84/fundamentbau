@@ -732,6 +732,7 @@ function setOverviewView(view) {
   if (view==='karte') {
     const mapWasInit = !!overviewMap;
     initOverviewMap();
+    ovNavAktualisieren();
     setTimeout(resizeOverviewMap, 50);
     setTimeout(() => {
       // Karte auf Standorte der aktuellen Phase zentrieren
@@ -2621,7 +2622,159 @@ function zoomToOverviewGPS() {
   if (overviewGpsMarker && overviewMap) overviewMap.setView(overviewGpsMarker.getLatLng(), 17);
 }
 
+// ============================================================
+// STANDORT-NAVIGATION AUF KARTEN
+// ============================================================
+// Pfeile, Beschriftung und Sprungliste — dieselbe Bedienung wie in der
+// Seitenleiste der Detailansicht. Die Zeile wird gebaut, nicht abgeschrieben:
+// sie steht auf der Uebersichtskarte und in der Abnahme-Checkliste, und beide
+// tun beim Anwaehlen etwas anderes (Karte anfahren bzw. Checkliste laden).
+const KARTE_NAV_PFEIL = r =>
+  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"`
+  + ` stroke-linecap="round" stroke-linejoin="round"><polyline points="${r}"/></svg>`;
+
+const _karteNavs = {};
+
+// opt: { liste(), waehle(pair), name(pair), aktiv() }
+function karteNavAufbauen(halterId, opt) {
+  const halter = document.getElementById(halterId);
+  if (!halter) return null;
+  const nav = _karteNavs[halterId];
+  if (nav) return nav;
+
+  halter.innerHTML =
+     '<div class="pair-nav">'
+   +   '<button class="pair-nav-btn nur-symbol" data-nav="-1" title="Vorheriger Standort" aria-label="Vorheriger Standort">' + KARTE_NAV_PFEIL('15 18 9 12 15 6') + '</button>'
+   +   '<div class="pair-jump-wrap">'
+   +     '<button class="pair-jump-btn" data-nav-label title="Standort wählen">'
+   +       '<span>Standort wählen</span>'
+   +       '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+   +     '</button>'
+   +     '<div class="pair-jump-panel">'
+   +       '<input class="pair-jump-such" type="search" placeholder="Standort suchen…">'
+   +       '<div class="pair-jump-liste"></div>'
+   +     '</div>'
+   +   '</div>'
+   +   '<button class="pair-nav-btn nur-symbol" data-nav="1" title="Nächster Standort" aria-label="Nächster Standort">' + KARTE_NAV_PFEIL('9 18 15 12 9 6') + '</button>'
+   + '</div>';
+
+  const el = {
+    prev:  halter.querySelector('[data-nav="-1"]'),
+    next:  halter.querySelector('[data-nav="1"]'),
+    label: halter.querySelector('[data-nav-label] span'),
+    knopf: halter.querySelector('[data-nav-label]'),
+    panel: halter.querySelector('.pair-jump-panel'),
+    such:  halter.querySelector('.pair-jump-such'),
+    liste: halter.querySelector('.pair-jump-liste'),
+  };
+  const name = opt.name || (p => p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id));
+  let markiert = 0;
+
+  const aktualisieren = () => {
+    const liste = opt.liste();
+    const i = liste.findIndex(p => p.id === opt.aktiv());
+    el.label.textContent = i < 0 ? 'Standort wählen' : `${name(liste[i])} / ${liste.length}`;
+    el.prev.disabled = el.next.disabled = !liste.length;
+  };
+
+  const zuklappen = () => el.panel.classList.remove('offen');
+
+  const listeZeichnen = filter => {
+    const q = (filter || '').trim();
+    const notAll = q ? loadAllNotizen() : {};
+    const bpAll  = q && typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+    const treffer = opt.liste().filter(p => !q || sucheTrifftStandort(p, q, notAll, bpAll));
+    markiert = 0;
+    if (!treffer.length) {
+      el.liste.innerHTML = '<div class="pair-jump-leer">Kein Standort gefunden</div>';
+      return;
+    }
+    el.liste.innerHTML = treffer.map((p, i) => {
+      const km = p.km_rs || p.km_rks;
+      return '<button class="pair-jump-eintrag'
+        + (p.id === opt.aktiv() ? ' aktiv' : '')
+        + (i === 0 ? ' markiert' : '') + '" data-pair="' + p.id + '">'
+        + '<span>' + escHtml(name(p)) + '</span>'
+        + (km ? '<span class="pj-neben">' + escHtml(parseFloat(km).toFixed(3)) + '</span>' : '')
+        + '</button>';
+    }).join('');
+    el.liste.querySelectorAll('[data-pair]').forEach(btn => {
+      btn.onclick = () => {
+        zuklappen();
+        const ziel = opt.liste().find(p => String(p.id) === btn.dataset.pair);
+        if (ziel) { opt.waehle(ziel); aktualisieren(); }
+      };
+    });
+    el.liste.querySelector('.pair-jump-eintrag.aktiv')?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const gehe = richtung => {
+    const liste = opt.liste();
+    if (!liste.length) return;
+    const i = liste.findIndex(p => p.id === opt.aktiv());
+    // Ohne bisherige Wahl beim ersten bzw. letzten Standort einsteigen
+    const ziel = i < 0 ? (richtung > 0 ? 0 : liste.length - 1)
+                       : (i + richtung + liste.length) % liste.length;
+    opt.waehle(liste[ziel]);
+    aktualisieren();
+  };
+
+  el.prev.onclick = () => gehe(-1);
+  el.next.onclick = () => gehe(1);
+  el.knopf.onclick = ev => {
+    ev.stopPropagation();
+    if (!el.panel.classList.toggle('offen')) return;
+    el.such.value = '';
+    el.such.focus();
+    listeZeichnen('');
+  };
+  el.such.oninput = () => listeZeichnen(el.such.value);
+  el.such.onkeydown = ev => {
+    const eintraege = [...el.liste.querySelectorAll('.pair-jump-eintrag')];
+    if (ev.key === 'Escape') { zuklappen(); return; }
+    if (!eintraege.length) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); eintraege[markiert]?.click(); return; }
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    eintraege[markiert]?.classList.remove('markiert');
+    markiert = (markiert + (ev.key === 'ArrowDown' ? 1 : -1) + eintraege.length) % eintraege.length;
+    eintraege[markiert].classList.add('markiert');
+    eintraege[markiert].scrollIntoView({ block: 'nearest' });
+  };
+
+  _karteNavs[halterId] = { aktualisieren, zuklappen };
+  aktualisieren();
+  return _karteNavs[halterId];
+}
+
+// Klick daneben schliesst jede offene Sprungliste
+document.addEventListener('click', e => {
+  if (e.target.closest('.pair-jump-wrap')) return;
+  Object.values(_karteNavs).forEach(n => n.zuklappen());
+});
+
+// ── Uebersichtskarte ─────────────────────────────────────────
+let _ovNavId = null;
+
+function ovNavZeigeStandort(pair) {
+  const eintrag = overviewMarkers.find(m => m.pairId === pair.id);
+  const marker  = eintrag?.rs || eintrag?.rks || eintrag?.bs;
+  if (!marker || !overviewMap) return;
+  _ovNavId = pair.id;
+  overviewMap.setView(marker.getLatLng(), Math.max(overviewMap.getZoom(), 17));
+  marker.openPopup();
+}
+
+function ovNavAktualisieren() {
+  karteNavAufbauen('ov-nav-halter', {
+    liste:  () => getFilteredSorted(),
+    waehle: ovNavZeigeStandort,
+    aktiv:  () => _ovNavId,
+  })?.aktualisieren();
+}
+
 function refreshOverviewMap() {
+  ovNavAktualisieren();
   // Sondagen-Marker nur in der Baugrundphase anzeigen
   if (_activePhase !== 'baugrund') {
     if (!overviewMap) { initOverviewMap(); setTimeout(resizeOverviewMap, 50); }

@@ -1231,6 +1231,49 @@ function refreshCurrentView() {
   else if (currentOverviewView === 'karte') refreshOverviewMap();
 }
 
+// ── Suche im Kopf ────────────────────────────────────────────
+// Reine Zahlen gelten als Mast-/Positionsnummer oder Kilometer. Eine
+// Volltextsuche nach «4» traefe sonst Jahreszahlen in Notizen, Koordinaten,
+// Artikelnummern — praktisch jeden Standort.
+const SUCHE_ZAHL      = /^\d+(?:[.,]\d+)?$/;
+const SUCHE_ZAHL_TEIL = /\d+(?:[.,]\d+)?/g;
+// Kilometer sind auf 10 m angeschrieben; wer «0.27» eingibt, meint diese Marke
+const SUCHE_KM_TOLERANZ = 0.05;
+
+function _zahl(s) { return parseFloat(String(s).replace(',', '.')); }
+
+function _sucheTrifftZahl(p, q) {
+  const wert = _zahl(q);
+  if (String(p.id) === q) return true;
+  const ausText = feld => (String(feld || '').match(SUCHE_ZAHL_TEIL) || []).some(z => _zahl(z) === wert);
+  if (ausText(p.mast) || ausText(p.bezeichnung)) return true;
+  return [p.km_rs, p.km_rks].some(km =>
+    km !== null && km !== undefined && km !== '' && Math.abs(_zahl(km) - wert) < SUCHE_KM_TOLERANZ);
+}
+
+// Alles, was am Standort haengt, in einen Text — damit die Suche nicht nur
+// Bezeichnung und Mast findet, sondern auch Strecke, Fundamenttyp, Zugang,
+// Kommentar, Schlagworte, Bauprojektangaben und Notizen.
+function _sucheText(p, notAll, bpAll) {
+  const pd = getPairData(p.id);
+  const bp = bpAll[p.id] || {};
+  return [
+    p.bezeichnung, 'Standort ' + p.id, p.mast, p.strecke, p.streckennr,
+    p.fundtyp, p.zugang, p.bemerkung, p.massnahme, p.bestand,
+    pd.comment, typeof statusLabel === 'function' ? statusLabel(pd.status) : pd.status,
+    ...(pd.tags || []).map(id => (customTags.find(t => t.id === id) || {}).name),
+    ...Object.values(bp).filter(v => typeof v === 'string' || typeof v === 'number'),
+    ...(notAll[p.id] || []).map(n => n.text),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function sucheTrifftStandort(p, roh, notAll, bpAll) {
+  const q = String(roh || '').trim().toLowerCase();
+  if (!q) return true;
+  if (SUCHE_ZAHL.test(q)) return _sucheTrifftZahl(p, q);
+  return _sucheText(p, notAll || {}, bpAll || {}).includes(q);
+}
+
 function getFilteredSorted() {
   // Nur Standorte der aktuellen Phase anzeigen (Installationen nie in der normalen Kachelansicht)
   let list = _activePhase === 'baugrund'
@@ -1239,16 +1282,10 @@ function getFilteredSorted() {
   if (currentFilter !== 'alle') list = list.filter(p => getPairData(p.id).status === currentFilter);
   if (activeTagFilter) list = list.filter(p => (getPairData(p.id).tags || []).includes(activeTagFilter));
   if (searchQuery) {
-    const q      = searchQuery.toLowerCase();
+    // Notizen und Bauprojektdaten einmal je Durchgang laden, nicht je Standort
     const notAll = loadAllNotizen();
-    list = list.filter(p =>
-      (p.bezeichnung||'').toLowerCase().includes(q) ||
-      ('standort '+p.id).includes(q) ||
-      String(p.mast).toLowerCase().includes(q) ||
-      String(p.km_rs).includes(q) ||
-      (p.zugang||'').toLowerCase().includes(q) ||
-      (notAll[p.id] || []).some(n => n.text.toLowerCase().includes(q))
-    );
+    const bpAll  = typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+    list = list.filter(p => sucheTrifftStandort(p, searchQuery, notAll, bpAll));
   }
   if (currentSort === 'name')   list.sort((a,b) => _listSortDir * (a.bezeichnung||'Standort '+a.id).localeCompare(b.bezeichnung||'Standort '+b.id, 'de'));
   if (currentSort === 'tag')    list.sort((a,b) => { const da = tagDates[a.tag]||'9999'; const db = tagDates[b.tag]||'9999'; return _listSortDir * (da < db ? -1 : da > db ? 1 : 0); });
