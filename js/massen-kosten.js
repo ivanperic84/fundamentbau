@@ -67,11 +67,19 @@ const MASSEN_GROESSEN = [
   { id: 'aushub',     label: 'Aushub',            einheit: 'm³'  },
   { id: 'schalung',   label: 'Schalung',          einheit: 'm²'  },
   { id: 'bewehr',     label: 'Bewehrung',         einheit: 'kg'  },
-  { id: 'schraub',    label: 'Fundamentschrauben',einheit: 'Stk' },
+  // Materiell Teil der Bewehrung, abgerechnet aber nach Stueck
+  { id: 'schraub',    label: 'Schrauben',         einheit: 'Stk',
+    hinweis: 'Fundamentschrauben — materiell Teil der Bewehrung, abgerechnet nach Stück' },
   // Pfaehle werden nach Stueck und Bohrmeter abgerechnet, nicht nach Volumen
   { id: 'pfahlStk',   label: 'Pfähle',            einheit: 'Stk' },
   { id: 'pfahlMeter', label: 'Pfahllänge',        einheit: 'm'   },
 ];
+
+// Spalten, die nur erscheinen, wenn sie eine Menge tragen. Pfahl- und
+// Ankerangaben betreffen wenige Projekte; leer mitgeschleppt kosten sie in
+// der Tabelle nur Breite. «Fundamente» bleibt immer stehen.
+const _mkSpaltenSichtbar = (summen) =>
+  MASSEN_GROESSEN.filter(g => g.id === 'anzahl' || (Number(summen[g.id]) || 0) > 0);
 
 // Groessen, die als ganze Zahl angeschrieben werden
 const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'bewehr']);
@@ -404,10 +412,24 @@ function lvMenge(zeile, summen) {
   return zeile.menge || 0;
 }
 
-// Schichten ueber alle Fundamenttypen, aus den Aufwandswerten. Das ist die
-// Groesse, an der die zeitabhaengigen Positionen haengen.
-function schichtenGesamt() {
+// Anzahl Schichten — die Groesse, an der die zeitabhaengigen Positionen
+// haengen. Massgebend ist das BAUPROGRAMM, sobald Baupakete terminiert sind:
+// dort steckt der Abzug fuer Installation und Anfahrt und die Nettodauer des
+// Sperrmusters, und ein Bauprogramm muss ohnehin vorgaengig gerechnet werden.
+// Die Rechnung aus den Aufwandswerten ist der Vorgriff darauf, solange kein
+// Programm steht.
+function schichtenBauprogramm() {
+  const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
+  const n = pakete.reduce((s, p) => s + (Number(p.anzahlNaechte) || 0), 0);
+  return n > 0 ? n : null;
+}
+
+function schichtenAufwandGesamt() {
   return lkVergleich().reduce((s, z) => s + (z.schichtenAufwand || 0), 0);
+}
+
+function schichtenGesamt() {
+  return schichtenBauprogramm() ?? schichtenAufwandGesamt();
 }
 
 // ── Darstellung ──────────────────────────────────────────────
@@ -517,9 +539,26 @@ function _mkLwTabelle() {
          ${td(sumAufwand, true)}
        </tr></tfoot>
      </table>`
+    + _mkSchichtQuelle(sumAufwand)
     + (ohneWert ? `<div style="padding:8px 14px;font-size:11px;color:#b45309;border-top:1px solid #f0f2f5;">`
         + `${ohneWert} Fundament(e) ohne Leistungswert im Katalog — Spezialtypen sind dort nicht als Position geführt. `
         + `Aufwandswert von Hand setzen.</div>` : '');
+}
+
+// Woher die Schichten kommen, die das Verzeichnis verrechnet. Der Unterschied
+// gehoert offen hingeschrieben: aus dem Bauprogramm ist es die terminierte
+// Zahl, aus den Aufwandswerten die geschaetzte.
+function _mkSchichtQuelle(sumAufwand) {
+  const bp = schichtenBauprogramm();
+  const abzug = mkAbzugStunden();
+  const abzugText = abzug ? ` · Abzug Installation und Anfahrt ${_mkZahl(abzug * 60, 0)} min je Schicht` : '';
+  return `<div style="padding:8px 14px;font-size:11px;color:#6b7280;border-top:1px solid #f0f2f5;">`
+    + (bp != null
+        ? `Massgebend für das Verzeichnis: <b>${bp} Schichten aus dem Bauprogramm</b> `
+          + `(${sumAufwand} aus den Aufwandswerten)${abzugText}`
+        : `Massgebend für das Verzeichnis: <b>${sumAufwand} Schichten aus den Aufwandswerten</b> — `
+          + `sobald Baupakete terminiert sind, gilt das Bauprogramm${abzugText}`)
+    + '</div>';
 }
 
 function _mkKennzahlen(summen, zeilen) {
@@ -553,24 +592,28 @@ function _mkMassenTabelle(zeilen, summen, gliederung) {
   // Die Spalten kommen aus MASSEN_GROESSEN — eine neue Groesse erscheint
   // damit von selbst in Tabelle, Summenzeile und Verzeichnis.
   const wert = (z, g) => _mkZahl(z[g.id], MASSEN_GANZ.has(g.id) ? 0 : 1);
+  const spalten = _mkSpaltenSichtbar(summen);
+  const weg = MASSEN_GROESSEN.filter(g => !spalten.includes(g)).map(g => g.label);
   el.innerHTML =
     `<table style="width:100%;border-collapse:collapse;font-size:12px;">
        <thead><tr style="background:#f9fafb;">
          <th style="text-align:left;padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">${kopf}</th>
-         ${MASSEN_GROESSEN.map(g =>
-           `<th style="text-align:right;padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${g.label}<br><span style="font-weight:400;text-transform:none;">${g.einheit}</span></th>`).join('')}
+         ${spalten.map(g =>
+           `<th ${g.hinweis ? `title="${escHtml(g.hinweis)}"` : ''} style="text-align:right;padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${g.label}<br><span style="font-weight:400;text-transform:none;">${g.einheit}</span></th>`).join('')}
        </tr></thead>
        <tbody>
          ${zeilen.map(z => `<tr>
            ${zelle(escHtml(z.name) + (z.fehlend ? ` <span title="${z.fehlend} Standort(e) ohne rechenbare Menge" style="color:#b45309;">·</span>` : ''))}
-           ${MASSEN_GROESSEN.map(g => zelle(wert(z, g), true)).join('')}
+           ${spalten.map(g => zelle(wert(z, g), true)).join('')}
          </tr>`).join('')}
        </tbody>
        <tfoot><tr style="background:#f9fafb;font-weight:700;">
          ${zelle('Total')}
-         ${MASSEN_GROESSEN.map(g => zelle(wert(summen, g), true)).join('')}
+         ${spalten.map(g => zelle(wert(summen, g), true)).join('')}
        </tr></tfoot>
-     </table>`;
+     </table>`
+    + (weg.length ? `<div style="padding:7px 12px;font-size:10px;color:#9ca3af;border-top:1px solid #f0f2f5;">`
+        + `Ohne Menge, deshalb ausgeblendet: ${escHtml(weg.join(', '))}</div>` : '');
 }
 
 function _mkLvTabelle(summen) {
@@ -586,6 +629,7 @@ function _mkLvTabelle(summen) {
     el.innerHTML = '<div style="padding:22px;text-align:center;font-size:12px;color:#9ca3af;line-height:1.6;">'
       + 'Leistungsverzeichnis über <b>LV einlesen</b> laden<br>'
       + '<span style="font-size:11px;">Erwartet werden Spalten für Positionsnummer, Text, Einheit, Menge und Einheitspreis.</span></div>';
+    _mkInstBasis(new Map());
     _mkSummenZeile(0);
     return;
   }
@@ -606,11 +650,7 @@ function _mkLvTabelle(summen) {
        ${MASSEN_GROESSEN.map(g => `<option value="${g.id}"${z.herkunft === g.id ? ' selected' : ''}>${g.label}</option>`).join('')}
      </select>`;
 
-  let total = 0;
-  const zeilenHtml = positionen.map(z => {
-    const menge  = lvMenge(z, summen);
-    const betrag = menge * (z.preis || 0);
-    total += betrag;
+  const zeileHtml = (z, menge, betrag) => {
     const gebunden = z.herkunft === 'schicht' || !!(z.herkunft && summen[z.herkunft] != null);
     return `<tr>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${eingabe(z.id,'pos',z.pos,'70px')}</td>
@@ -629,7 +669,48 @@ function _mkLvTabelle(summen) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button></td>
     </tr>`;
-  }).join('');
+  };
+
+  // Nach Kapitel gruppiert — die ersten drei Ziffern der Positionsnummer.
+  // Die Zwischensumme je Kapitel ist die Groesse, die in der Zusammenstellung
+  // gebraucht wird; die Abschnitte darunter tragen die Installationsbasis.
+  const gruppen = new Map();
+  const abschnitte = new Map();
+  let total = 0;
+  positionen.forEach(z => {
+    const menge  = lvMenge(z, summen);
+    const betrag = menge * (z.preis || 0);
+    total += betrag;
+    const g = _lvGruppe(z.pos);
+    if (!gruppen.has(g.kapitel)) gruppen.set(g.kapitel, { summe: 0, zeilen: [] });
+    const eintrag = gruppen.get(g.kapitel);
+    eintrag.summe += betrag;
+    eintrag.zeilen.push(zeileHtml(z, menge, betrag));
+    if (!abschnitte.has(g.abschnitt)) abschnitte.set(g.abschnitt, { summe: 0, anzahl: 0 });
+    const a = abschnitte.get(g.abschnitt);
+    a.summe += betrag;
+    a.anzahl++;
+  });
+
+  const sortiert = [...gruppen.keys()].sort((a, b) =>
+    (a === '—') - (b === '—') || Number(a) - Number(b));
+  const koerper = gruppen.size < 2
+    ? sortiert.map(k => gruppen.get(k).zeilen.join('')).join('')
+    : sortiert.map(k => {
+        const g = gruppen.get(k);
+        return `<tr style="background:#f9fafb;">
+            <td colspan="8" style="padding:6px 10px;font-size:10px;font-weight:700;color:#374151;
+                text-transform:uppercase;letter-spacing:.05em;border-top:1px solid #e5e7eb;">Gruppe ${escHtml(k)}</td>
+          </tr>`
+          + g.zeilen.join('')
+          + `<tr>
+              <td colspan="6" style="padding:5px 10px;text-align:right;font-size:11px;color:#6b7280;
+                  border-bottom:1px solid #e5e7eb;">Zwischensumme ${escHtml(k)}</td>
+              <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;
+                  border-bottom:1px solid #e5e7eb;">${_mkZahl(g.summe)}</td>
+              <td style="border-bottom:1px solid #e5e7eb;"></td>
+            </tr>`;
+      }).join('');
 
   const th = (t, rechts) =>
     `<th style="text-align:${rechts ? 'right' : 'left'};padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t}</th>`;
@@ -638,9 +719,80 @@ function _mkLvTabelle(summen) {
        <thead><tr style="background:#f9fafb;">
          ${th('Pos.')}${th('Bezeichnung')}${th('Einheit')}${th('Menge', true)}${th('Menge aus')}${th('Einheitspreis', true)}${th('Betrag', true)}${th('')}
        </tr></thead>
-       <tbody>${zeilenHtml}</tbody>
+       <tbody>${koerper}</tbody>
      </table>`;
+  _mkInstBasis(abschnitte);
   _mkSummenZeile(total);
+}
+
+// ── Basis der Baustelleninstallation ─────────────────────────
+// Die Installation wird nicht frei geschaetzt, sondern aus den uebrigen
+// Baukosten hergeleitet. Nicht alles zaehlt dazu: die Installation selbst
+// nicht, das Personal und die Sicherheitsausruestung ebenfalls nicht — sonst
+// bemaesse sich die Installation an sich selbst. Der Anwender kann jeden
+// Abschnitt zu- und abwaehlen; die Vorgabe folgt der ueblichen Abgrenzung.
+const LV_INST_KEY = () => 'sp_lv_instbasis__' + _activeId;
+const INST_AUS_VORGABE = ['100.100', '100.200', '100.600'];
+
+function loadInstAus() {
+  try { return jsonParse(store.getItem(LV_INST_KEY())) || INST_AUS_VORGABE.slice(); }
+  catch { return INST_AUS_VORGABE.slice(); }
+}
+
+function instAbschnittUmschalten(abschnitt) {
+  const aus = loadInstAus();
+  const i = aus.indexOf(abschnitt);
+  if (i < 0) aus.push(abschnitt); else aus.splice(i, 1);
+  store.setItem(LV_INST_KEY(), JSON.stringify(aus));
+  renderMassenView();
+}
+
+// «1001110122» → Kapitel 100, Abschnitt 100.100 (erste Ziffer der
+// Hauptposition, wie in der Zusammenstellung)
+function _lvGruppe(pos) {
+  const z = String(pos || '').replace(/\D/g, '');
+  if (z.length < 4) return { kapitel: '—', abschnitt: '—' };
+  const kapitel = z.slice(0, 3);
+  return { kapitel, abschnitt: kapitel + '.' + z[3] + '00' };
+}
+
+function _mkInstBasis(abschnitte) {
+  const el = document.getElementById('mk-instbasis');
+  if (!el) return;
+  if (!abschnitte.size) { el.innerHTML = ''; return; }
+
+  const aus = loadInstAus();
+  const keys = [...abschnitte.keys()].sort((a, b) =>
+    (a === '—') - (b === '—') || a.localeCompare(b, 'de', { numeric: true }));
+  let basis = 0;
+  const zeilen = keys.map(k => {
+    const a = abschnitte.get(k);
+    const drin = !aus.includes(k);
+    if (drin) basis += a.summe;
+    return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;
+                 color:${drin ? '#374151' : '#9ca3af'};cursor:pointer;">
+        <input type="checkbox" ${drin ? 'checked' : ''} onchange="instAbschnittUmschalten('${k}')"
+               style="margin:0;cursor:pointer;">
+        <span style="font-variant-numeric:tabular-nums;flex:0 0 62px;">${escHtml(k)}</span>
+        <span style="flex:0 0 78px;color:#9ca3af;">${a.anzahl} Pos.</span>
+        <span style="flex:1 1 auto;text-align:right;font-variant-numeric:tabular-nums;">${_mkZahl(a.summe)}</span>
+      </label>`;
+  }).join('');
+
+  el.innerHTML =
+    `<div style="padding:10px 14px;">
+       <div style="font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
+         Baukosten für die Ermittlung der Baustelleninstallation</div>
+       <div style="max-width:420px;">${zeilen}
+         <div style="display:flex;gap:8px;border-top:1px solid #e5e7eb;margin-top:5px;padding-top:5px;
+                     font-size:12px;font-weight:700;color:#1a3a5c;">
+           <span style="flex:1 1 auto;">Summe</span>
+           <span style="font-variant-numeric:tabular-nums;">${_mkZahl(basis)}</span></div>
+       </div>
+       <div style="font-size:10px;color:#9ca3af;margin-top:5px;">
+         Abgewählte Abschnitte zählen nicht mit — die Installation, das Personal und die
+         Sicherheitsausrüstung bemessen sich nicht an sich selbst.</div>
+     </div>`;
 }
 
 function _mkSummenZeile(netto) {
@@ -901,9 +1053,17 @@ function lwAufwand(ftId) {
   const e = loadFtLeistungswerte()[ftId];
   return e?.eigenH ?? e?.vorschlagH ?? null;
 }
+// Rüstzeit: eigener Wert, sonst der hergeleitete, sonst der Abzug fuer
+// Installation und Anfahrt aus dem Bauprogramm — dieselbe Zeit, hier in
+// Stunden statt Minuten.
 function lwRuestzeit(ftId) {
   const e = loadFtLeistungswerte()[ftId];
-  return e?.eigenRuest ?? e?.vorschlagRuest ?? null;
+  return e?.eigenRuest ?? e?.vorschlagRuest ?? mkAbzugStunden();
+}
+
+function mkAbzugStunden() {
+  const min = typeof loadProjEinst === 'function' ? loadProjEinst().abzugMinuten : null;
+  return Number(min) > 0 ? Number(min) / 60 : null;
 }
 
 // Leistungswert eines Typs bei der gewaehlten Intervalldauer
@@ -956,7 +1116,7 @@ function lkVergleich() {
       lw,
       schichtenKatalog: lw ? Math.ceil(z.anzahl / lw) : null,
       vorschlagH:     eintrag.vorschlagH ?? null,
-      vorschlagRuest: eintrag.vorschlagRuest ?? null,
+      vorschlagRuest: eintrag.vorschlagRuest ?? mkAbzugStunden(),
       eigenH:         eintrag.eigenH ?? null,
       eigenRuest:     eintrag.eigenRuest ?? null,
       aufwand, ruest,
