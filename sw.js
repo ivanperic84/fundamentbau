@@ -50,6 +50,7 @@ const APP_MODULE = [
   'js/termine-planung.js',
   'js/listen-bsp.js',
   'js/bahn.js',
+  'js/massen-kosten.js',
   'js/start.js',
 ];
 

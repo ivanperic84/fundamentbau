@@ -635,14 +635,21 @@ function bannerProjektZeigen(zeigen) {
   if (titel) titel.classList.toggle('eingeklappt', !zeigen);
   const btn = document.getElementById('projekte-btn-wrap');
   if (btn) btn.style.visibility = zeigen ? '' : 'hidden';
-  // Das Suchfeld im Kopf filtert die Standortliste. In der Erfassungsansicht
-  // steht es unmittelbar ueber dem Suchfeld der Karte, das etwas ganz anderes
-  // tut — beim Absetzen eines Punktes stiftet das nur Verwirrung.
-  const suche = document.getElementById('search-input');
-  if (suche) {
-    const erfassen = document.getElementById('create-view')?.style.display === 'block';
-    suche.style.display = erfassen ? 'none' : '';
-  }
+  kopfSucheSichtbarkeit();
+}
+
+// Das Suchfeld im Kopf gehoert zu den Standortansichten: es filtert Kacheln
+// und Liste und waehlt auf der Karte einen Standort an. In der Detailansicht,
+// in der Erfassung und in den Bereichen hat es nichts zu tun — dort stand es
+// nur herum oder, beim Erfassen, ueber dem Suchfeld der Karte.
+function kopfSucheSichtbarkeit() {
+  const wrap = document.getElementById('kopf-such-wrap');
+  if (!wrap) return;
+  const sichtbar = ['karten', 'liste', 'karte'].includes(currentOverviewView)
+    && document.getElementById('overview-view')?.style.display !== 'none'
+    && document.getElementById('create-view')?.style.display !== 'block';
+  wrap.style.display = sichtbar ? '' : 'none';
+  if (!sichtbar && typeof kopfSuchSchliessen === 'function') kopfSuchSchliessen();
 }
 
 // Kurzes Einblenden eines gerade sichtbar gemachten Kastens. Die Klasse wird
@@ -664,6 +671,7 @@ const OV_INHALT_IDS = {
   baugrund: 'baugrund-wrap', fundamente: 'fundtyp-wrap',
   installationen: 'installationen-wrap', termine: 'termine-wrap',
   protokolle: 'protokolle-wrap', bauprogramm: 'bauprogramm-tab-wrap',
+  massen: 'massen-wrap',
 };
 
 function setOverviewView(view) {
@@ -674,7 +682,7 @@ function setOverviewView(view) {
     return;
   }
   currentOverviewView = view;
-  ['karten','liste','karte','baugrund','fundamente','installationen','termine','protokolle','bauprogramm'].forEach(v => {
+  ['karten','liste','karte','baugrund','fundamente','installationen','termine','protokolle','bauprogramm','massen'].forEach(v => {
     const btn = document.getElementById('vbtn-'+v);
     if (btn) btn.classList.toggle('active', v===view);
   });
@@ -696,6 +704,8 @@ function setOverviewView(view) {
   if (protokolleEl) protokolleEl.style.display = view==='protokolle' ? 'block' : 'none';
   const bpTabEl = document.getElementById('bauprogramm-tab-wrap');
   if (bpTabEl) bpTabEl.style.display = view==='bauprogramm' ? 'block' : 'none';
+  const mkEl = document.getElementById('massen-wrap');
+  if (mkEl) mkEl.style.display = view==='massen' ? 'block' : 'none';
   const btnNeu = document.getElementById('btn-neu');
   if (btnNeu) btnNeu.style.display = view === 'karten' ? 'none' : '';
   // Überschrift «Standorte», Filterleiste und Fortschrittsbalken beziehen sich
@@ -752,6 +762,8 @@ function setOverviewView(view) {
   if (view==='termine')       renderTermineView();
   if (view==='protokolle') { renderAbnahmeListView(); renderAushubView(); }
   if (view==='bauprogramm') renderBauprogrammTab();
+  if (view==='massen') renderMassenView();
+  kopfSucheSichtbarkeit();
   ansichtEinblenden(document.getElementById(OV_INHALT_IDS[view]));
   // Notizen-Sektion immer zuunterst aktualisieren
   renderNotizSection();

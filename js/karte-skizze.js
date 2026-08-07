@@ -148,9 +148,12 @@ function nordZeichenUmschalten() {
   else                                       karteDrehungSetzen(0);
 }
 
+// Das Zeichen sass unten rechts, dicht am Schnellnotiz-Knopf und am Rand, wo
+// der Daumen liegt. Jetzt steht es oben rechts unter der Knopfspalte, mit
+// deutlichem Abstand zum GPS-Knopf (siehe .nord-zeichen in index.html).
 function nordZeichenAnlegen(karte) {
   if (!L.Control || karte._nordZeichen) return;
-  const ctrl = L.control({ position: 'bottomright' });
+  const ctrl = L.control({ position: 'topright' });
   ctrl.onAdd = () => {
     const el = L.DomUtil.create('div', 'nord-zeichen');
     el.title = 'Nach Norden ausrichten (nochmals: zurück zur gewählten Drehung)';
