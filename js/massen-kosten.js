@@ -220,6 +220,118 @@ function massenSummen(zeilen) {
 }
 
 // ── Leistungsverzeichnis ─────────────────────────────────────
+// ── Positionsvorlage aus dem Zusammenstellungsblatt ──────────
+// Das Zusammenstellungsblatt fuehrt die Positionen, die bei diesen Arbeiten
+// ueblicherweise anfallen: Installationen, Personal, Sicherung, Abbruch,
+// Kabelkanal, Fundamente. Es liefert damit die AUSWAHL — welche davon im
+// Projekt gebraucht werden und mit welcher Menge, entscheidet der Anwender.
+const LV_VORLAGE_KEY = 'sp_lv_vorlage';
+
+function loadLvVorlage() {
+  try { return jsonParse(store.getItem(LV_VORLAGE_KEY)) || []; } catch { return []; }
+}
+
+// Die Positionsnummer steht in vier Spalten nebeneinander (Kapitel,
+// Hauptposition, Unterposition, Variante) und wird zum Schluessel verkettet —
+// so steht sie auch im Katalog.
+function lvVorlageAusPuffer(puffer) {
+  const wb = XLSX.read(puffer, { type: 'array' });
+  const blattName = wb.SheetNames.find(n => /mengen|zusammenstell/i.test(n)) || wb.SheetNames[0];
+  const roh = XLSX.utils.sheet_to_json(wb.Sheets[blattName], { header: 1, defval: '' });
+  const katalog = loadLkKatalog();
+
+  // Kopfzeile: die Zeile mit «Beschrieb» und «LE»
+  let kopf = roh.findIndex(z => z.some(c => /beschrieb/i.test(String(c))));
+  if (kopf < 0) throw new Error('Im Blatt «' + blattName + '» fehlt die Kopfzeile mit «Beschrieb».');
+  const norm = roh[kopf].map(c => String(c || '').trim().toLowerCase());
+  const sp = {
+    text:    norm.findIndex(c => c.includes('beschrieb')),
+    einheit: norm.findIndex(c => c === 'le' || c.includes('einheit')),
+    pos:     norm.findIndex(c => c.includes('lk-position') || c.includes('lk position')),
+  };
+
+  const eintraege = [];
+  roh.slice(kopf + 1).forEach(z => {
+    // Vier Spalten ab der LK-Position bilden den Schluessel
+    if (sp.pos < 0) return;
+    const teile = [0, 1, 2, 3].map(i => String(z[sp.pos + i] ?? '').trim());
+    if (!/^\d{3}$/.test(teile[0])) return;
+    const schluessel = teile.join('');
+    const ausKatalog = katalog?.positionen.find(p => p.id === schluessel);
+    const text = String(z[sp.text] ?? '').trim() || ausKatalog?.text || '';
+    if (!text) return;
+    eintraege.push({
+      pos:     schluessel,
+      text:    text.replace(/\s+/g, ' ').slice(0, 160),
+      einheit: String(z[sp.einheit] ?? '').trim() || ausKatalog?.einheit || '',
+      preis:   ausKatalog?.preis ?? null,
+    });
+  });
+  if (!eintraege.length) throw new Error('Keine Positionen mit Positionsnummer erkannt.');
+  store.setItem(LV_VORLAGE_KEY, JSON.stringify(eintraege));
+  return eintraege.length;
+}
+
+function lvVorlageImport(input) {
+  const datei = input.files?.[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onload = e => {
+    try {
+      const n = lvVorlageAusPuffer(e.target.result);
+      renderMassenView();
+      ui.toast(n + ' Positionen als Vorlage übernommen', 'erfolg');
+    } catch (err) { ui.toast(err.message, 'fehler'); }
+    input.value = '';
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+// Auswahlfeld: Positionen der Vorlage ins Verzeichnis uebernehmen
+function lvVorlagePanelUmschalten(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('mk-vorlage-panel');
+  if (!panel) return;
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  const vorlage = loadLvVorlage();
+  if (!vorlage.length) {
+    ui.toast('Noch keine Vorlage eingelesen — «Positionen einlesen».', 'fehler');
+    return;
+  }
+  const drin = new Set(loadLvPositionen().map(z => z.pos));
+  panel.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;">Position übernehmen</div>'
+    + '<div style="max-height:320px;overflow-y:auto;">'
+    + vorlage.map((v, i) =>
+        `<button onclick="lvAusVorlage(${i})" ${drin.has(v.pos) ? 'disabled' : ''}
+           style="display:block;width:100%;text-align:left;padding:5px 7px;border:none;border-radius:6px;
+                  background:none;font-size:11px;font-family:inherit;cursor:pointer;
+                  color:${drin.has(v.pos) ? '#c7cdd4' : '#374151'};"
+           onmouseover="if(!this.disabled)this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+           <span style="font-variant-numeric:tabular-nums;color:#9ca3af;">${escHtml(v.pos)}</span>
+           ${escHtml(v.text.slice(0, 70))}
+         </button>`).join('')
+    + '</div>';
+  panel.style.display = 'block';
+}
+
+function lvAusVorlage(index) {
+  const v = loadLvVorlage()[index];
+  if (!v) return;
+  const liste = loadLvPositionen();
+  liste.push({ id: 'lv_' + Date.now().toString(36), pos: v.pos, text: v.text,
+               einheit: v.einheit, menge: 0, preis: v.preis || 0, herkunft: '' });
+  saveLvPositionen(liste);
+  document.getElementById('mk-vorlage-panel').style.display = 'none';
+  renderMassenView();
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#mk-vorlage-panel') || e.target.closest('#mk-vorlage-btn')) return;
+  const panel = document.getElementById('mk-vorlage-panel');
+  if (panel) panel.style.display = 'none';
+});
+
 function lvZeileNeu() {
   const liste = loadLvPositionen();
   liste.push({ id: 'lv_' + Date.now().toString(36), pos: '', text: '',
@@ -243,10 +355,20 @@ async function lvZeileLoeschen(id) {
   renderMassenView();
 }
 
-// Menge einer Position: aus dem Massenauszug, wenn eine Herkunft gesetzt ist
+// Menge einer Position. Drei Herkuenfte:
+//   ''          von Hand — die Zahl steht in der Zeile (globale Angabe)
+//   'schicht'   Anzahl Schichten (Bauleitung, Sicherung, Maschinen je Nacht)
+//   <Groesse>   eine Groesse des Massenauszugs
 function lvMenge(zeile, summen) {
+  if (zeile.herkunft === 'schicht') return schichtenGesamt();
   if (zeile.herkunft && summen[zeile.herkunft] != null) return summen[zeile.herkunft];
   return zeile.menge || 0;
+}
+
+// Schichten ueber alle Fundamenttypen, aus den Aufwandswerten. Das ist die
+// Groesse, an der die zeitabhaengigen Positionen haengen.
+function schichtenGesamt() {
+  return lkVergleich().reduce((s, z) => s + (z.schichtenAufwand || 0), 0);
 }
 
 // ── Darstellung ──────────────────────────────────────────────
@@ -310,21 +432,31 @@ function _mkLwTabelle() {
   const td = (inhalt, rechts, stil) =>
     `<td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;${rechts ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}${stil || ''}">${inhalt}</td>`;
 
-  let sumKatalog = 0, sumPlanung = 0, ohneWert = 0;
+  // Vorschlagswerte stehen grau daneben, gerechnet wird mit dem eigenen Wert.
+  // Ein leeres Feld heisst «Vorschlag gilt» — deshalb steht der Vorschlag als
+  // Platzhalter im Feld und nicht als vorbelegter Inhalt: sonst waere nicht zu
+  // unterscheiden, was der Anwender gesetzt hat und was hergeleitet ist.
+  const grau = t => `<span style="color:#9ca3af;">${t}</span>`;
+  const feld = (ftId, name, wert, platzhalter) =>
+    `<input type="number" step="0.05" min="0" value="${wert ?? ''}"
+            placeholder="${platzhalter != null ? _mkZahl(platzhalter, 2) : ''}"
+            onchange="lwEigenSetzen('${ftId}','${name}',this.value)"
+            style="width:66px;padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;
+                   font-size:12px;font-family:inherit;text-align:right;font-variant-numeric:tabular-nums;">`;
+
+  let sumKatalog = 0, sumAufwand = 0, ohneWert = 0;
   const koerper = zeilen.map(z => {
     if (z.schichtenKatalog != null) sumKatalog += z.schichtenKatalog; else ohneWert += z.anzahl;
-    if (z.schichtenPlanung != null) sumPlanung += z.schichtenPlanung;
-    const abw = (z.schichtenKatalog != null && z.schichtenPlanung != null)
-      ? z.schichtenPlanung - z.schichtenKatalog : null;
+    if (z.schichtenAufwand != null) sumAufwand += z.schichtenAufwand;
     return `<tr>
       ${td(escHtml(z.name))}
       ${td(z.anzahl, true)}
-      ${td(z.lw != null ? z.lw : '<span style="color:#b45309;">—</span>', true)}
-      ${td(z.schichtenKatalog != null ? z.schichtenKatalog : '—', true, 'font-weight:600;')}
-      ${td(z.stdJeFund != null ? _mkZahl(z.stdJeFund, 1) : '—', true)}
-      ${td(z.schichtenPlanung != null ? z.schichtenPlanung : '—', true)}
-      ${td(abw == null ? '—' : (abw > 0 ? '+' + abw : abw), true,
-           abw ? 'color:#b45309;font-weight:600;' : 'color:#9ca3af;')}
+      ${td(z.lw != null ? grau(z.lw) : grau('—'), true)}
+      ${td(z.schichtenKatalog != null ? grau(z.schichtenKatalog) : grau('—'), true)}
+      ${td(z.vorschlagH != null ? grau(_mkZahl(z.vorschlagH, 2)) : grau('—'), true)}
+      ${td(z.ftId ? feld(z.ftId, 'eigenH', z.eigenH, z.vorschlagH) : '', true)}
+      ${td(z.ftId ? feld(z.ftId, 'eigenRuest', z.eigenRuest, z.vorschlagRuest) : '', true)}
+      ${td(z.schichtenAufwand != null ? z.schichtenAufwand : '—', true, 'font-weight:600;')}
     </tr>`;
   }).join('');
 
@@ -332,21 +464,23 @@ function _mkLwTabelle() {
     `<table style="width:100%;border-collapse:collapse;font-size:12px;">
        <thead><tr style="background:#f9fafb;">
          ${th('Fundamenttyp')}${th('Anzahl', true)}
-         ${th('LE/Schicht', true, 'Schichtleistung aus dem Katalog bei der gewählten Intervalldauer')}
-         ${th('Schichten Katalog', true, 'aufgerundet: Anzahl ÷ Leistungswert')}
-         ${th('h/Fundament', true, 'Ausführungsdauer aus der Typenbibliothek oder dem Leistungsprofil')}
-         ${th('Schichten Planung', true, 'aus der Ausführungsdauer und der Intervalldauer')}
-         ${th('Abweichung', true, 'Planung minus Katalog')}
+         ${th('LE/Schicht', true, 'Schichtleistung aus dem Katalog bei der gewählten Intervalldauer — nur zur Ansicht')}
+         ${th('Schichten daraus', true, 'aufgerundet: Anzahl ÷ Schichtleistung — nur zur Ansicht')}
+         ${th('h/Fund. herg.', true, 'Aus den Schichtleistungen hergeleiteter Aufwandswert (Steigung der Ausgleichsgeraden)')}
+         ${th('h/Fundament', true, 'Eigener Aufwandswert. Leer = hergeleiteter Wert gilt.')}
+         ${th('Rüstzeit h', true, 'Fixe Zeit je Schicht: Sperrpause, Sicherung einrichten, Räumen. Leer = hergeleiteter Wert gilt.')}
+         ${th('Schichten', true, 'aufgerundet: Anzahl × Aufwandswert ÷ (Intervalldauer − Rüstzeit)')}
        </tr></thead>
        <tbody>${koerper}</tbody>
        <tfoot><tr style="background:#f9fafb;font-weight:700;">
-         ${td('Total')}${td(zeilen.reduce((s, z) => s + z.anzahl, 0), true)}${td('')}
-         ${td(sumKatalog, true)}${td('')}${td(sumPlanung, true)}
-         ${td(sumPlanung - sumKatalog > 0 ? '+' + (sumPlanung - sumKatalog) : (sumPlanung - sumKatalog), true)}
+         ${td('Total')}${td(zeilen.reduce((s, z) => s + z.anzahl, 0), true)}
+         ${td('')}${td(grau(sumKatalog), true)}${td('')}${td('')}${td('')}
+         ${td(sumAufwand, true)}
        </tr></tfoot>
      </table>`
     + (ohneWert ? `<div style="padding:8px 14px;font-size:11px;color:#b45309;border-top:1px solid #f0f2f5;">`
-        + `${ohneWert} Fundament(e) ohne Leistungswert im Katalog — Spezialtypen sind dort nicht als Position geführt.</div>` : '');
+        + `${ohneWert} Fundament(e) ohne Leistungswert im Katalog — Spezialtypen sind dort nicht als Position geführt. `
+        + `Aufwandswert von Hand setzen.</div>` : '');
 }
 
 function _mkKennzahlen(summen, zeilen) {
@@ -429,6 +563,7 @@ function _mkLvTabelle(summen) {
              title="Menge aus dem Massenauszug übernehmen"
              style="padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-family:inherit;background:white;">
        <option value="">von Hand</option>
+       <option value="schicht"${z.herkunft === 'schicht' ? ' selected' : ''}>Anzahl Schichten</option>
        ${MASSEN_GROESSEN.map(g => `<option value="${g.id}"${z.herkunft === g.id ? ' selected' : ''}>${g.label}</option>`).join('')}
      </select>`;
 
@@ -437,14 +572,14 @@ function _mkLvTabelle(summen) {
     const menge  = lvMenge(z, summen);
     const betrag = menge * (z.preis || 0);
     total += betrag;
-    const gebunden = !!(z.herkunft && summen[z.herkunft] != null);
+    const gebunden = z.herkunft === 'schicht' || !!(z.herkunft && summen[z.herkunft] != null);
     return `<tr>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${eingabe(z.id,'pos',z.pos,'70px')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${eingabe(z.id,'text',z.text,'100%')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${eingabe(z.id,'einheit',z.einheit,'52px')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">
         ${gebunden
-          ? `<span title="aus dem Massenauszug" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(menge, 1)}</span>`
+          ? `<span title="${z.herkunft === 'schicht' ? 'Anzahl Schichten aus den Aufwandswerten' : 'aus dem Massenauszug'}" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(menge, 1)}</span>`
           : eingabe(z.id,'menge',z.menge,'80px','zahl')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${herkunftWahl(z)}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">${eingabe(z.id,'preis',z.preis,'90px','zahl')}</td>
@@ -653,6 +788,35 @@ function _lkTypAusBeschrieb(text) {
   return m ? { familie: m[1].toLowerCase(), tiefe: parseFloat(m[2].replace(',', '.')) } : null;
 }
 
+// Aus den Schichtleistungen den Aufwandswert herleiten.
+//
+// Die Katalogzahlen sind kein Zufall: sie entstehen aus einer festen Ruestzeit
+// je Schicht und einer Arbeitszeit je Fundament. Traegt man die Intervalldauer
+// ueber die Schichtleistung auf, liegen die Punkte auf einer Geraden
+//
+//     Intervalldauer = Ruestzeit + Aufwandswert × Schichtleistung
+//
+// Steigung und Achsenabschnitt einer Ausgleichsgeraden liefern damit beide
+// Groessen. Fuer DP1a ergibt das rund 0.8 h je Fundament bei 1.8 h Ruestzeit.
+// Der Wert ist ein VORSCHLAG — die Katalogzahlen sind ausgehandelte
+// Mindestwerte, nicht zwingend die Planungswerte des Anwenders.
+function _lwAufwandHerleiten(lw) {
+  const punkte = [];
+  lw.forEach((wert, i) => {
+    if (wert != null && wert > 0) punkte.push({ x: wert, y: LK_INTERVALLE[i] });
+  });
+  if (punkte.length < 2) return null;
+  const n  = punkte.length;
+  const mx = punkte.reduce((s, p) => s + p.x, 0) / n;
+  const my = punkte.reduce((s, p) => s + p.y, 0) / n;
+  const sxy = punkte.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0);
+  const sxx = punkte.reduce((s, p) => s + (p.x - mx) ** 2, 0);
+  if (!sxx) return null;
+  const aufwand = sxy / sxx;
+  if (!(aufwand > 0)) return null;
+  return { aufwand, ruestzeit: Math.max(0, my - aufwand * mx) };
+}
+
 function lkLeistungswerteZuweisen() {
   const katalog = loadLkKatalog();
   if (!katalog) return 0;
@@ -667,11 +831,40 @@ function lkLeistungswerteZuweisen() {
       return k && k.familie === gesucht.familie && Math.abs(k.tiefe - gesucht.tiefe) < 0.005;
     });
     if (!pos) return;
-    werte[ft.id] = { lkPos: pos.id, lw: pos.lw, text: pos.text };
+    const herleitung = _lwAufwandHerleiten(pos.lw);
+    // Ein bereits gesetzter eigener Wert bleibt stehen — ein erneuter Import
+    // darf die Planungswerte des Anwenders nicht ueberfahren.
+    werte[ft.id] = {
+      ...(werte[ft.id] || {}),
+      lkPos: pos.id, lw: pos.lw, text: pos.text,
+      vorschlagH:     herleitung ? Math.round(herleitung.aufwand   * 100) / 100 : null,
+      vorschlagRuest: herleitung ? Math.round(herleitung.ruestzeit * 100) / 100 : null,
+    };
     treffer++;
   });
   saveFtLeistungswerte(werte);
   return treffer;
+}
+
+// Eigener Aufwandswert je Typ. Leer heisst: es gilt der Vorschlag.
+function lwEigenSetzen(ftId, feld, roh) {
+  const werte = loadFtLeistungswerte();
+  if (!werte[ftId]) werte[ftId] = {};
+  const n = parseFloat(String(roh).replace(',', '.'));
+  if (Number.isFinite(n) && n > 0) werte[ftId][feld] = n;
+  else delete werte[ftId][feld];
+  saveFtLeistungswerte(werte);
+  renderMassenView();
+}
+
+// Massgeblicher Wert: eigener vor Vorschlag
+function lwAufwand(ftId) {
+  const e = loadFtLeistungswerte()[ftId];
+  return e?.eigenH ?? e?.vorschlagH ?? null;
+}
+function lwRuestzeit(ftId) {
+  const e = loadFtLeistungswerte()[ftId];
+  return e?.eigenRuest ?? e?.vorschlagRuest ?? null;
 }
 
 // Leistungswert eines Typs bei der gewaehlten Intervalldauer
@@ -703,21 +896,31 @@ function lkVergleich() {
   });
 
   return [...proTyp.values()].map(z => {
-    const lw = z.ft ? lkLeistungswert(z.ft.id, stunden) : null;
-    // Planungswert: Leistungsprofil hat Vorrang, wie in getFtLeistung()
-    const lpIntv = z.ft?.leistungsprofilId
-      ? lps.find(x => x.id === z.ft.leistungsprofilId)?.ftIntervall : null;
-    const stdJeFund = lpIntv ?? z.ft?.ftIntervall ?? null;
-    const proSchicht = stdJeFund ? Math.floor(stunden / stdJeFund) : null;
+    const ftId = z.ft?.id;
+    const eintrag = ftId ? (loadFtLeistungswerte()[ftId] || {}) : {};
+    const lw      = ftId ? lkLeistungswert(ftId, stunden) : null;
+    const aufwand = ftId ? lwAufwand(ftId)   : null;
+    const ruest   = ftId ? lwRuestzeit(ftId) : null;
+
+    // Schichten aus dem Aufwandswert. Die Ruestzeit faellt in JEDER Schicht
+    // an, nicht einmal je Baustelle — deshalb wird sie von der Intervalldauer
+    // abgezogen und nicht zur Arbeitszeit addiert.
+    const netto = (aufwand != null) ? stunden - (ruest || 0) : null;
+    const schichtenAufwand = (netto && netto > 0)
+      ? Math.ceil(z.anzahl * aufwand / netto) : null;
+
     return {
       name: z.name,
+      ftId,
       anzahl: z.anzahl,
       lw,
       schichtenKatalog: lw ? Math.ceil(z.anzahl / lw) : null,
-      stdJeFund,
-      proSchicht,
-      schichtenPlanung: proSchicht ? Math.ceil(z.anzahl / proSchicht)
-                                   : (stdJeFund ? z.anzahl * Math.ceil(stdJeFund / stunden) : null),
+      vorschlagH:     eintrag.vorschlagH ?? null,
+      vorschlagRuest: eintrag.vorschlagRuest ?? null,
+      eigenH:         eintrag.eigenH ?? null,
+      eigenRuest:     eintrag.eigenRuest ?? null,
+      aufwand, ruest,
+      schichtenAufwand,
     };
   }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
