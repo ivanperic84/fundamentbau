@@ -2221,6 +2221,11 @@
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Katalog einlesen
+        <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="lkKatalogImport(this)">
+      </label>
+      <button onclick="lkKatalogExport()" class="btn btn-secondary btn-sm">Katalog ausgeben</button>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
         LV einlesen
         <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="lvImportDatei(this)">
       </label>
@@ -2244,6 +2249,21 @@
       </select>
     </div>
     <div id="mk-massen-tabelle" style="overflow-x:auto;"></div>
+  </div>
+
+  <!-- Leistungswerte und Schichten -->
+  <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #f0f2f5;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;">Leistungswerte und Schichten</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;">Intervalldauer
+          <select id="mk-intervall" onchange="lkIntervallSetzen(+this.value)"
+            style="padding:4px 8px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;"></select>
+        </label>
+        <div id="mk-katalog-stand" style="font-size:10px;color:#9ca3af;"></div>
+      </div>
+    </div>
+    <div id="mk-lw-tabelle" style="overflow-x:auto;"></div>
   </div>
 
   <!-- Leistungsverzeichnis -->

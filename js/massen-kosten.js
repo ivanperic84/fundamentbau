@@ -18,6 +18,48 @@
 const LV_POS_KEY   = () => 'sp_lv_positionen__' + _activeId;
 const LV_EINST_KEY = () => 'sp_lv_einstellungen__' + _activeId;
 
+// ============================================================
+// LEISTUNGSKATALOG DES RAHMENVERTRAGS
+// ============================================================
+// Der Katalog gilt fuer alle Projekte, nicht je Projekt — er kommt aus dem
+// Rahmenvertrag. Je Position stehen darin der Einheitspreis der Preiszone und
+// die MINDESTSCHICHTLEISTUNG je Intervalldauer (4h bis 9h, Logistik
+// konventionell). Aus ihr rechnet der Vertrag die Schichten:
+//
+//   Schichten je Position = aufrunden(Menge / Leistungswert bei Intervall)
+//
+// Achtung auf die Einheit: der Katalog zaehlt FUNDAMENTE JE SCHICHT, das Feld
+// «ftIntervall» der Typenbibliothek dagegen STUNDEN JE FUNDAMENT. Beides
+// steht nebeneinander, umgerechnet wird nichts — welcher Wert die Bauzeit
+// bestimmt, entscheidet der Anwender (siehe lkVergleich()).
+const LK_KATALOG_KEY = 'sp_lk_katalog';
+const FT_LW_KEY      = 'sp_ft_leistungswerte';
+
+// Intervalldauern in der Reihenfolge der Katalogspalten
+const LK_INTERVALLE = [4, 5, 6, 7, 8, 9];
+
+function loadLkKatalog() {
+  try { return jsonParse(store.getItem(LK_KATALOG_KEY)) || null; } catch { return null; }
+}
+function saveLkKatalog(k) { store.setItem(LK_KATALOG_KEY, JSON.stringify(k)); }
+
+function loadFtLeistungswerte() {
+  try { return jsonParse(store.getItem(FT_LW_KEY)) || {}; } catch { return {}; }
+}
+function saveFtLeistungswerte(w) { store.setItem(FT_LW_KEY, JSON.stringify(w)); }
+
+// Gewaehlte Intervalldauer — der Wert steht im Sperrmuster, hier nur die
+// Vorgabe fuer die Vertragsrechnung.
+const LK_INTERVALL_KEY = () => 'sp_lk_intervall__' + _activeId;
+function lkIntervall() {
+  const n = parseFloat(store.getItem(LK_INTERVALL_KEY()));
+  return LK_INTERVALLE.includes(n) ? n : 5;
+}
+function lkIntervallSetzen(wert) {
+  store.setItem(LK_INTERVALL_KEY(), String(wert));
+  renderMassenView();
+}
+
 // Groessen, die der Massenauszug kennt. Die Einheit steht hier, damit sie in
 // Tabelle und Verzeichnis dieselbe ist.
 const MASSEN_GROESSEN = [
@@ -227,7 +269,83 @@ function renderMassenView() {
 
   _mkKennzahlen(summen, zeilen);
   _mkMassenTabelle(zeilen, summen, gliederung);
+  _mkLwTabelle();
   _mkLvTabelle(summen);
+}
+
+// Leistungswerte und die daraus folgenden Schichten. Bewusst als
+// Gegenueberstellung: der Rahmenvertrag zaehlt Fundamente je Schicht, die
+// Typenbibliothek Stunden je Fundament. Solange nicht entschieden ist,
+// welcher Wert die Bauzeit bestimmt, wird hier nichts umgerechnet, sondern
+// beides nebeneinander gezeigt.
+function _mkLwTabelle() {
+  const el = document.getElementById('mk-lw-tabelle');
+  if (!el) return;
+
+  const sel = document.getElementById('mk-intervall');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = LK_INTERVALLE.map(h => `<option value="${h}">${h} h</option>`).join('');
+  }
+  if (sel) sel.value = String(lkIntervall());
+
+  const katalog = loadLkKatalog();
+  const standEl = document.getElementById('mk-katalog-stand');
+  if (standEl) {
+    standEl.textContent = katalog
+      ? `${katalog.positionen.length} Positionen · ${katalog.preiszone} · Logistik ${katalog.logistik}`
+      : 'Kein Katalog eingelesen';
+  }
+  if (!katalog) {
+    el.innerHTML = '<div style="padding:22px;text-align:center;font-size:12px;color:#9ca3af;line-height:1.6;">'
+      + 'Leistungskatalog des Rahmenvertrags über <b>Katalog einlesen</b> laden<br>'
+      + '<span style="font-size:11px;">Erwartet wird das Blatt «C3 LEISTUNG» mit Einheitspreis und den '
+      + 'Mindestschichtleistungen 4 h bis 9 h.</span></div>';
+    return;
+  }
+
+  const zeilen = lkVergleich();
+  const th = (t, rechts, hinweis) =>
+    `<th ${hinweis ? `title="${escHtml(hinweis)}"` : ''} style="text-align:${rechts ? 'right' : 'left'};padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t}</th>`;
+  const td = (inhalt, rechts, stil) =>
+    `<td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;${rechts ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}${stil || ''}">${inhalt}</td>`;
+
+  let sumVertrag = 0, sumPlanung = 0, ohneWert = 0;
+  const koerper = zeilen.map(z => {
+    if (z.schichtenVertrag != null) sumVertrag += z.schichtenVertrag; else ohneWert += z.anzahl;
+    if (z.schichtenPlanung != null) sumPlanung += z.schichtenPlanung;
+    const abw = (z.schichtenVertrag != null && z.schichtenPlanung != null)
+      ? z.schichtenPlanung - z.schichtenVertrag : null;
+    return `<tr>
+      ${td(escHtml(z.name))}
+      ${td(z.anzahl, true)}
+      ${td(z.lw != null ? z.lw : '<span style="color:#b45309;">—</span>', true)}
+      ${td(z.schichtenVertrag != null ? z.schichtenVertrag : '—', true, 'font-weight:600;')}
+      ${td(z.stdJeFund != null ? _mkZahl(z.stdJeFund, 1) : '—', true)}
+      ${td(z.schichtenPlanung != null ? z.schichtenPlanung : '—', true)}
+      ${td(abw == null ? '—' : (abw > 0 ? '+' + abw : abw), true,
+           abw ? 'color:#b45309;font-weight:600;' : 'color:#9ca3af;')}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML =
+    `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+       <thead><tr style="background:#f9fafb;">
+         ${th('Fundamenttyp')}${th('Anzahl', true)}
+         ${th('LE/Schicht', true, 'Mindestschichtleistung des Rahmenvertrags bei der gewählten Intervalldauer')}
+         ${th('Schichten Vertrag', true, 'aufgerundet: Anzahl ÷ Leistungswert')}
+         ${th('h/Fundament', true, 'Ausführungsdauer aus der Typenbibliothek oder dem Leistungsprofil')}
+         ${th('Schichten Planung', true, 'aus der Ausführungsdauer und der Intervalldauer')}
+         ${th('Abweichung', true, 'Planung minus Vertrag')}
+       </tr></thead>
+       <tbody>${koerper}</tbody>
+       <tfoot><tr style="background:#f9fafb;font-weight:700;">
+         ${td('Total')}${td(zeilen.reduce((s, z) => s + z.anzahl, 0), true)}${td('')}
+         ${td(sumVertrag, true)}${td('')}${td(sumPlanung, true)}
+         ${td(sumPlanung - sumVertrag > 0 ? '+' + (sumPlanung - sumVertrag) : (sumPlanung - sumVertrag), true)}
+       </tr></tfoot>
+     </table>`
+    + (ohneWert ? `<div style="padding:8px 14px;font-size:11px;color:#b45309;border-top:1px solid #f0f2f5;">`
+        + `${ohneWert} Fundament(e) ohne Leistungswert im Katalog — Spezialtypen sind dort nicht als Position geführt.</div>` : '');
 }
 
 function _mkKennzahlen(summen, zeilen) {
@@ -426,6 +544,198 @@ function lvImportDatei(input) {
     input.value = '';
   };
   leser.readAsArrayBuffer(datei);
+}
+
+// ── Katalog einlesen ─────────────────────────────────────────
+// Gelesen wird das Blatt «C3 LEISTUNG» der Kostenschaetzung. Die Spalten
+// werden ueber die Kopfzeile gefunden, nicht ueber feste Buchstaben — die
+// Mappe wird gepflegt, und eine eingeschobene Spalte darf den Import nicht
+// stillschweigend verschieben.
+//
+// Die Leistungswerte stehen ZWEIMAL nebeneinander: erst «Logistik
+// konventionell» (4h…9h), dann «Logistik Bauzug» mit denselben
+// Ueberschriften. Genommen wird die erste Gruppe — sie gilt fuer die hier
+// ausgefuehrten Arbeiten.
+function _lkKopfzeileFinden(roh) {
+  for (let i = 0; i < Math.min(roh.length, 40); i++) {
+    const zeile = roh[i].map(z => String(z || '').toLowerCase());
+    if (zeile.some(z => z.includes('leistungsbeschrieb'))) return i;
+  }
+  return -1;
+}
+
+function _lkSpalten(kopf) {
+  const norm = kopf.map(z => String(z || '').replace(/\s+/g, ' ').trim().toLowerCase());
+  const suche = teil => norm.findIndex(z => z.includes(teil));
+  const spalten = {
+    id:       norm.findIndex(z => z === 'id'),
+    text:     suche('leistungsbeschrieb'),
+    einheit:  suche('leistungs-einheit') >= 0 ? suche('leistungs-einheit') : suche('einheit [le]'),
+    preis:    suche('einheitspreis'),
+  };
+  if (spalten.einheit < 0) spalten.einheit = suche('einheit');
+  // Erste sechs Spalten mit einer Stundenangabe nach dem Einheitspreis
+  spalten.lw = [];
+  for (let i = Math.max(0, spalten.preis); i < norm.length && spalten.lw.length < 6; i++) {
+    if (/^\d+\s*h$/.test(norm[i])) spalten.lw.push(i);
+  }
+  return spalten;
+}
+
+// Puffer auswerten und ablegen. Getrennt vom Dateifeld, damit dieselbe
+// Auswertung auch aus einer anderen Quelle heraus geprueft werden kann.
+// Rueckgabe: { positionen, zugeordnet } oder wirft mit Klartext.
+function lkKatalogAusPuffer(puffer) {
+  const wb = XLSX.read(puffer, { type: 'array' });
+  const blattName = wb.SheetNames.find(n => /leistung/i.test(n)) || wb.SheetNames[0];
+  const roh = XLSX.utils.sheet_to_json(wb.Sheets[blattName], { header: 1, defval: '' });
+  const kopfIndex = _lkKopfzeileFinden(roh);
+  if (kopfIndex < 0) throw new Error('Im Blatt «' + blattName + '» fehlt die Kopfzeile mit «Leistungsbeschriebe».');
+  const sp = _lkSpalten(roh[kopfIndex]);
+  if (sp.text < 0 || sp.lw.length < 6) {
+    throw new Error('Kopfzeile erkannt, aber nicht alle Spalten (Beschrieb, Einheitspreis, 4h…9h).');
+  }
+
+  const zahl = w => {
+    const n = parseFloat(String(w).replace(/'/g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const positionen = [];
+  roh.slice(kopfIndex + 1).forEach(z => {
+    const id = String(z[sp.id] ?? '').trim();
+    if (!id || !/^\d/.test(id)) return;
+    const preis = zahl(z[sp.preis]);
+    const lw    = sp.lw.map(i => zahl(z[i]));
+    if (preis == null && !lw.some(x => x != null)) return;
+    positionen.push({
+      id,
+      text:    String(z[sp.text] ?? '').replace(/\s+/g, ' ').trim(),
+      einheit: String(z[sp.einheit] ?? '').trim(),
+      preis,
+      lw,
+    });
+  });
+  if (!positionen.length) throw new Error('Keine Positionen erkannt.');
+
+  saveLkKatalog({
+    stand: new Date().toISOString(),
+    preiszone: 'PZ6 Zürich',
+    logistik: 'konventionell',
+    blatt: blattName,
+    positionen,
+  });
+  return { positionen: positionen.length, zugeordnet: lkLeistungswerteZuweisen() };
+}
+
+function lkKatalogImport(input) {
+  const datei = input.files?.[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onload = e => {
+    try {
+      const { positionen, zugeordnet } = lkKatalogAusPuffer(e.target.result);
+      renderMassenView();
+      ui.toast(positionen + ' Positionen eingelesen, ' + zugeordnet + ' Typen zugeordnet', 'erfolg');
+    } catch (err) {
+      ui.toast(err.message, 'fehler');
+    }
+    input.value = '';
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+// ── Katalogposition ↔ Fundamenttyp ───────────────────────────
+// Der Katalog nennt die Typen im Beschrieb: «Mastfundament DP1a /1.5,
+// Kopfhoehe 100 cm …». Verglichen wird wie ueberall ueber Familie und Tiefe
+// als Zahl — die Schreibweise ist auch hier uneinheitlich («DP1a /1.5» gegen
+// «DP1a / 1.5»).
+function _lkTypAusBeschrieb(text) {
+  const m = String(text || '').match(/\b([A-Z]{2}\d[a-z])\s*\/\s*(\d+(?:[.,]\d+)?)/);
+  return m ? { familie: m[1].toLowerCase(), tiefe: parseFloat(m[2].replace(',', '.')) } : null;
+}
+
+function lkLeistungswerteZuweisen() {
+  const katalog = loadLkKatalog();
+  if (!katalog) return 0;
+  const werte = loadFtLeistungswerte();
+  let treffer = 0;
+  loadFtProfile().forEach(ft => {
+    const gesucht = ftNameZerlegen(ft.name);
+    if (!gesucht.familie || Number.isNaN(gesucht.tiefe)) return;
+    const pos = katalog.positionen.find(p => {
+      if (!p.lw.some(x => x != null)) return false;
+      const k = _lkTypAusBeschrieb(p.text);
+      return k && k.familie === gesucht.familie && Math.abs(k.tiefe - gesucht.tiefe) < 0.005;
+    });
+    if (!pos) return;
+    werte[ft.id] = { lkPos: pos.id, lw: pos.lw, text: pos.text };
+    treffer++;
+  });
+  saveFtLeistungswerte(werte);
+  return treffer;
+}
+
+// Leistungswert eines Typs bei der gewaehlten Intervalldauer
+function lkLeistungswert(ftId, stunden) {
+  const e = loadFtLeistungswerte()[ftId];
+  if (!e) return null;
+  const i = LK_INTERVALLE.indexOf(stunden ?? lkIntervall());
+  return i < 0 ? null : (e.lw[i] ?? null);
+}
+
+// Gegenueberstellung: Schichten nach Rahmenvertrag gegen Schichten nach der
+// Ausfuehrungsdauer der Typenbibliothek. Beides je Fundamenttyp, damit der
+// Unterschied sichtbar wird, bevor jemand danach plant.
+function lkVergleich() {
+  const stunden   = lkIntervall();
+  const ftProfile = loadFtProfile();
+  const allBp     = loadAllBauprojekt();
+  const lps       = typeof loadLeistungsprofile === 'function' ? loadLeistungsprofile() : [];
+  const proTyp    = new Map();
+
+  getFundamente().forEach(p => {
+    const bp = { ...p, ...(allBp[p.id] || {}) };
+    const ft = ftTypZuStandort(ftProfile, bp);
+    const schluessel = ft?.id || ('_' + (bp.fundtyp || 'ohne'));
+    if (!proTyp.has(schluessel)) {
+      proTyp.set(schluessel, { name: ft?.name || bp.fundtyp || '— kein Typ —', ft, anzahl: 0 });
+    }
+    proTyp.get(schluessel).anzahl++;
+  });
+
+  return [...proTyp.values()].map(z => {
+    const lw = z.ft ? lkLeistungswert(z.ft.id, stunden) : null;
+    // Planungswert: Leistungsprofil hat Vorrang, wie in getFtLeistung()
+    const lpIntv = z.ft?.leistungsprofilId
+      ? lps.find(x => x.id === z.ft.leistungsprofilId)?.ftIntervall : null;
+    const stdJeFund = lpIntv ?? z.ft?.ftIntervall ?? null;
+    const proSchicht = stdJeFund ? Math.floor(stunden / stdJeFund) : null;
+    return {
+      name: z.name,
+      anzahl: z.anzahl,
+      lw,
+      schichtenVertrag: lw ? Math.ceil(z.anzahl / lw) : null,
+      stdJeFund,
+      proSchicht,
+      schichtenPlanung: proSchicht ? Math.ceil(z.anzahl / proSchicht)
+                                   : (stdJeFund ? z.anzahl * Math.ceil(stdJeFund / stunden) : null),
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+// ── Katalog und Leistungswerte ausgeben ──────────────────────
+// Damit Preise und Leistungswerte in Excel gepflegt und wieder eingelesen
+// werden koennen — dieselben Spaltennamen wie beim Einlesen.
+function lkKatalogExport() {
+  const katalog = loadLkKatalog();
+  if (!katalog) { ui.toast('Noch kein Katalog eingelesen.', 'fehler'); return; }
+  const kopf = ['ID', 'Leistungsbeschriebe', 'Leistungs-einheit [LE]', 'Einheitspreis [CHF/LE]']
+    .concat(LK_INTERVALLE.map(h => h + 'h'));
+  const zeilen = [kopf].concat(katalog.positionen.map(p =>
+    [p.id, p.text, p.einheit, p.preis].concat(p.lw)));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zeilen), 'C3 LEISTUNG');
+  XLSX.writeFile(wb, 'Leistungskatalog ' + (katalog.preiszone || '') + '.xlsx');
 }
 
 function lvExportXlsx() {
