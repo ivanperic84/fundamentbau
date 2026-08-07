@@ -2231,7 +2231,9 @@
       </label>
       <div style="position:relative;">
         <button id="mk-vorlage-btn" onclick="lvVorlagePanelUmschalten(event)" class="btn btn-secondary btn-sm">+ aus Vorlage</button>
-        <div id="mk-vorlage-panel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.14);min-width:340px;"></div>
+        <!-- fest positioniert und beim Oeffnen eingepasst: das Feld ist breiter
+             als der Knopf und liefe sonst am linken Rand aus dem Bild -->
+        <div id="mk-vorlage-panel" style="display:none;position:fixed;z-index:300;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.14);width:min(560px,94vw);"></div>
       </div>
       <button onclick="lvZeileNeu()" class="btn btn-secondary btn-sm">+ Position</button>
       <button onclick="lvExportXlsx()" class="btn btn-secondary btn-sm">Export</button>

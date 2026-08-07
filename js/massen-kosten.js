@@ -287,32 +287,71 @@ function lvVorlageImport(input) {
   leser.readAsArrayBuffer(datei);
 }
 
-// Auswahlfeld: Positionen der Vorlage ins Verzeichnis uebernehmen
+// Auswahlfeld: Positionen der Vorlage ins Verzeichnis uebernehmen. Gezeigt
+// werden Nummer, ganzer Beschrieb, Einheit und Einheitspreis — die Auswahl
+// faellt am Preis, nicht an der Positionsnummer.
+function _lvVorlageZeilen(filter) {
+  const vorlage = loadLvVorlage();
+  const drin = new Set(loadLvPositionen().map(z => z.pos));
+  const such = String(filter || '').trim().toLowerCase();
+  const treffer = vorlage
+    .map((v, i) => ({ v, i }))
+    .filter(({ v }) => !such || (v.pos + ' ' + v.text).toLowerCase().includes(such));
+
+  if (!treffer.length) {
+    return '<div style="padding:14px;text-align:center;font-size:11px;color:#9ca3af;">Kein Treffer</div>';
+  }
+  return treffer.map(({ v, i }) => {
+    const belegt = drin.has(v.pos);
+    return `<button onclick="lvAusVorlage(${i})" ${belegt ? 'disabled' : ''}
+        title="${belegt ? 'bereits im Verzeichnis' : 'ins Verzeichnis übernehmen'}"
+        style="display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;padding:5px 7px;
+               border:none;border-radius:6px;background:none;font-size:11px;font-family:inherit;
+               cursor:${belegt ? 'default' : 'pointer'};color:${belegt ? '#c7cdd4' : '#374151'};"
+        onmouseover="if(!this.disabled)this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+        <span style="font-variant-numeric:tabular-nums;color:${belegt ? '#dde1e6' : '#9ca3af'};flex:0 0 82px;">${escHtml(v.pos)}</span>
+        <span style="flex:1 1 auto;line-height:1.35;">${escHtml(v.text)}</span>
+        <span style="flex:0 0 34px;color:#9ca3af;">${escHtml(v.einheit || '')}</span>
+        <span style="flex:0 0 76px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">${
+          v.preis != null ? _mkZahl(v.preis) : '<span style="font-weight:400;color:#c7cdd4;">kein Preis</span>'}</span>
+      </button>`;
+  }).join('');
+}
+
+function lvVorlageFiltern(wert) {
+  const liste = document.getElementById('mk-vorlage-liste');
+  if (liste) liste.innerHTML = _lvVorlageZeilen(wert);
+}
+
 function lvVorlagePanelUmschalten(ev) {
   if (ev) ev.stopPropagation();
   const panel = document.getElementById('mk-vorlage-panel');
   if (!panel) return;
   if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
-  const vorlage = loadLvVorlage();
-  if (!vorlage.length) {
+  if (!loadLvVorlage().length) {
     ui.toast('Noch keine Vorlage eingelesen — «Positionen einlesen».', 'fehler');
     return;
   }
-  const drin = new Set(loadLvPositionen().map(z => z.pos));
   panel.innerHTML =
     '<div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;">Position übernehmen</div>'
-    + '<div style="max-height:320px;overflow-y:auto;">'
-    + vorlage.map((v, i) =>
-        `<button onclick="lvAusVorlage(${i})" ${drin.has(v.pos) ? 'disabled' : ''}
-           style="display:block;width:100%;text-align:left;padding:5px 7px;border:none;border-radius:6px;
-                  background:none;font-size:11px;font-family:inherit;cursor:pointer;
-                  color:${drin.has(v.pos) ? '#c7cdd4' : '#374151'};"
-           onmouseover="if(!this.disabled)this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
-           <span style="font-variant-numeric:tabular-nums;color:#9ca3af;">${escHtml(v.pos)}</span>
-           ${escHtml(v.text.slice(0, 70))}
-         </button>`).join('')
-    + '</div>';
+    + `<input id="mk-vorlage-suche" type="text" placeholder="Nummer oder Beschrieb"
+             oninput="lvVorlageFiltern(this.value)"
+             style="width:100%;padding:5px 8px;margin-bottom:8px;border:1px solid #e5e7eb;border-radius:6px;
+                    font-size:11px;font-family:inherit;">`
+    + `<div style="display:flex;gap:8px;padding:0 7px 4px;font-size:10px;color:#9ca3af;
+                   text-transform:uppercase;letter-spacing:.05em;">
+         <span style="flex:0 0 82px;">Pos.</span><span style="flex:1 1 auto;">Bezeichnung</span>
+         <span style="flex:0 0 34px;">LE</span><span style="flex:0 0 76px;text-align:right;">Preis</span>
+       </div>`
+    + `<div id="mk-vorlage-liste" style="max-height:340px;overflow-y:auto;">${_lvVorlageZeilen('')}</div>`;
   panel.style.display = 'block';
+  const knopf = document.getElementById('mk-vorlage-btn')?.getBoundingClientRect();
+  if (knopf) {
+    const breite = panel.getBoundingClientRect().width;
+    panel.style.top  = (knopf.bottom + 6) + 'px';
+    panel.style.left = Math.max(8, Math.min(knopf.right - breite, window.innerWidth - breite - 8)) + 'px';
+  }
+  document.getElementById('mk-vorlage-suche')?.focus();
 }
 
 function lvAusVorlage(index) {
@@ -418,15 +457,15 @@ function _mkLwTabelle() {
         + (katalog.stand ? ' · Stand ' + new Date(katalog.stand).toLocaleDateString('de-CH') : '')
       : 'Kein Katalog eingelesen';
   }
-  if (!katalog) {
+  // Ohne Katalog bleibt die Tabelle bedienbar: die Aufwandswerte darf der
+  // Anwender von Hand setzen, der Katalog liefert nur den Vorschlag dazu.
+  const zeilen = lkVergleich();
+  if (!zeilen.length) {
     el.innerHTML = '<div style="padding:22px;text-align:center;font-size:12px;color:#9ca3af;line-height:1.6;">'
-      + 'Leistungskatalog über <b>Katalog einlesen</b> laden<br>'
-      + '<span style="font-size:11px;">Erwartet wird eine Tabelle mit Positionsnummer, Beschrieb, '
-      + 'Einheit, Einheitspreis und den Schichtleistungen 4 h bis 9 h.</span></div>';
+      + 'Noch keine Fundamenttypen zugewiesen<br>'
+      + '<span style="font-size:11px;">Die Aufwandswerte hängen an den Typen der Standorte.</span></div>';
     return;
   }
-
-  const zeilen = lkVergleich();
   const th = (t, rechts, hinweis) =>
     `<th ${hinweis ? `title="${escHtml(hinweis)}"` : ''} style="text-align:${rechts ? 'right' : 'left'};padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t}</th>`;
   const td = (inhalt, rechts, stil) =>
@@ -869,8 +908,9 @@ function lwRuestzeit(ftId) {
 
 // Leistungswert eines Typs bei der gewaehlten Intervalldauer
 function lkLeistungswert(ftId, stunden) {
+  // Ohne Katalog steht am Typ nur der eigene Aufwandswert, kein lw-Feld.
   const e = loadFtLeistungswerte()[ftId];
-  if (!e) return null;
+  if (!e?.lw) return null;
   const i = LK_INTERVALLE.indexOf(stunden ?? lkIntervall());
   return i < 0 ? null : (e.lw[i] ?? null);
 }
