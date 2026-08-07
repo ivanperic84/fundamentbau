@@ -650,9 +650,77 @@ function openCreateView(id) {
   }, 80);
 }
 
-// Letzte Rueckfallposition, wenn weder ein bestehender Standort noch GPS
-// etwas Besseres liefern: Mitte des bisherigen Projektgebiets.
+// Letzte Rueckfallposition, wenn weder eine Strecke noch ein bestehender
+// Standort noch GPS etwas Besseres liefern: Mitte des bisherigen Projektgebiets.
 const CREATE_MAP_NOTFALL = { lat: 47.566, lng: 9.106 };
+
+// Kartenart der Erfassungskarte — waehrend der Sitzung gemerkt, damit sie
+// nicht bei jedem neuen Standort zurueckspringt.
+let _createBasemapKey  = 'swiss-luft';
+let _createBaseLayer   = null;
+let _createUmweltEbenen = [];
+
+// ── Kartenausschnitt aus Strecke oder Liniennummer ───────────
+// Beim Anlegen steht die Linie meist schon fest, der Punkt noch nicht. Statt
+// die Karte irgendwo stehen zu lassen, wird sie auf diese Linie gestellt.
+let _createStreckeTimer = null;
+
+function onCreateStreckeEingabe() {
+  clearTimeout(_createStreckeTimer);
+  _createStreckeTimer = setTimeout(() => createKarteAusVorgabe(true), 600);
+}
+
+// nurStrecke=true: kein Rueckgriff auf GPS (der Nutzer hat gerade getippt)
+async function createKarteAusVorgabe(nurStrecke) {
+  const karte = createMapLeaflet;
+  if (!karte) return;
+  // Gesetzte Punkte nicht ueberfahren
+  const gesetzt = () => karte !== createMapLeaflet || createRsMarker || createRksMarker;
+  if (gesetzt()) return;
+
+  const nr    = document.getElementById('c-streckennr')?.value.trim() || '';
+  const name  = document.getElementById('c-strecke')?.value.trim() || '';
+  // Die Liniennummer steckt haeufig im Streckennamen («Linie 755 Altstetten…»)
+  const linie = (nr.match(/\d{3}/) || name.match(/\d{3}/) || [])[0];
+
+  // Was bereits geladen ist, kostet keine Abfrage
+  const ausCache = (typeof bahnSuche === 'function' ? bahnSuche(linie || name) : [])[0];
+  if (ausCache && !gesetzt()) { karte.setView([ausCache.lat, ausCache.lon], 15); return; }
+
+  if (linie && typeof bahnLinieOrtOnline === 'function') {
+    const ort = await bahnLinieOrtOnline(linie);
+    if (ort && !gesetzt()) { karte.setView([ort.lat, ort.lon], 14); return; }
+  }
+  if (name && typeof bahnStationSuchenOnline === 'function') {
+    const st = (await bahnStationSuchenOnline(name))[0];
+    if (st && !gesetzt()) { karte.setView([st.lat, st.lon], 15); return; }
+  }
+  if (nurStrecke || !navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    pos => { if (!gesetzt()) karte.setView([pos.coords.latitude, pos.coords.longitude], 18); },
+    () => { /* ohne GPS bleibt die Rueckfallposition stehen */ },
+    { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+  );
+}
+
+function setCreateBaseLayer(key) {
+  _createBasemapKey = key;
+  const sel = document.getElementById('create-basemap-select');
+  if (sel) sel.value = key;
+  if (!createMapLeaflet) return;
+  _createUmweltEbenen.forEach(l => { try { createMapLeaflet.removeLayer(l); } catch {} });
+  _createUmweltEbenen = [];
+  if (_createBaseLayer) createMapLeaflet.removeLayer(_createBaseLayer);
+  // «Umwelt» ist die graue Landeskarte mit den Fachebenen darueber
+  _createBaseLayer = makeTile(key === 'umwelt' ? 'swiss-karte' : key,
+    key === 'umwelt' ? { className: 'umwelt-base-tile' } : {}).addTo(createMapLeaflet);
+  _createBaseLayer.bringToBack();
+  if (key === 'umwelt') {
+    _createUmweltEbenen = _buildUmweltOverlays();
+    _createUmweltEbenen.forEach(l => l.addTo(createMapLeaflet));
+  }
+}
 
 function initCreateMap(center) {
   // Vorherige Instanz bereinigen
@@ -672,25 +740,12 @@ function initCreateMap(center) {
   createMapLeaflet = L.map('create-map', { zoomControl: true })
     .setView([center.lat, center.lng], 19);
 
-  // Kein bestehender Standort als Anhaltspunkt: dann ist die eigene Position
-  // der beste Ausschnitt. Nachgeholt, sobald sie vorliegt — die Karte steht
-  // solange auf der Rueckfallposition, statt auf das GPS zu warten.
-  if (center.ersatz && navigator.geolocation) {
-    const karte = createMapLeaflet;
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        // Zwischenzeitlich gesetzte Punkte nicht ueberfahren
-        if (karte !== createMapLeaflet || createRsMarker || createRksMarker) return;
-        karte.setView([pos.coords.latitude, pos.coords.longitude], 18);
-      },
-      () => { /* ohne GPS bleibt die Rueckfallposition stehen */ },
-      { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
-    );
-  }
+  // Kein bestehender Standort als Anhaltspunkt: erst die vorgegebene Strecke
+  // versuchen, sonst die eigene Position. Beides wird nachgeholt, sobald es
+  // vorliegt — die Karte steht solange auf der Rueckfallposition.
+  if (center.ersatz) createKarteAusVorgabe();
 
-  // Luftbild als Standard-Basiskarte
-  L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg',
-    { maxZoom: 20, attribution: '© <a href="https://swisstopo.admin.ch">swisstopo</a>' }).addTo(createMapLeaflet);
+  setCreateBaseLayer(_createBasemapKey);
 
   // Bahnlinien sind standardmässig an (App-Einstellungen › Kartendarstellung)
   if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('create'), 60);

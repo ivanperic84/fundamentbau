@@ -634,6 +634,24 @@ async function bahnStationSuchenOnline(text) {
   }
 }
 
+// Mitte einer Linie, ueber die Kilometrierungspunkte bei data.sbb.ch. Dient
+// dazu, eine Karte auf eine eingegebene Liniennummer zu stellen, bevor
+// ueberhaupt ein Punkt gesetzt ist.
+async function bahnLinieOrtOnline(linienr) {
+  const nr = parseInt(linienr, 10);
+  if (!nr) return null;
+  try {
+    const punkte = await _bahnAbfrage('linienkilometrierung', `linienr=${nr}`, p =>
+      (!p.geo_point_2d || p.km == null) ? null
+        : { lat: p.geo_point_2d.lat, lon: p.geo_point_2d.lon, km: +p.km }, 100);
+    if (!punkte.length) return null;
+    punkte.sort((a, b) => a.km - b.km);
+    return punkte[Math.floor(punkte.length / 2)];
+  } catch {
+    return null;
+  }
+}
+
 function bahnSucheEingabe(text) {
   const liste = document.getElementById('bahn-such-liste');
   if (!liste) return;

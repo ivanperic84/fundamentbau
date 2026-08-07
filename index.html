@@ -4438,14 +4438,14 @@ function _ladeScript(pfad) {
           <div class="create-field">
             <label class="create-lbl">Strecke <span style="color:#9ca3af;font-weight:400;font-size:10px;">(SBB auto)</span></label>
             <div style="display:flex;gap:4px;align-items:center;">
-              <input class="create-input" id="c-strecke" placeholder="wird abgefragt…" style="flex:1;min-width:0;">
+              <input class="create-input" id="c-strecke" placeholder="wird abgefragt…" oninput="onCreateStreckeEingabe()" style="flex:1;min-width:0;">
               <button onclick="refreshSbbCreate()" title="Strecke von SBB neu abfragen" style="flex:0 0 auto;padding:5px 7px;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;color:#6b7280;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
             </div>
           </div>
           <div class="create-field">
             <label class="create-lbl">Streckennr. <span style="color:#9ca3af;font-weight:400;font-size:10px;">(SBB auto)</span></label>
             <div style="display:flex;gap:4px;align-items:center;">
-              <input class="create-input" id="c-streckennr" placeholder="z.B. 850" style="flex:1;min-width:0;">
+              <input class="create-input" id="c-streckennr" placeholder="z.B. 850" oninput="onCreateStreckeEingabe()" style="flex:1;min-width:0;">
               <button onclick="refreshSbbCreate()" title="Streckennr. von SBB neu abfragen" style="flex:0 0 auto;padding:5px 7px;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;color:#6b7280;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
             </div>
           </div>
@@ -4657,26 +4657,36 @@ function _ladeScript(pfad) {
     <div class="create-main">
       <div id="create-map"></div>
 
-      <!-- Suchfeld über der Karte — kompakter -->
+      <!-- Suchfeld über der Karte, mittig — wie in den übrigen Kartenansichten -->
       <div class="create-map-search-wrap">
-        <div style="display:flex;align-items:center;gap:6px;max-width:380px;margin:0 auto;">
-          <div class="create-search-wrap" style="flex:1;">
-            <input id="create-map-search" class="app-suche voll auf-karte" type="search"
-                   placeholder="Ort suchen…"
-                   oninput="onCreateSearch(this.value)"
-                   onkeydown="if(event.key==='Escape'){this.value='';document.getElementById('create-search-results').style.display='none';}"
-                   autocomplete="off">
-            <div id="create-search-results" class="create-search-results" style="display:none;"></div>
-          </div>
-          <!-- Vollbild -->
-          <button class="karten-knopf" onclick="toggleCreateMapFullscreen()" title="Vollbild">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-          </button>
-          <!-- GPS -->
-          <button class="karten-knopf" onclick="locateCreateMap()" title="Mein Standort">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2"/></svg>
-          </button>
+        <div class="create-search-wrap" style="max-width:380px;margin:0 auto;">
+          <input id="create-map-search" class="app-suche voll auf-karte" type="search"
+                 placeholder="Ort, Station, Linie suchen…"
+                 oninput="onCreateSearch(this.value)"
+                 onkeydown="if(event.key==='Escape'){this.value='';document.getElementById('create-search-results').style.display='none';}"
+                 autocomplete="off">
+          <div id="create-search-results" class="create-search-results" style="display:none;"></div>
         </div>
+      </div>
+      <!-- Vollbild + eigener Standort oben rechts, wie auf den übrigen Karten -->
+      <div class="karten-knopf-spalte" style="z-index:1000;">
+        <button class="karten-knopf" onclick="toggleCreateMapFullscreen()" title="Vollbild">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        <button class="karten-knopf" onclick="locateCreateMap()" title="Mein Standort">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2"/></svg>
+        </button>
+      </div>
+      <!-- Kartenart wie in der Übersicht -->
+      <div style="position:absolute;bottom:24px;left:16px;z-index:1000;">
+        <select id="create-basemap-select" onchange="setCreateBaseLayer(this.value)"
+          style="padding:6px 10px;border-radius:8px;border:1px solid #e0e4ea;background:rgba(255,255,255,0.96);
+                 font-size:11px;font-family:inherit;font-weight:600;cursor:pointer;
+                 box-shadow:0 2px 8px rgba(0,0,0,0.14);outline:none;">
+          <option value="swiss-luft">Luftbild</option>
+          <option value="swiss-karte">swisstopo</option>
+          <option value="umwelt">Umwelt</option>
+        </select>
       </div>
 
       <!-- Distanz-Badge auf der Karte -->

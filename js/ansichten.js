@@ -635,6 +635,14 @@ function bannerProjektZeigen(zeigen) {
   if (titel) titel.classList.toggle('eingeklappt', !zeigen);
   const btn = document.getElementById('projekte-btn-wrap');
   if (btn) btn.style.visibility = zeigen ? '' : 'hidden';
+  // Das Suchfeld im Kopf filtert die Standortliste. In der Erfassungsansicht
+  // steht es unmittelbar ueber dem Suchfeld der Karte, das etwas ganz anderes
+  // tut — beim Absetzen eines Punktes stiftet das nur Verwirrung.
+  const suche = document.getElementById('search-input');
+  if (suche) {
+    const erfassen = document.getElementById('create-view')?.style.display === 'block';
+    suche.style.display = erfassen ? 'none' : '';
+  }
 }
 
 // Kurzes Einblenden eines gerade sichtbar gemachten Kastens. Die Klasse wird
