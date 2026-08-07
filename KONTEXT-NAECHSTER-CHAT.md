@@ -326,3 +326,29 @@ _ftMatchesNeigung(ft, neigung)          FT/Neigung-Konflikt
 ---
 
 *Erstellt: 2026-05-21*
+
+---
+
+## Abklaerung Zugbewegungen in Echtzeit (2026-08-07) — zurueckgestellt
+
+Gepruefte Quellen und Ergebnis, damit die Abklaerung nicht wiederholt wird:
+
+- **Fahrzeugpositionen aus GPS gibt es nicht als offene Daten.** Weder SBB
+  noch die Plattform opentransportdata veroeffentlichen Ortungsdaten der Zuege.
+- **TRAVIC (geOps / Uni Freiburg)** zeigt keine gemessenen Positionen: die
+  Fahrzeuge werden aus dem Fahrplan interpoliert und, wo vorhanden, mit
+  GTFS-RT-Verspaetungen korrigiert; ohne Echtzeitkanal bleibt die reine
+  Fahrplanposition. geOps nennt als Fehlerquellen Rundung auf ganze Minuten,
+  verzoegerte Aktualisierung, unvollstaendige Haltezeiten, Ausfaelle und
+  Umleitungen. Eine Minute Rundung sind bei 120 km/h 2 km Weg; zwischen zwei
+  Stationen wird linear interpoliert, also ohne Anfahren und Bremsen.
+  Echte Ortungsdaten stecken erst im kommerziellen Produkt TRALIS.
+- **Nutzbar waere `transport.opendata.ch/v1/stationboard`** — ohne Schluessel
+  abfragbar, liefert Abfahrten mit Verspaetung und Prognose (am 2026-08-07 aus
+  der App heraus gegen Sulgen getestet, Antwort mit delay und prognosis).
+  Daraus liesse sich eine geschaetzte Durchfahrt am Standort rechnen
+  (Kilometrierung aus js/bahn.js, angenommene Geschwindigkeit).
+
+**Entscheid:** vorerst nicht gebaut. Ein Alarm mit Vibration wuerde eine
+Genauigkeit vortaeuschen, die die Datenlage nicht hergibt. Die Sicherung im
+Gleisbereich bleibt beim Sicherheitswaerter.
