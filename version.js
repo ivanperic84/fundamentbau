@@ -13,4 +13,4 @@
 //
 // BEI JEDEM RELEASE ERHOEHEN.
 // ============================================================
-const APP_VERSION = 'v152';
+const APP_VERSION = 'v154';

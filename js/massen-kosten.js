@@ -21,13 +21,19 @@ const LV_EINST_KEY = () => 'sp_lv_einstellungen__' + _activeId;
 // Groessen, die der Massenauszug kennt. Die Einheit steht hier, damit sie in
 // Tabelle und Verzeichnis dieselbe ist.
 const MASSEN_GROESSEN = [
-  { id: 'anzahl',  label: 'Fundamente',        einheit: 'Stk' },
-  { id: 'beton',   label: 'Beton',             einheit: 'm³'  },
-  { id: 'aushub',  label: 'Aushub',            einheit: 'm³'  },
-  { id: 'schalung',label: 'Schalung',          einheit: 'm²'  },
-  { id: 'bewehr',  label: 'Bewehrung',         einheit: 'kg'  },
-  { id: 'schraub', label: 'Fundamentschrauben',einheit: 'Stk' },
+  { id: 'anzahl',     label: 'Fundamente',        einheit: 'Stk' },
+  { id: 'beton',      label: 'Beton',             einheit: 'm³'  },
+  { id: 'aushub',     label: 'Aushub',            einheit: 'm³'  },
+  { id: 'schalung',   label: 'Schalung',          einheit: 'm²'  },
+  { id: 'bewehr',     label: 'Bewehrung',         einheit: 'kg'  },
+  { id: 'schraub',    label: 'Fundamentschrauben',einheit: 'Stk' },
+  // Pfaehle werden nach Stueck und Bohrmeter abgerechnet, nicht nach Volumen
+  { id: 'pfahlStk',   label: 'Pfähle',            einheit: 'Stk' },
+  { id: 'pfahlMeter', label: 'Pfahllänge',        einheit: 'm'   },
 ];
+
+// Groessen, die als ganze Zahl angeschrieben werden
+const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'bewehr']);
 
 // ── Speicher ─────────────────────────────────────────────────
 function loadLvPositionen() {
@@ -98,51 +104,29 @@ function _mkTypDaten(ft) {
   const kopfH   = _mkZahlFeld(ft.kopfHoehe);
   const tiefe   = _mkZahlFeld(ft.tiefe);
 
-  // Ohne Kopf- und Blockmass oder ohne Tiefe laesst sich nichts rechnen
-  if (!kopf || !block || kopfH == null || tiefe == null) {
-    return { beton: null, aushub: null, schalung: null, bewehr: null, schraub };
-  }
+  // Pfaehle: Stueckzahl und Bohrmeter je Fundament. Ein Betonvolumen liesse
+  // sich erst mit dem Pfahldurchmesser rechnen — den fuehrt der Typ nicht.
+  const pfahlStk   = _mkZahlFeld(ft.anzahlPfaehle);
+  const pfahlLaenge= _mkZahlFeld(ft.pfahlLaenge);
+  const pfahlMeter = (pfahlStk != null && pfahlLaenge != null) ? pfahlStk * pfahlLaenge : null;
+
+  const leer = { beton: null, aushub: null, schalung: null, bewehr: null,
+                 schraub, pfahlStk, pfahlMeter };
+
+  // Ohne Kopf- und Blockmass oder ohne Tiefe laesst sich der Block nicht rechnen
+  if (!kopf || !block || kopfH == null || tiefe == null) return leer;
+
   const blockH   = Math.max(0, tiefe - kopfH);
   const kopfVol  = kopf.a * kopf.b * kopfH;
   const blockVol = block.a * block.b * blockH;
   const schalung = 2 * (kopf.a + kopf.b) * kopfH + 2 * (block.a + block.b) * blockH;
 
   return {
+    ...leer,
     beton:    kopfVol + blockVol,
     aushub:   block.a * block.b * tiefe,
     schalung,
-    bewehr:   null,       // am Typ steht die Stahlsorte, nicht das Gewicht
-    schraub,
   };
-}
-
-// Typ eines Standorts finden. Zuerst ueber die stabile Kennung; aeltere und
-// eingelesene Standorte tragen nur den Namen. Der wiederum stimmt nicht
-// zeichengleich ueberein — die Bibliothek fuehrt «DP1a / 1.8», der Standort
-// «DP1a / 1.80». Deshalb wird die Tiefe als Zahl verglichen, nicht als Text.
-function _mkNameZerlegen(name) {
-  const teile = String(name || '').split('/');
-  const familie = teile[0].trim().toLowerCase();
-  const tiefe = teile.length > 1 ? parseFloat(teile[1].replace(',', '.')) : NaN;
-  return { familie, tiefe };
-}
-
-function _mkTypZuStandort(ftProfile, bp) {
-  if (bp.ftProfilId) {
-    const nachId = ftProfile.find(t => t.id === bp.ftProfilId);
-    if (nachId) return nachId;
-  }
-  if (!bp.fundtyp) return null;
-  const genau = ftProfile.find(t => t.name === bp.fundtyp);
-  if (genau) return genau;
-  const gesucht = _mkNameZerlegen(bp.fundtyp);
-  if (!gesucht.familie) return null;
-  return ftProfile.find(t => {
-    const k = _mkNameZerlegen(t.name);
-    if (k.familie !== gesucht.familie) return false;
-    if (Number.isNaN(gesucht.tiefe) && Number.isNaN(k.tiefe)) return true;
-    return Math.abs(k.tiefe - gesucht.tiefe) < 0.005;
-  }) || null;
 }
 
 // Ein Eintrag je Gruppe, mit den Summen aller Groessen und der Zahl der
@@ -156,7 +140,7 @@ function massenauszugRechnen(gliederung) {
 
   getFundamente().forEach(p => {
     const bp = { ...p, ...(allBp[p.id] || {}) };
-    const eintrag = _mkTypZuStandort(ftProfile, bp);
+    const eintrag = ftTypZuStandort(ftProfile, bp);
     const typName = eintrag?.name || bp.fundtyp || '— kein Typ —';
 
     let schluessel = typName;
@@ -168,15 +152,19 @@ function massenauszugRechnen(gliederung) {
     }
 
     if (!gruppen.has(schluessel)) {
-      gruppen.set(schluessel, { name: schluessel, anzahl: 0, fehlend: 0,
-        beton: 0, aushub: 0, schalung: 0, bewehr: 0, schraub: 0 });
+      const leer = { name: schluessel, fehlend: 0 };
+      MASSEN_GROESSEN.forEach(g => { leer[g.id] = 0; });
+      gruppen.set(schluessel, leer);
     }
     const g = gruppen.get(schluessel);
     g.anzahl++;
     const d = _mkTypDaten(eintrag);
-    if (!d || d.beton == null) g.fehlend++;
-    if (d) ['beton','aushub','schalung','bewehr','schraub'].forEach(k => {
-      if (d[k] != null) g[k] += d[k];
+    // Fehlend heisst: zu diesem Standort laesst sich gar keine Menge rechnen.
+    // Ein Pfahlfundament ohne Betonvolumen, aber mit Bohrmetern zaehlt nicht
+    // dazu — es ist erfasst, nur anders bemessen.
+    if (!d || (d.beton == null && d.pfahlMeter == null)) g.fehlend++;
+    if (d) MASSEN_GROESSEN.forEach(({ id }) => {
+      if (id !== 'anzahl' && d[id] != null) g[id] += d[id];
     });
   });
 
@@ -184,7 +172,8 @@ function massenauszugRechnen(gliederung) {
 }
 
 function massenSummen(zeilen) {
-  const s = { anzahl: 0, fehlend: 0, beton: 0, aushub: 0, schalung: 0, bewehr: 0, schraub: 0 };
+  const s = { fehlend: 0 };
+  MASSEN_GROESSEN.forEach(g => { s[g.id] = 0; });
   zeilen.forEach(z => Object.keys(s).forEach(k => { s[k] += z[k] || 0; }));
   return s;
 }
@@ -252,7 +241,7 @@ function _mkKennzahlen(summen, zeilen) {
      </div>`;
   box.innerHTML =
       kachel(summen.anzahl, 'Fundamente',
-             summen.fehlend ? summen.fehlend + ' ohne Kubatur' : '')
+             summen.fehlend ? summen.fehlend + ' ohne rechenbare Menge' : '')
     + kachel(_mkZahl(summen.beton, 1) + ' m³', 'Beton')
     + kachel(_mkZahl(summen.aushub, 1) + ' m³', 'Aushub')
     + kachel(zeilen.length, 'Gruppen im Auszug');
@@ -269,6 +258,9 @@ function _mkMassenTabelle(zeilen, summen, gliederung) {
   const kopf = { typ: 'Fundamenttyp', massnahme: 'Massnahme', los: 'Los' }[gliederung] || 'Gruppe';
   const zelle = (inhalt, rechts) =>
     `<td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;${rechts ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}">${inhalt}</td>`;
+  // Die Spalten kommen aus MASSEN_GROESSEN — eine neue Groesse erscheint
+  // damit von selbst in Tabelle, Summenzeile und Verzeichnis.
+  const wert = (z, g) => _mkZahl(z[g.id], MASSEN_GANZ.has(g.id) ? 0 : 1);
   el.innerHTML =
     `<table style="width:100%;border-collapse:collapse;font-size:12px;">
        <thead><tr style="background:#f9fafb;">
@@ -278,23 +270,13 @@ function _mkMassenTabelle(zeilen, summen, gliederung) {
        </tr></thead>
        <tbody>
          ${zeilen.map(z => `<tr>
-           ${zelle(escHtml(z.name) + (z.fehlend ? ` <span title="${z.fehlend} Standort(e) ohne Kubatur am Typ" style="color:#b45309;">·</span>` : ''))}
-           ${zelle(z.anzahl, true)}
-           ${zelle(_mkZahl(z.beton, 1), true)}
-           ${zelle(_mkZahl(z.aushub, 1), true)}
-           ${zelle(_mkZahl(z.schalung, 1), true)}
-           ${zelle(_mkZahl(z.bewehr, 0), true)}
-           ${zelle(z.schraub, true)}
+           ${zelle(escHtml(z.name) + (z.fehlend ? ` <span title="${z.fehlend} Standort(e) ohne rechenbare Menge" style="color:#b45309;">·</span>` : ''))}
+           ${MASSEN_GROESSEN.map(g => zelle(wert(z, g), true)).join('')}
          </tr>`).join('')}
        </tbody>
        <tfoot><tr style="background:#f9fafb;font-weight:700;">
          ${zelle('Total')}
-         ${zelle(summen.anzahl, true)}
-         ${zelle(_mkZahl(summen.beton, 1), true)}
-         ${zelle(_mkZahl(summen.aushub, 1), true)}
-         ${zelle(_mkZahl(summen.schalung, 1), true)}
-         ${zelle(_mkZahl(summen.bewehr, 0), true)}
-         ${zelle(summen.schraub, true)}
+         ${MASSEN_GROESSEN.map(g => zelle(wert(summen, g), true)).join('')}
        </tr></tfoot>
      </table>`;
 }
