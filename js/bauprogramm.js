@@ -2905,7 +2905,6 @@ function openBpFullscreen(paketId) {
   const pane = document.getElementById('bp-fs-map-pane');
   if (pane) pane.style.display = 'block';
   _bpFsMapOpen = true;
-  _updateBpFsMapBtn();
   _moveFsMap();
   // Info-Layer auf "Baupaket / Schicht" setzen
   _bpFsPrevInfoLayer = _overviewInfoLayer;
@@ -2954,15 +2953,29 @@ function toggleBpFsMap() {
   _bpFsMapOpen = !_bpFsMapOpen;
   const pane = document.getElementById('bp-fs-map-pane');
   if (pane) pane.style.display = _bpFsMapOpen ? 'block' : 'none';
-  _updateBpFsMapBtn();
   if (_bpFsMapOpen) _moveFsMap();
   else _restoreFsMap();
 }
 
-function _updateBpFsMapBtn() {
-  const btn = document.getElementById('bp-fs-map-toggle-btn');
-  if (!btn) return;
-  btn.classList.toggle('an', _bpFsMapOpen);
+// Die Legende ist eine Leaflet-Steuerung unten links auf der Uebersichtskarte.
+// Im Bauprogramm-Vollbild gehoert sie an die Seite und aufgeklappt: dort steckt
+// der Bauablauf-Schieber, der hier das eigentliche Werkzeug ist.
+let _bpFsLegendeHeimat = null;
+
+function _bpFsLegendeUmhaengen(insVollbild) {
+  const leg    = document.getElementById('ov-legend-outer');
+  const halter = document.getElementById('bp-fs-legende-halter');
+  if (!leg || !halter) return;
+  if (insVollbild) {
+    _bpFsLegendeHeimat = _bpFsLegendeHeimat || leg.parentElement;
+    halter.appendChild(leg);
+    leg.classList.add('legende-seitlich');
+    // Auf schmalen Geraeten ist der Koerper zugeklappt — hier nicht
+    leg.querySelector('#ov-legend-body')?.classList.remove('ov-legend-collapsed');
+  } else if (_bpFsLegendeHeimat) {
+    _bpFsLegendeHeimat.appendChild(leg);
+    leg.classList.remove('legende-seitlich');
+  }
 }
 
 // Verschiebt #overview-map in den Vollbild-Pane und zeigt Paket-Highlight
@@ -2999,6 +3012,7 @@ function _moveFsMap() {
   }
   const unten = document.getElementById('ov-karte-unten');
   if (unten) pane.appendChild(unten);
+  _bpFsLegendeUmhaengen(true);
   mapEl.style.height       = '100%';
   mapEl.style.width        = '100%';
   mapEl.style.borderRadius = '0';
@@ -3023,6 +3037,7 @@ function _restoreFsMap() {
   if (nav) { wrap.appendChild(nav); nav.classList.remove('im-bp-vollbild'); }
   const unten = document.getElementById('ov-karte-unten');
   if (unten) wrap.appendChild(unten);
+  _bpFsLegendeUmhaengen(false);
   mapEl.style.height       = '';
   mapEl.style.width        = '';
   mapEl.style.borderRadius = '';

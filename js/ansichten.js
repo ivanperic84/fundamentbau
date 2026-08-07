@@ -2684,6 +2684,8 @@ function karteNavAufbauen(halterId, opt) {
     const i = liste.findIndex(p => p.id === opt.aktiv());
     el.label.textContent = i < 0 ? 'Standort wählen' : `${name(liste[i])} / ${liste.length}`;
     el.prev.disabled = el.next.disabled = !liste.length;
+    // Ohne Auswahl tritt die Zeile ueber der Karte zurueck (siehe .leer)
+    halter.classList.toggle('leer', i < 0);
   };
 
   const zuklappen = () => el.panel.classList.remove('offen');

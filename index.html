@@ -807,13 +807,41 @@
   #ov-nav-halter { right: 72px; }
   /* Im Bauprogramm-Vollbild sitzt nur der GPS-Knopf rechts (right:10px) */
   #ov-nav-halter.im-bp-vollbild { right: 52px; }
-  .karte-nav-halter .pair-nav {
-    pointer-events: auto;
-    position: static; margin: 0 auto; max-width: 380px;
-    border-bottom: none; border-radius: 10px;
-    background: rgba(255,255,255,0.96);
+
+  /* Legende als eigene Darstellung an der rechten Seite des
+     Bauprogramm-Vollbilds — mit dem Bauablauf-Schieber. */
+  #bp-fs-legende-halter:empty { display: none; }
+  #bp-fs-legende-halter {
+    position: absolute; z-index: 700;
+    top: 52px; right: 10px; width: 232px;
+  }
+  /* !important, weil die Steuerung ihre Breite inline mitbringt */
+  #ov-legend-outer.legende-seitlich {
+    max-width: none !important; width: 100%;
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
   }
+  #ov-legend-outer.legende-seitlich #ov-legend-body { display: block; }
+  #ov-legend-outer.legende-seitlich #ov-legend-toggle { display: none; }
+  /* Der Schieber ist hier das Werkzeug, nicht eine Randnotiz */
+  #ov-legend-outer.legende-seitlich input[type="range"] { height: 22px; }
+  /* Ueber der Karte kompakt: gleiche Hoehe wie die Auswahlfelder am unteren
+     Kartenrand, damit die Karte nicht von Bedienelementen zugestellt wird. */
+  .karte-nav-halter .pair-nav {
+    pointer-events: auto;
+    position: static; margin: 0 auto; max-width: 260px;
+    padding: 3px 4px; gap: 2px;
+    border-bottom: none; border-radius: 8px;
+    background: rgba(255,255,255,0.96);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .karte-nav-halter .pair-nav-btn.nur-symbol { width: 24px; height: 24px; }
+  .karte-nav-halter .pair-jump-btn { padding: 2px 6px; font-size: 12px; }
+
+  /* Ohne gewaehlten Standort tritt die Zeile zurueck — sie ist dann ein
+     Angebot, kein Zustand. Beim Annaehern wird sie wieder voll sichtbar. */
+  .karte-nav-halter.leer .pair-nav { opacity: 0.45; }
+  .karte-nav-halter.leer:hover .pair-nav,
+  .karte-nav-halter.leer:focus-within .pair-nav { opacity: 1; }
   /* Gruppen auf-/zuklappen und Reihenfolge zuruecksetzen betreffen die
      Seitenleiste — im Vollbild ist sie nicht da. */
   /* !important, weil die Knoepfe ihr display inline tragen */
@@ -8236,12 +8264,11 @@ function _ladeScript(pfad) {
         <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Monate</button>
         <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Jahre</button>
       </div>
-      <!-- Kartenschalter wie in der Abnahme. _updateBpFsMapBtn() erwartet
-           diesen Knopf seit je, er fehlte aber im Kopf — die Karte liess sich
-           nur ueber ein Baupaket oeffnen. -->
-      <button id="bp-fs-map-toggle-btn" class="kopf-knopf" onclick="toggleBpFsMap()" title="Karte ein-/ausblenden">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-        Karte
+      <!-- Die Karte gehoert in dieser Ansicht dazu und ist immer offen; der
+           fruehere Schalter dafuer ist entfallen. Hier steht stattdessen der
+           echte Vollbildmodus des Browsers. -->
+      <button id="bp-fs-native-btn" class="kopf-knopf" onclick="toggleBpNativeFs()" title="Nativer Vollbild">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
       </button>
       <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -8256,6 +8283,11 @@ function _ladeScript(pfad) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
     </div>
+    <!-- Aufnahme fuer die Legende samt Bauablauf-Schieber. Auf der
+         Uebersichtskarte sitzt sie als Leaflet-Steuerung unten links und ist
+         auf schmalen Geraeten zugeklappt; hier steht sie offen an der Seite,
+         damit der Schieber unmittelbar bedienbar ist (_moveFsMap). -->
+    <div id="bp-fs-legende-halter"></div>
   </div>
   <!-- Gantt + Legende unten -->
   <div id="bp-fs-left" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;min-width:0;">
