@@ -981,6 +981,9 @@
   .pair-jump-panel.offen { display: block; }
   /* Das Suchfeld selbst kommt von .app-suche.voll */
   .pair-jump-panel .app-suche { margin-bottom: 6px; }
+  /* Trefferliste unter dem Suchfeld im Kopf: sie haengt am Feld, nicht an
+     einer Zeile mit Pfeilen — deshalb linksbuendig statt mittig. */
+  #kopf-such-panel { left: 0; transform: none; width: 260px; z-index: 3000; }
   .pair-jump-liste { max-height: 260px; overflow-y: auto; }
   .pair-jump-eintrag {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -1577,9 +1580,21 @@
       <span id="progress-label">0/0</span>
     </div>
     <span style="flex:1 1 auto;min-width:8px;"></span>
-    <input class="app-suche dunkel" id="search-input" type="search" placeholder="Suchen…"
-           title="Standort suchen — Text sucht in Bezeichnung, Strecke, Fundamenttyp, Zugang, Kommentar, Schlagwort und Notizen; Zahlen gelten als Mast-/Positionsnummer oder Kilometer"
-           oninput="onSearchInput(this.value)">
+    <!-- Suchfeld mittig: die beiden Zwischenraeume links und rechts sind
+         gleich stark, damit es unabhaengig von der Breite der Nachbarn in der
+         Mitte steht. Die Trefferliste darunter waehlt einen Standort. -->
+    <div id="kopf-such-wrap" style="position:relative;flex-shrink:1;min-width:0;">
+      <input class="app-suche dunkel" id="search-input" type="search" placeholder="Suchen…"
+             title="Standort suchen und wählen — Text sucht in Bezeichnung, Strecke, Fundamenttyp, Zugang, Kommentar, Schlagwort und Notizen; Zahlen gelten als Mast-/Positionsnummer oder Kilometer"
+             autocomplete="off"
+             oninput="onSearchInput(this.value)"
+             onfocus="kopfSuchListe(this.value)"
+             onkeydown="kopfSuchTaste(event)">
+      <div class="pair-jump-panel" id="kopf-such-panel">
+        <div class="pair-jump-liste" id="kopf-such-liste"></div>
+      </div>
+    </div>
+    <span style="flex:1 1 auto;min-width:8px;"></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;padding-left:20px;">
     <!-- Verlaufs-Navigation. Der frühere Knopf «Übersicht» stand daneben und
