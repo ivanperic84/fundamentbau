@@ -28,6 +28,56 @@ function makeTile(key, opts={}) {
 // touchRotate an (zwei Finger auf dem Tablet).
 const KARTE_DREH_OPT = { rotate: true, touchRotate: true, rotateControl: false };
 
+// Zwei Finger auf der Karte heissen meistens «zoomen». Das Paket dreht aber
+// schon bei einem Grad Verdrehung mit, und beim Aufziehen stehen die Finger
+// nie exakt gleich — die Karte kippte dadurch unbeabsichtigt. Deshalb eine
+// Totzone: gedreht wird erst ab dieser Verdrehung. Ist sie einmal
+// ueberschritten, bleibt das Drehen fuer den Rest der Geste frei.
+const KARTE_DREH_TOTZONE = 12;  // Grad
+
+(function drehTotzoneEinbauen() {
+  const G = L.Map && L.Map.TouchGestures;
+  if (!G) return;
+  const startAlt = G.prototype._onTouchStart;
+  const moveAlt  = G.prototype._onTouchMove;
+
+  G.prototype._onTouchStart = function (e) {
+    this._drehFrei = false;
+    startAlt.call(this, e);
+  };
+
+  G.prototype._onTouchMove = function (e) {
+    // Nur solange auch gezoomt wird — sonst wuerde die Sperre die einzige
+    // Wirkung der Geste unterdruecken.
+    if (this.rotate && this._zooming && !this._drehFrei
+        && e.touches && e.touches.length === 2) {
+      const map = this._map;
+      const p1 = map.mouseEventToContainerPoint(e.touches[0]);
+      const p2 = map.mouseEventToContainerPoint(e.touches[1]);
+      const v  = p1.subtract(p2);
+      // Der Winkel aus atan springt um 180 Grad, wenn die Finger die Seite
+      // wechseln; hier interessiert nur die Verdrehung gegen den Start.
+      let delta = (Math.atan(v.x / v.y) - this._startTheta) * L.DomUtil.RAD_TO_DEG;
+      delta = ((delta % 180) + 270) % 180 - 90;
+
+      if (Math.abs(delta) < KARTE_DREH_TOTZONE) {
+        const merk = this._rotating;
+        this._rotating = false;      // dieser Schritt zoomt nur
+        moveAlt.call(this, e);
+        this._rotating = merk;
+        return;
+      }
+      // Freigabe: ohne Nachfuehren des Startwinkels spraenge die Karte hier
+      // um die volle Totzone weiter.
+      this._drehFrei = true;
+      this._startTheta   = Math.atan(v.x / v.y);
+      this._startBearing = map.getBearing();
+      if (v.y < 0) this._startBearing += 180;
+    }
+    moveAlt.call(this, e);
+  };
+})();
+
 const KARTE_DREHUNG_KEY = 'sp_karte_drehung';
 
 function _karteDrehungLaden() {
