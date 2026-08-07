@@ -2686,9 +2686,7 @@
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               <input type="file" accept="image/*" id="foto-input" style="display:none" multiple onchange="addFotos(this)">
             </label>
-            <button onclick="event.stopPropagation();openCamera()" title="Foto aufnehmen" style="cursor:pointer;background:none;border:none;padding:6px;color:#6b7280;display:flex;align-items:center;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            </button>
+            <!-- Aufnehmen laeuft ueber den Schnellfoto-Knopf an der Karte -->
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
@@ -2726,12 +2724,7 @@
         <h3 onclick="toggleSection('sec-notizen')">
           <span>Notizen</span>
           <span style="display:flex;align-items:center;gap:6px;">
-            <button onclick="event.stopPropagation();notizNeu()" title="Neue Notiz"
-              style="cursor:pointer;background:none;border:none;padding:6px;color:#6b7280;display:flex;align-items:center;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
+            <!-- Erfassen laeuft ueber den Schnellnotiz-Knopf an der Karte -->
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
@@ -3601,15 +3594,25 @@
           style="position:absolute;top:46px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
         </button>
+        <!-- Erscheint erst mit laufendem GPS: schaltet die Detailansicht
+             fortlaufend auf den nächstgelegenen Standort um. -->
+        <button id="btn-gps-auto" onclick="toggleGpsAutoStandort()" title="Nächsten Standort automatisch wählen"
+          style="display:none;position:absolute;top:82px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;align-items:center;justify-content:center;opacity:0.5;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="2.5"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>
+        </button>
         <!-- Schnellzugriff unten rechts: Notiz und Foto zum aktuellen Standort.
              Dieselbe Handlung wie in der Übersicht, nur ohne Standortauswahl —
              der Standort steht in der Detailansicht bereits fest. -->
         <div class="detail-fabs">
-          <label class="detail-fab" title="Schnellfoto aufnehmen" aria-label="Schnellfoto aufnehmen">
+          <!-- Der Auslöser ist ein Knopf, nicht ein <label> um das Feld. Auf dem
+               Tablet öffnete sich über das Label nicht zuverlässig die Kamera;
+               der Knopf löst das Dateifeld ausdrücklich per click() aus und
+               meldet zurück, wenn kein Standort geöffnet ist. -->
+          <button class="detail-fab" onclick="schnellFotoDetail()" title="Schnellfoto aufnehmen" aria-label="Schnellfoto aufnehmen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <!-- capture=environment: auf dem Tablet öffnet direkt die Rückkamera -->
-            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="addFotos(this)">
-          </label>
+          </button>
+          <!-- capture=environment: auf dem Tablet öffnet direkt die Rückkamera -->
+          <input id="detail-foto-input" type="file" accept="image/*" capture="environment" style="display:none;" onchange="addFotos(this)">
           <button class="detail-fab" onclick="notizNeu()" title="Schnellnotiz erfassen" aria-label="Schnellnotiz erfassen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>

@@ -603,9 +603,9 @@ function openCreateView(id) {
       const last = PAIRS[PAIRS.length - 1];
       const src  = last.rs?.e ? last.rs : (last.rks?.e ? last.rks : null);
       const c    = src ? lv95ToWgs84(src.e, src.n) : null;
-      mapCenter  = (c && !c.invalid) ? c : { lat: 47.566, lng: 9.106 };
+      mapCenter  = (c && !c.invalid) ? c : { ...CREATE_MAP_NOTFALL, ersatz: true };
     } else {
-      mapCenter = { lat: 47.566, lng: 9.106 };
+      mapCenter = { ...CREATE_MAP_NOTFALL, ersatz: true };
     }
   }
 
@@ -650,6 +650,10 @@ function openCreateView(id) {
   }, 80);
 }
 
+// Letzte Rueckfallposition, wenn weder ein bestehender Standort noch GPS
+// etwas Besseres liefern: Mitte des bisherigen Projektgebiets.
+const CREATE_MAP_NOTFALL = { lat: 47.566, lng: 9.106 };
+
 function initCreateMap(center) {
   // Vorherige Instanz bereinigen
   if (createMapLeaflet) {
@@ -666,6 +670,22 @@ function initCreateMap(center) {
 
   createMapLeaflet = L.map('create-map', { zoomControl: true, attributionControl: false })
     .setView([center.lat, center.lng], 19);
+
+  // Kein bestehender Standort als Anhaltspunkt: dann ist die eigene Position
+  // der beste Ausschnitt. Nachgeholt, sobald sie vorliegt — die Karte steht
+  // solange auf der Rueckfallposition, statt auf das GPS zu warten.
+  if (center.ersatz && navigator.geolocation) {
+    const karte = createMapLeaflet;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        // Zwischenzeitlich gesetzte Punkte nicht ueberfahren
+        if (karte !== createMapLeaflet || createRsMarker || createRksMarker) return;
+        karte.setView([pos.coords.latitude, pos.coords.longitude], 18);
+      },
+      () => { /* ohne GPS bleibt die Rueckfallposition stehen */ },
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+    );
+  }
 
   // Luftbild als Standard-Basiskarte
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg',
@@ -1223,20 +1243,29 @@ function onCreateSearch(val) {
 // Suchfeld daneben waere die naheliegende, aber schlechtere Loesung — man
 // muesste erst entscheiden, welches Feld zustaendig ist.
 async function fetchCreateSearch(query) {
-  const bahn = (typeof bahnSuche === 'function' ? bahnSuche(query) : [])
+  const orteHolen = (async () => {
+    try {
+      const url = `https://api.geo.admin.ch/rest/services/ech/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&lang=de&limit=5&sr=4326`;
+      const data = await fetch(url).then(r => r.json());
+      // geo.admin liefert im Suchergebnis y als Breite und x als Laenge
+      return (data.results || []).map(r => ({
+        lat: r.attrs.y, lng: r.attrs.x,
+        titel: r.attrs.label.replace(/<[^>]+>/g, ''), neben: '', art: 'Ort',
+      }));
+    } catch { return []; } // Netzwerkfehler ignorieren — Bahntreffer bleiben nutzbar
+  })();
+  const stationenHolen = typeof bahnStationSuchenOnline === 'function'
+    ? bahnStationSuchenOnline(query) : Promise.resolve([]);
+
+  const bahn = (typeof bahnSuche === 'function' ? bahnSuche(query) : []);
+  const [stationen, orte] = await Promise.all([stationenHolen, orteHolen]);
+
+  // Stationen zuerst: gesucht wird der Bahnhof, nicht das Dorfzentrum.
+  // Was die oertliche Suche schon kennt, kommt nicht doppelt.
+  const bekannt = new Set(bahn.map(t => t.titel));
+  const alleBahn = [...bahn, ...stationen.filter(s => !bekannt.has(s.titel))]
     .map(t => ({ lat: t.lat, lng: t.lon, titel: t.titel, neben: t.neben, art: t.art }));
-  let orte = [];
-  try {
-    const url = `https://api.geo.admin.ch/rest/services/ech/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&lang=de&limit=5&sr=4326`;
-    const data = await fetch(url).then(r => r.json());
-    // geo.admin liefert im Suchergebnis y als Breite und x als Laenge
-    orte = (data.results || []).map(r => ({
-      lat: r.attrs.y, lng: r.attrs.x,
-      titel: r.attrs.label.replace(/<[^>]+>/g, ''), neben: '', art: 'Ort',
-    }));
-  } catch { /* Netzwerkfehler ignorieren — Bahntreffer bleiben nutzbar */ }
-  // Bahntreffer zuerst: sie sind die praezisere Angabe
-  renderCreateSearchResults([...bahn, ...orte]);
+  renderCreateSearchResults([...alleBahn, ...orte]);
 }
 
 let _createSuchTreffer = [];

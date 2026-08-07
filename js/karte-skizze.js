@@ -757,12 +757,15 @@ function updateMapToCurrentPair() {
 function toggleGPS() {
   const btn    = document.getElementById('btn-gps');
   const btnTop = document.getElementById('btn-gps-top');
+  const btnAuto = document.getElementById('btn-gps-auto');
   const syncGpsBtn = (active) => {
     if (btn)    { btn.classList.toggle('active', active); btn.style.opacity = active ? '1' : '0.45'; }
     if (btnTop) btnTop.style.opacity = active ? '1' : '0.5';
+    if (btnAuto) btnAuto.style.display = active ? 'flex' : 'none';
   };
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId); watchId = null;
+    gpsAutoStandortSetzen(false);
     if (gpsMarker)  { gpsMarker.remove();  gpsMarker  = null; }
     if (gpsCircle)  { gpsCircle.remove();  gpsCircle  = null; }
     if (btn) { btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> GPS'; }
@@ -792,6 +795,7 @@ function toggleGPS() {
       syncGpsBtn(true);
       document.getElementById('btn-gps-zoom').style.display = '';
       updateDistances(lat, lng);
+      gpsAutoStandortAnwenden(lat, lng);
     },
     err => {
       if (btn) btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> GPS';
@@ -818,6 +822,79 @@ function zoomToGPS() {
   if (gpsMarker && leafletMap) {
     leafletMap.setView(gpsMarker.getLatLng(), 18);
   }
+}
+
+// ── Automatische Standortwahl nach GPS ───────────────────────
+// Auf der Baustelle geht man die Standorte der Reihe nach ab. Statt jedes Mal
+// von Hand umzuschalten, uebernimmt dieser Schalter die Wahl: bei jeder neuen
+// Position wird der naechstgelegene Standort geoeffnet.
+let _gpsAutoStandort = false;
+let _gpsAutoHighlight = null;
+
+// Gewechselt wird erst, wenn der andere Standort deutlich naeher liegt.
+// Ohne diesen Abstand springt die Ansicht zwischen zwei fast gleich weit
+// entfernten Standorten hin und her, sobald das GPS um ein paar Meter wandert.
+const GPS_AUTO_VORSPRUNG_M = 15;
+
+function toggleGpsAutoStandort() {
+  gpsAutoStandortSetzen(!_gpsAutoStandort);
+  if (_gpsAutoStandort) {
+    const p = gpsMarker?.getLatLng();
+    if (p) gpsAutoStandortAnwenden(p.lat, p.lng);
+    else ui.toast('Warte auf GPS-Position…');
+  }
+}
+
+function gpsAutoStandortSetzen(an) {
+  _gpsAutoStandort = !!an;
+  const btn = document.getElementById('btn-gps-auto');
+  if (btn) {
+    btn.style.opacity    = _gpsAutoStandort ? '1' : '0.5';
+    btn.style.background = _gpsAutoStandort ? '#1a3a5c' : 'white';
+    btn.style.color      = _gpsAutoStandort ? '#fff'    : '#374151';
+  }
+  if (!_gpsAutoStandort) standortHighlightEntfernen();
+}
+
+function gpsAutoStandortAnwenden(lat, lng) {
+  if (!_gpsAutoStandort) return;
+  // pairCenter liefert fuer Standorte ohne Koordinaten die Schweizmitte —
+  // ein gueltiger Punkt, der die Auswahl verfaelschen wuerde. Deshalb wird
+  // hier am Datensatz geprueft, nicht am berechneten Mittelpunkt.
+  const kandidaten = PAIRS
+    .filter(p => p.rs?.e || p.rks?.e || p.fund?.e)
+    .map(p => ({ p, c: pairCenter(p) }))
+    .filter(x => !x.c.invalid)
+    .map(x => ({ id: x.p.id, dist: haversine(lat, lng, x.c.lat, x.c.lng) }))
+    .sort((a, b) => a.dist - b.dist);
+  if (!kandidaten.length) return;
+  const naechster = kandidaten[0];
+  if (naechster.id === currentPairId) { standortHighlightZeigen(currentPairId); return; }
+  const aktuell = kandidaten.find(k => k.id === currentPairId);
+  if (aktuell && aktuell.dist - naechster.dist < GPS_AUTO_VORSPRUNG_M) return;
+  showDetail(naechster.id);
+  standortHighlightZeigen(naechster.id);
+  const pair = PAIRS.find(p => p.id === naechster.id);
+  ui.toast(`Standort ${pair?.mast || naechster.id} · ${formatDist(naechster.dist)}`);
+}
+
+// Der gewaehlte Standort wird auf der Karte hervorgehoben — sonst ist bei
+// dicht beieinanderliegenden Punkten nicht erkennbar, welcher gerade gilt.
+function standortHighlightZeigen(pairId) {
+  const pair = PAIRS.find(p => p.id === pairId);
+  if (!pair || !leafletMap) return;
+  if (!(pair.rs?.e || pair.rks?.e || pair.fund?.e)) return;
+  const c = pairCenter(pair);
+  if (c.invalid) return;
+  standortHighlightEntfernen();
+  _gpsAutoHighlight = L.circleMarker([c.lat, c.lng], {
+    radius: 22, color: '#1a3a5c', weight: 3, opacity: 0.9,
+    fillColor: '#1a3a5c', fillOpacity: 0.12, interactive: false,
+  }).addTo(leafletMap);
+}
+
+function standortHighlightEntfernen() {
+  if (_gpsAutoHighlight) { _gpsAutoHighlight.remove(); _gpsAutoHighlight = null; }
 }
 
 // ============================================================

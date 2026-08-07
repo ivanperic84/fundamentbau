@@ -598,6 +598,34 @@ function bahnSuche(text) {
   return treffer.slice(0, 8);
 }
 
+// Namenssuche direkt bei data.sbb.ch. bahnSuche() kennt nur Stationen aus
+// bereits geladenen Kartenausschnitten — beim Anlegen eines neuen Standorts
+// ist dieser Bestand in der Regel leer, und die Ortssuche landet dann im
+// Dorfzentrum statt am Bahnhof.
+async function bahnStationSuchenOnline(text) {
+  const q = (text || '').trim().replace(/["\\]/g, '');
+  if (q.length < 2) return [];
+  try {
+    const treffer = await _bahnAbfrage(
+      'linie-mit-betriebspunkten', `search(bezeichnung_offiziell, "${q}")`,
+      p => (!p.geopos || !p.bezeichnung_offiziell) ? null : {
+        art: 'Station', titel: p.bezeichnung_offiziell,
+        neben: `Linie ${p.linie}${p.km != null ? ' · km ' + (+p.km).toFixed(1) : ''}`,
+        lat: p.geopos.lat, lon: p.geopos.lon,
+      }, 100);
+    // Ein Betriebspunkt steht je Linie einmal im Datensatz — der erste
+    // Eintrag genuegt, die Lage ist dieselbe.
+    const gesehen = new Set();
+    return treffer.filter(t => {
+      if (gesehen.has(t.titel)) return false;
+      gesehen.add(t.titel);
+      return true;
+    }).slice(0, 6);
+  } catch {
+    return []; // ohne Netz bleibt die oertliche Suche
+  }
+}
+
 function bahnSucheEingabe(text) {
   const liste = document.getElementById('bahn-such-liste');
   if (!liste) return;

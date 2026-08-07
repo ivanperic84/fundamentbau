@@ -106,6 +106,9 @@ function addFotos(input) {
         setPairData(currentPairId, { fotos: allFotos });
         logChange(currentPairId, 'Foto', `${files.length} hinzugefügt (${PHASEN_CONFIG[_activePhase]?.labelKurz || _activePhase})`);
         renderFotos();
+        // Rueckmeldung: der Knopf an der Karte liegt oft ueber der eingeklappten
+        // Fotoliste — ohne Meldung sieht man nicht, dass etwas gespeichert wurde.
+        ui.toast(files.length === 1 ? 'Foto gespeichert' : `${files.length} Fotos gespeichert`, 'erfolg');
       }
     };
     reader.readAsDataURL(file);
@@ -115,6 +118,17 @@ function addFotos(input) {
 
 // Legacy-Alias (falls noch aufgerufen)
 function addFoto(input) { addFotos(input); }
+
+// Schnellfoto-Knopf an der Karte der Detailansicht.
+// Ohne gewaehlten Standort haette addFotos keinen Ort zum Ablegen — dann gar
+// nicht erst die Kamera oeffnen, sondern sagen warum.
+function schnellFotoDetail() {
+  if (!currentPairId) { ui.toast('Kein Standort geöffnet', 'fehler'); return; }
+  const inp = document.getElementById('detail-foto-input');
+  if (!inp) return;
+  inp.value = '';
+  inp.click();
+}
 
 // ── Kamera-Funktionen ───────────────────────────────────────
 let _cameraStream = null;
