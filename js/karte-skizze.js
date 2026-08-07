@@ -92,9 +92,31 @@ let _karteDrehungLaeuft = false;            // gegen Rueckkopplung beim Verteile
 
 // Eine Karte anmelden: sie uebernimmt die aktuelle Drehung, bekommt das
 // Nordzeichen und meldet eigene Drehungen an alle uebrigen weiter.
+// Leaflet merkt von sich aus nicht, wenn sein Behaelter die Groesse aendert.
+// Bisher stand nach jeder Layoutaenderung ein invalidateSize() mit geratener
+// Verzoegerung im Code — bei der einfahrenden Seitenleiste blieb trotzdem ein
+// grauer Rand stehen. Der Beobachter meldet die Aenderung selbst.
+function karteGroesseBeobachten(karte) {
+  if (typeof ResizeObserver !== 'function' || karte._groessenWache) return;
+  let angefordert = false;
+  const wache = new ResizeObserver(() => {
+    if (angefordert) return;
+    angefordert = true;
+    requestAnimationFrame(() => {
+      angefordert = false;
+      karte.invalidateSize({ animate: false });
+      if (karte === leafletMap && typeof resizeSketchCanvas === 'function') resizeSketchCanvas();
+    });
+  });
+  wache.observe(karte.getContainer());
+  karte._groessenWache = wache;
+  karte.on('unload', () => { wache.disconnect(); karte._groessenWache = null; });
+}
+
 function karteDrehungAnmelden(karte) {
   if (!karte || _karteRegister.has(karte)) return;
   _karteRegister.add(karte);
+  karteGroesseBeobachten(karte);
   karte.on('unload', () => _karteRegister.delete(karte));
   if (typeof karte.setBearing === 'function' && _karteDrehung) karte.setBearing(_karteDrehung);
   nordZeichenAnlegen(karte);

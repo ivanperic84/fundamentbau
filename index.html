@@ -465,7 +465,9 @@
   /* dvh statt vh: 100vh rechnet auf Android die Flaeche hinter der
      Browserleiste mit — die Werkzeugleiste am unteren Kartenrand lag damit
      ausserhalb des sichtbaren Bereichs. vh bleibt als Rueckfall zuerst. */
-  .detail-layout { display: flex; height: calc(100vh - var(--app-header-h, 85px)); }
+  /* overflow:hidden, damit die eingefahrene Seitenleiste keinen Rollbalken
+     erzeugt (siehe .map-fullscreen weiter unten). */
+  .detail-layout { display: flex; overflow: hidden; height: calc(100vh - var(--app-header-h, 85px)); }
   @supports (height: 100dvh) {
     .detail-layout { height: calc(100dvh - var(--app-header-h, 85px)); }
   }
@@ -528,6 +530,13 @@
     width: 370px; min-width: 370px; background: #f0f2f5;
     overflow-y: auto; border-right: 1px solid #e0e4ea; display: flex; flex-direction: column;
     gap: 6px; padding: 0 8px 6px;
+    /* Fuer den Kartenvollbildmodus: die Leiste faehrt seitlich ein, statt zu
+       verschwinden. Der Sprung war vorher der einzige harte Schnitt in der
+       ganzen Ansicht. */
+    transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s linear;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .detail-sidebar { transition: none; }
   }
   .detail-main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
   .map-container { flex: 1; position: relative; height: 100%; }
@@ -863,10 +872,12 @@
   }
 
   /* Karten-Vollbildmodus in der Detailansicht */
-  .detail-layout.map-fullscreen .detail-sidebar { display: none; }
-  .detail-layout.map-fullscreen .detail-main {
-    position: fixed; inset: 0; z-index: 2000;
-    background: #000;
+  /* Die Leiste schiebt sich nach links aus dem Bild; die Karte waechst
+     dabei mit, weil sie den restlichen Platz nimmt. Frueher wurde die Leiste
+     ausgeblendet und die Karte fest ueber alles gelegt — ein harter Sprung,
+     der ausserdem das Kopfband mitverdeckte. */
+  .detail-layout.map-fullscreen .detail-sidebar {
+    margin-left: -370px; opacity: 0; pointer-events: none;
   }
   .detail-layout.map-fullscreen .map-container { height: 100%; }
   /* Vollbild-Button — schwebend oben rechts über der Karte */
