@@ -338,18 +338,38 @@
   }
   .pb-green { background: #34d399; transition: width 0.4s; }
   .pb-amber { background: #fbbf24; transition: width 0.4s; }
-  .kopf-suche {
+  /* ── Suchfelder ─────────────────────────────────────────────
+     Eine Festlegung fuer die ganze App: Kopfband, Karten, Panels.
+     Vorher trug jedes Feld seine eigenen Masse — gleiche Aufgabe,
+     drei verschiedene Hoehen und Rundungen.
+       .dunkel     im dunklen Kopfband
+       .auf-karte  ueber einer Karte (Schatten, heller Grund)
+       .voll       fuellt seinen Behaelter, waechst nicht */
+  .app-suche {
     width: 150px; flex-shrink: 1; min-width: 90px;
     padding: 5px 10px; border-radius: var(--r-sm);
-    border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.08);
-    color: #fff; font-size: var(--fs-md); font-family: inherit;
+    border: 1px solid #e0e4ea; background: #fff;
+    color: var(--c-text-strong); font-size: var(--fs-md); font-family: inherit;
+    outline: none;
     transition: background 0.15s, border-color 0.15s, width 0.15s;
   }
-  .kopf-suche::placeholder { color: rgba(255,255,255,0.45); }
-  .kopf-suche:focus {
-    outline: none; width: 210px;
+  .app-suche::placeholder { color: #9ca3af; }
+  .app-suche:focus { width: 210px; border-color: #94a3b8; }
+
+  .app-suche.dunkel {
+    border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.08); color: #fff;
+  }
+  .app-suche.dunkel::placeholder { color: rgba(255,255,255,0.45); }
+  .app-suche.dunkel:focus {
     background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.45);
   }
+
+  .app-suche.auf-karte {
+    background: rgba(255,255,255,0.96); box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+  }
+
+  .app-suche.voll { width: 100%; min-width: 0; }
+  .app-suche.voll:focus { width: 100%; }
   /* Zaehler an den Statusfiltern — ersetzt den frueheren Zahlenblock */
   .filter-btn .fb-zahl { margin-left: 6px; opacity: 0.6; font-variant-numeric: tabular-nums; }
   .filter-btn.active .fb-zahl { opacity: 0.75; }
@@ -841,14 +861,41 @@
   .leaflet-bar a:last-child  { border-radius: 0 0 7px 7px !important; }
   .leaflet-disabled { opacity: 0.4 !important; cursor: default !important; }
 
-  #btn-map-fullscreen {
-    position: absolute; top: 10px; right: 10px; z-index: 700;
-    background: rgba(255,255,255,0.92); border: 1px solid #d1d5db;
-    border-radius: 7px; padding: 5px 9px; cursor: pointer;
-    line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    transition: all 0.15s; display: flex; align-items: center;
+  /* ── Kartenknoepfe ──────────────────────────────────────────
+     Vollbild, GPS und Verwandtes — auf jeder Karte gleich. Vorher
+     trug jeder Knopf seine Masse inline: 32 und 34 Pixel, Radius 7
+     und 8, drei verschiedene Schatten.
+       .an   eingeschaltet (dunkel hinterlegt)
+       .aus  vorhanden, aber inaktiv (halbdurchsichtig) */
+  .karten-knopf {
+    width: 32px; height: 32px; border-radius: 7px; border: none;
+    background: rgba(255,255,255,0.94); color: var(--c-text-strong);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; flex-shrink: 0; transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
   }
-  #btn-map-fullscreen:hover { background: white; box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
+  .karten-knopf:hover { background: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.26); }
+  .karten-knopf.aus { opacity: 0.5; }
+  .karten-knopf.an  { background: #1a3a5c; color: #fff; opacity: 1; }
+  .karten-knopf.an:hover { background: #244a72; }
+
+  /* Knopfspalte in der oberen rechten Kartenecke */
+  .karten-knopf-spalte {
+    position: absolute; top: 10px; right: 10px; z-index: 700;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  /* Knoepfe im dunklen Kopf einer Vollbildansicht (Abnahme, Bauprogramm).
+     Damit sieht das Verlassen einer Ansicht ueberall gleich aus. */
+  .kopf-knopf {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12);
+    color: #fff; font-size: 11px; font-weight: 600; font-family: inherit;
+    cursor: pointer; white-space: nowrap;
+  }
+  .kopf-knopf:hover { background: rgba(255,255,255,0.22); }
+  .kopf-knopf.an { background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.6); }
   .tool-group { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
   .tool-btn {
     padding: 5px 9px; border-radius: 6px; border: 1px solid #d1d5db;
@@ -907,10 +954,8 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.14); padding: 8px;
   }
   .pair-jump-panel.offen { display: block; }
-  .pair-jump-such {
-    width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db;
-    font-size: 12px; font-family: inherit; margin-bottom: 6px;
-  }
+  /* Das Suchfeld selbst kommt von .app-suche.voll */
+  .pair-jump-panel .app-suche { margin-bottom: 6px; }
   .pair-jump-liste { max-height: 260px; overflow-y: auto; }
   .pair-jump-eintrag {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -1142,12 +1187,7 @@
   .bahn-linie { background: rgba(255,255,255,0.95); color: #111827; font-weight: 700; }
   .bahn-bp    { background: rgba(26,58,92,0.9);     color: #fff; padding: 1px 5px; font-weight: 700; }
 
-  /* Suche nach Station, Linie oder Kilometer */
-  .bahn-suche {
-    width: 150px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e0e4ea;
-    background: rgba(255,255,255,0.96); font-size: 11px; font-family: inherit;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.14); outline: none;
-  }
+  /* Suche nach Station, Linie oder Kilometer — Feld: .app-suche.auf-karte */
   .bahn-such-liste {
     display: none; position: absolute; bottom: calc(100% + 6px); left: 0;
     width: 250px; max-height: 240px; overflow-y: auto; z-index: 1001;
@@ -1408,12 +1448,7 @@
 
   /* ── Vollbild-Erfassungsansicht: Suchfeld-Ergebnisse ── */
   .create-search-wrap { position: relative; }
-  .create-search-input {
-    width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #e0e4ea;
-    font-size: 13px; font-family: inherit; outline: none; background: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  }
-  .create-search-input:focus { border-color: #3b82f6; }
+  /* Feld: .app-suche.voll.auf-karte */
   .create-search-results {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
     background: white; border-radius: 8px; border: 1px solid #e0e4ea;
@@ -1517,7 +1552,7 @@
       <span id="progress-label">0/0</span>
     </div>
     <span style="flex:1 1 auto;min-width:8px;"></span>
-    <input class="kopf-suche" id="search-input" type="search" placeholder="Suchen…"
+    <input class="app-suche dunkel" id="search-input" type="search" placeholder="Suchen…"
            title="Standort suchen — Text sucht in Bezeichnung, Strecke, Fundamenttyp, Zugang, Kommentar, Schlagwort und Notizen; Zahlen gelten als Mast-/Positionsnummer oder Kilometer"
            oninput="onSearchInput(this.value)">
   </div>
@@ -1698,18 +1733,15 @@
     <!-- Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
     <div class="karte-nav-halter offen" id="ov-nav-halter"></div>
 
-    <!-- Top-right: Vollbild + GPS -->
-    <div style="position:absolute;top:10px;right:30px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
-      <button id="btn-ov-fullscreen" onclick="toggleOverviewFullscreen()" title="Vollbild"
-        style="width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+    <!-- Vollbild + GPS oben rechts -->
+    <div class="karten-knopf-spalte" style="right:30px;">
+      <button id="btn-ov-fullscreen" class="karten-knopf" onclick="toggleOverviewFullscreen()" title="Vollbild">
         <svg id="btn-ov-fullscreen-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
-      <button id="btn-overview-gps" onclick="toggleOverviewGPS()" title="GPS"
-        style="width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
+      <button id="btn-overview-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
-      <button id="btn-overview-gps-zoom" onclick="zoomToOverviewGPS()" title="Zu meinem Standort"
-        style="display:none;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;align-items:center;justify-content:center;">
+      <button id="btn-overview-gps-zoom" class="karten-knopf" onclick="zoomToOverviewGPS()" title="Zu meinem Standort" style="display:none;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
@@ -1725,8 +1757,9 @@
       </button>
     </div>
 
-    <!-- Bottom: kompakte Dropdowns -->
-    <div style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:1000;
+    <!-- Bottom: kompakte Dropdowns. Wandert mit der Karte ins
+         Bauprogramm-Vollbild (_moveFsMap in js/bauprogramm.js). -->
+    <div id="ov-karte-unten" style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:1000;
                 display:flex;gap:8px;align-items:center;">
       <!-- Kartenart -->
       <select id="ov-basemap-select" onchange="setOverviewBaseLayer(this.value)"
@@ -1749,7 +1782,7 @@
       </select>
       <!-- Suche über Station, Liniennummer und Kilometer — nur bei aktiver Ebene -->
       <span id="bahn-suche-wrap" style="display:none;position:relative;align-items:center;">
-        <input class="bahn-suche" id="bahn-suche" type="search" placeholder="Station, Linie, km…"
+        <input class="app-suche auf-karte" id="bahn-suche" type="search" placeholder="Station, Linie, km…"
                oninput="bahnSucheEingabe(this.value)">
         <div class="bahn-such-liste" id="bahn-such-liste"></div>
       </span>
@@ -2477,7 +2510,7 @@
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div class="pair-jump-panel" id="pair-jump-panel">
-            <input class="pair-jump-such" id="pair-jump-such" type="search" placeholder="Standort suchen…"
+            <input class="app-suche voll" id="pair-jump-such" type="search" placeholder="Standort suchen…"
                    oninput="renderPairJumpListe(this.value)" onkeydown="pairJumpTaste(event)">
             <div class="pair-jump-liste" id="pair-jump-liste"></div>
           </div>
@@ -3639,18 +3672,18 @@
              im Vollbild bereit; die Zeile selbst wird aus der Seitenleiste
              hierher gehaengt (pairNavUmhaengen). -->
         <div id="karte-nav-halter" class="karte-nav-halter"></div>
-        <!-- Vollbild + GPS top-right -->
-        <button id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
-        <button id="btn-gps-top" onclick="toggleGPS()" title="GPS"
-          style="position:absolute;top:46px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </button>
-        <!-- Erscheint erst mit laufendem GPS: schaltet die Detailansicht
-             fortlaufend auf den nächstgelegenen Standort um. -->
-        <button id="btn-gps-auto" onclick="toggleGpsAutoStandort()" title="Nächsten Standort automatisch wählen"
-          style="display:none;position:absolute;top:82px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;align-items:center;justify-content:center;opacity:0.5;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="2.5"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>
-        </button>
+        <!-- Vollbild + GPS oben rechts -->
+        <div class="karten-knopf-spalte">
+          <button id="btn-map-fullscreen" class="karten-knopf" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+          <button id="btn-gps-top" class="karten-knopf aus" onclick="toggleGPS()" title="GPS">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+          <!-- Erscheint erst mit laufendem GPS: schaltet die Detailansicht
+               fortlaufend auf den nächstgelegenen Standort um. -->
+          <button id="btn-gps-auto" class="karten-knopf aus" onclick="toggleGpsAutoStandort()" title="Nächsten Standort automatisch wählen" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="2.5"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>
+          </button>
+        </div>
         <!-- Schnellzugriff unten rechts: Notiz und Foto zum aktuellen Standort.
              Dieselbe Handlung wie in der Übersicht, nur ohne Standortauswahl —
              der Standort steht in der Detailansicht bereits fest. -->
@@ -4628,21 +4661,19 @@ function _ladeScript(pfad) {
       <div class="create-map-search-wrap">
         <div style="display:flex;align-items:center;gap:6px;max-width:380px;margin:0 auto;">
           <div class="create-search-wrap" style="flex:1;">
-            <input id="create-map-search" class="create-search-input" type="search"
+            <input id="create-map-search" class="app-suche voll auf-karte" type="search"
                    placeholder="Ort suchen…"
                    oninput="onCreateSearch(this.value)"
                    onkeydown="if(event.key==='Escape'){this.value='';document.getElementById('create-search-results').style.display='none';}"
-                   autocomplete="off" style="font-size:12px;">
+                   autocomplete="off">
             <div id="create-search-results" class="create-search-results" style="display:none;"></div>
           </div>
           <!-- Vollbild -->
-          <button onclick="toggleCreateMapFullscreen()" title="Vollbild"
-            style="width:32px;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,0.8);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.2);">
+          <button class="karten-knopf" onclick="toggleCreateMapFullscreen()" title="Vollbild">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
           </button>
           <!-- GPS -->
-          <button onclick="locateCreateMap()" title="Mein Standort"
-            style="width:32px;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,0.8);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.2);">
+          <button class="karten-knopf" onclick="locateCreateMap()" title="Mein Standort">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2"/></svg>
           </button>
         </div>
@@ -5799,22 +5830,28 @@ function _ladeScript(pfad) {
          Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
     <div id="ck-nav-halter" class="karte-nav-leiste"></div>
     <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
-      <button id="ck-karte-btn" onclick="toggleCkKarte()" title="Situationskarte ein-/ausblenden"
-        style="display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;font-size:11px;font-weight:600;cursor:pointer;">
+      <button id="ck-karte-btn" class="kopf-knopf" onclick="toggleCkKarte()" title="Situationskarte ein-/ausblenden">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         Karte
       </button>
-      <button onclick="closeCheckliste()" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;font-size:14px;cursor:pointer;padding:0;" title="Schliessen">✕</button>
+      <button class="kopf-knopf" onclick="closeCheckliste()" title="Abnahme schliessen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schliessen
+      </button>
     </div>
   </div>
 
   <!-- Situationskarte (toggle) -->
   <div id="ck-karte-wrap" style="display:none;position:sticky;top:54px;z-index:9;height:220px;border-bottom:2px solid #1a3a5c;">
     <div id="ck-karte" style="width:100%;height:100%;"></div>
-    <button id="ck-gps-btn" onclick="toggleCkGps()" title="GPS-Standort anzeigen"
-      style="position:absolute;top:8px;right:8px;z-index:1000;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 6px rgba(0,0,0,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;pointer-events:all;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-    </button>
+    <div class="karten-knopf-spalte" style="z-index:1000;">
+      <button id="ck-vollbild-btn" class="karten-knopf" onclick="toggleCkKarteGross()" title="Karte vergrössern">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <button id="ck-gps-btn" class="karten-knopf aus" onclick="toggleCkGps()" title="GPS-Standort anzeigen">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
   </div>
 
   <div style="max-width:680px;margin:0 auto;padding:16px;">
@@ -8189,20 +8226,26 @@ function _ladeScript(pfad) {
         <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Monate</button>
         <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Jahre</button>
       </div>
-      <button onclick="closeBpFullscreen()"
-        style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:white;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <!-- Kartenschalter wie in der Abnahme. _updateBpFsMapBtn() erwartet
+           diesen Knopf seit je, er fehlte aber im Kopf — die Karte liess sich
+           nur ueber ein Baupaket oeffnen. -->
+      <button id="bp-fs-map-toggle-btn" class="kopf-knopf" onclick="toggleBpFsMap()" title="Karte ein-/ausblenden">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Karte
+      </button>
+      <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Schliessen
       </button>
     </div>
   </div>
   <!-- Karte oben (versteckt bis Toggle) — #overview-map wird per JS hierhin verschoben -->
   <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;">
-    <!-- Masse und Rundung wie die Kartenknoepfe der uebrigen Ansichten -->
-    <button id="btn-bp-fs-gps" onclick="toggleOverviewGPS()" title="GPS"
-      style="position:absolute;top:10px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-    </button>
+    <div class="karten-knopf-spalte">
+      <button id="btn-bp-fs-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
   </div>
   <!-- Gantt + Legende unten -->
   <div id="bp-fs-left" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;min-width:0;">

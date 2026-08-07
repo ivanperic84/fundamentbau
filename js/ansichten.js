@@ -722,8 +722,7 @@ function setOverviewView(view) {
     navigator.geolocation.clearWatch(overviewWatchId); overviewWatchId = null;
     if (overviewGpsMarker) { overviewGpsMarker.remove(); overviewGpsMarker = null; }
     if (overviewGpsCircle) { overviewGpsCircle.remove(); overviewGpsCircle = null; }
-    const b = document.getElementById('btn-overview-gps');
-    if (b) { b.style.opacity = '0.5'; b.classList.remove('active'); }
+    _syncOverviewGpsBtn(false);
     const bz = document.getElementById('btn-overview-gps-zoom');
     if (bz) bz.style.display = 'none';
   }
@@ -2566,16 +2565,18 @@ function _addOverviewLegend(map) {
 
 const GPS_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
 
+// Der Knopf ist quadratisch und traegt nur das Zeichen. Frueher wurde hier
+// «GPS Aktiv» als Text hineingeschrieben — das verdraengte im 32er-Quadrat
+// das Zeichen. Der Zustand steht jetzt in den Klassen.
 function _syncOverviewGpsBtn(active) {
-  const btn   = document.getElementById('btn-overview-gps');
-  const btnFs = document.getElementById('btn-bp-fs-gps');
-  if (active) {
-    if (btn)   { btn.textContent = 'GPS Aktiv'; btn.style.opacity = '1'; btn.classList.add('active'); }
-    if (btnFs) { btnFs.style.background = '#e0f2fe'; btnFs.style.opacity = '1'; }
-  } else {
-    if (btn)   { btn.innerHTML = GPS_ICON_SVG + ' GPS'; btn.style.opacity = '0.45'; btn.classList.remove('active'); }
-    if (btnFs) { btnFs.style.background = 'white'; btnFs.style.opacity = '0.5'; }
-  }
+  [document.getElementById('btn-overview-gps'),
+   document.getElementById('btn-bp-fs-gps')].forEach(b => {
+    if (!b) return;
+    b.innerHTML = GPS_ICON_SVG;
+    b.classList.toggle('an',  active);
+    b.classList.toggle('aus', !active);
+    b.title = active ? 'GPS aktiv — ausschalten' : 'GPS';
+  });
 }
 
 function toggleOverviewGPS() {
@@ -2589,7 +2590,7 @@ function toggleOverviewGPS() {
     return;
   }
   if (!navigator.geolocation) { ui.toast('GPS wird von diesem Browser nicht unterstützt.', 'fehler'); return; }
-  if (btn) { btn.style.opacity = '1'; btn.innerHTML = GPS_ICON_SVG + ' GPS…'; }
+  if (btn) { btn.classList.remove('aus'); btn.title = 'GPS wird gesucht…'; }
   overviewWatchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude: lat, longitude: lng, accuracy } = pos.coords;
@@ -2651,7 +2652,7 @@ function karteNavAufbauen(halterId, opt) {
    +       '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
    +     '</button>'
    +     '<div class="pair-jump-panel">'
-   +       '<input class="pair-jump-such" type="search" placeholder="Standort suchen…">'
+   +       '<input class="app-suche voll" type="search" placeholder="Standort suchen…">'
    +       '<div class="pair-jump-liste"></div>'
    +     '</div>'
    +   '</div>'
@@ -2664,7 +2665,7 @@ function karteNavAufbauen(halterId, opt) {
     label: halter.querySelector('[data-nav-label] span'),
     knopf: halter.querySelector('[data-nav-label]'),
     panel: halter.querySelector('.pair-jump-panel'),
-    such:  halter.querySelector('.pair-jump-such'),
+    such:  halter.querySelector('.app-suche'),
     liste: halter.querySelector('.pair-jump-liste'),
   };
   const name = opt.name || (p => p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id));

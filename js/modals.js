@@ -668,7 +668,8 @@ function initCreateMap(center) {
   const el = document.getElementById('create-map');
   if (!el) return;
 
-  createMapLeaflet = L.map('create-map', { zoomControl: true, attributionControl: false })
+  // Quellenangabe wie auf den uebrigen Karten
+  createMapLeaflet = L.map('create-map', { zoomControl: true })
     .setView([center.lat, center.lng], 19);
 
   // Kein bestehender Standort als Anhaltspunkt: dann ist die eigene Position
@@ -689,7 +690,7 @@ function initCreateMap(center) {
 
   // Luftbild als Standard-Basiskarte
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg',
-    { maxZoom: 20 }).addTo(createMapLeaflet);
+    { maxZoom: 20, attribution: '© <a href="https://swisstopo.admin.ch">swisstopo</a>' }).addTo(createMapLeaflet);
 
   // Bahnlinien sind standardmässig an (App-Einstellungen › Kartendarstellung)
   if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('create'), 60);

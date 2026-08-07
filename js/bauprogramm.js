@@ -2905,6 +2905,7 @@ function openBpFullscreen(paketId) {
   const pane = document.getElementById('bp-fs-map-pane');
   if (pane) pane.style.display = 'block';
   _bpFsMapOpen = true;
+  _updateBpFsMapBtn();
   _moveFsMap();
   // Info-Layer auf "Baupaket / Schicht" setzen
   _bpFsPrevInfoLayer = _overviewInfoLayer;
@@ -2961,8 +2962,7 @@ function toggleBpFsMap() {
 function _updateBpFsMapBtn() {
   const btn = document.getElementById('bp-fs-map-toggle-btn');
   if (!btn) return;
-  btn.style.background  = _bpFsMapOpen ? 'rgba(255,255,255,0.2)' : 'transparent';
-  btn.style.borderColor = _bpFsMapOpen ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)';
+  btn.classList.toggle('an', _bpFsMapOpen);
 }
 
 // Verschiebt #overview-map in den Vollbild-Pane und zeigt Paket-Highlight
@@ -2986,6 +2986,9 @@ function _moveFsMap() {
   // Die Standort-Navigation gehoert zur Karte, nicht zum Uebersichtskasten —
   // sonst bliebe sie beim Verschieben zurueck und man koennte im Vollbild
   // keinen Mast mehr anfahren.
+  // Bedienelemente der Karte wandern mit: Standort-Navigation oben,
+  // Kartenart, Transparenz und Bahn-Suche unten. Blieben sie im
+  // Uebersichtskasten zurueck, waere die Vollbildkarte nicht mehr bedienbar.
   const nav = document.getElementById('ov-nav-halter');
   if (nav) {
     pane.appendChild(nav);
@@ -2994,6 +2997,8 @@ function _moveFsMap() {
     // — die Zeile ist dann noch leer.
     ovNavAktualisieren();
   }
+  const unten = document.getElementById('ov-karte-unten');
+  if (unten) pane.appendChild(unten);
   mapEl.style.height       = '100%';
   mapEl.style.width        = '100%';
   mapEl.style.borderRadius = '0';
@@ -3016,6 +3021,8 @@ function _restoreFsMap() {
   wrap.insertBefore(mapEl, wrap.firstChild);
   const nav = document.getElementById('ov-nav-halter');
   if (nav) { wrap.appendChild(nav); nav.classList.remove('im-bp-vollbild'); }
+  const unten = document.getElementById('ov-karte-unten');
+  if (unten) wrap.appendChild(unten);
   mapEl.style.height       = '';
   mapEl.style.width        = '';
   mapEl.style.borderRadius = '';

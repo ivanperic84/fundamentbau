@@ -760,7 +760,7 @@ function toggleGPS() {
   const btnAuto = document.getElementById('btn-gps-auto');
   const syncGpsBtn = (active) => {
     if (btn)    { btn.classList.toggle('active', active); btn.style.opacity = active ? '1' : '0.45'; }
-    if (btnTop) btnTop.style.opacity = active ? '1' : '0.5';
+    if (btnTop) btnTop.classList.toggle('aus', !active);
     if (btnAuto) btnAuto.style.display = active ? 'flex' : 'none';
   };
   if (watchId !== null) {
@@ -849,9 +849,8 @@ function gpsAutoStandortSetzen(an) {
   _gpsAutoStandort = !!an;
   const btn = document.getElementById('btn-gps-auto');
   if (btn) {
-    btn.style.opacity    = _gpsAutoStandort ? '1' : '0.5';
-    btn.style.background = _gpsAutoStandort ? '#1a3a5c' : 'white';
-    btn.style.color      = _gpsAutoStandort ? '#fff'    : '#374151';
+    btn.classList.toggle('an',  _gpsAutoStandort);
+    btn.classList.toggle('aus', !_gpsAutoStandort);
   }
   if (!_gpsAutoStandort) standortHighlightEntfernen();
 }

@@ -296,9 +296,9 @@ function bahnKarteVergessen(welche) {
   delete _bahnEbenen[welche];
 }
 
-// Quellenangabe ein-/ausblenden. Die Erfassungskarte wird ohne
-// Attributionsleiste erzeugt — die Nennung von data.sbb.ch ist aber Pflicht
-// (Nutzungsbedingungen Ziffer 4.1), also wird sie dort angelegt.
+// Quellenangabe ein-/ausblenden. Sollte eine Karte ohne Attributionsleiste
+// erzeugt worden sein, wird sie hier angelegt — die Nennung von data.sbb.ch
+// ist Pflicht (Nutzungsbedingungen Ziffer 4.1).
 function _bahnQuelleZeigen(karte, an) {
   if (!karte.attributionControl) {
     if (!an) return;
