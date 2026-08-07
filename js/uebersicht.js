@@ -432,15 +432,117 @@ function hasFelddaten(id) {
   return fd.rs_tiefe_ist || fd.rks_tiefe_ist || fd.rks_schicht;
 }
 
+// ============================================================
+// KACHELN — REIHENFOLGE UND INHALT
+// ============================================================
+// Die Kachel zeigte immer dasselbe und stand immer in derselben Reihenfolge.
+// Je nach Aufgabe braucht man aber anderes: beim Abgehen der Strecke die
+// Kilometer, beim Bestellen den Fundamenttyp.
+const KACHEL_SORT_KEY   = 'sp_kachel_sort';
+const KACHEL_FELDER_KEY = 'sp_kachel_felder';
+
+const KACHEL_FELDER = [
+  { id: 'massnahme',  label: 'Massnahme' },
+  { id: 'fundtyp',    label: 'Fundamenttyp' },
+  { id: 'baupaket',   label: 'Baupaket / Schicht' },
+  { id: 'km',         label: 'Kilometer und Neigung' },
+  { id: 'untertitel', label: 'Untertitel (Boden, Zugang)' },
+  { id: 'tags',       label: 'Schlagworte' },
+  { id: 'symbole',    label: 'Symbole (Foto, Notiz …)' },
+];
+
+function kachelSort() {
+  return store.getItem(KACHEL_SORT_KEY) || 'alpha';
+}
+
+function kachelSortSetzen(wert) {
+  store.setItem(KACHEL_SORT_KEY, wert);
+  renderCards();
+}
+
+function _kachelFelderCfg() {
+  try { return jsonParse(store.getItem(KACHEL_FELDER_KEY)) || {}; } catch { return {}; }
+}
+
+// Standard: alles an. Gespeichert wird nur, was abgeschaltet ist.
+function kachelZeigt(id) {
+  return _kachelFelderCfg()[id] !== false;
+}
+
+function kachelFeldUmschalten(id, an) {
+  const cfg = _kachelFelderCfg();
+  if (an) delete cfg[id]; else cfg[id] = false;
+  store.setItem(KACHEL_FELDER_KEY, JSON.stringify(cfg));
+  renderCards();
+}
+
+function kachelInhaltPanelUmschalten(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('kachel-inhalt-panel');
+  if (!panel) return;
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  panel.innerHTML = '<div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;">Auf der Kachel zeigen</div>'
+    + KACHEL_FELDER.map(f =>
+      `<label style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:11px;color:#374151;cursor:pointer;">
+         <input type="checkbox" ${kachelZeigt(f.id) ? 'checked' : ''}
+                onchange="kachelFeldUmschalten('${f.id}', this.checked)">
+         ${escHtml(f.label)}
+       </label>`).join('');
+  panel.style.display = 'block';
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#kachel-inhalt-panel') || e.target.closest('#kachel-inhalt-btn')) return;
+  const panel = document.getElementById('kachel-inhalt-panel');
+  if (panel) panel.style.display = 'none';
+});
+
+// Natuerliche Ordnung: «FS T10» gehoert hinter «FS T9», nicht dazwischen.
+const _kachelVergleich = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
+
+function _kachelName(p) {
+  return p.mast ? String(p.mast) : (p.bezeichnung || 'Standort ' + p.id);
+}
+
+function kachelSortieren(liste, allBp, ftProfiles) {
+  const art = kachelSort();
+  const kopie = [...liste];
+  if (art === 'km') {
+    return kopie.sort((a, b) =>
+      (parseFloat(a.km_rs ?? a.km_rks ?? 9999) || 9999) - (parseFloat(b.km_rs ?? b.km_rks ?? 9999) || 9999));
+  }
+  if (art === 'fundtyp') {
+    const typ = p => {
+      const bp = { ...p, ...(allBp[p.id] || {}) };
+      const eintrag = bp.ftProfilId ? ftProfiles.find(t => t.id === bp.ftProfilId) : null;
+      return eintrag?.name || bp.fundtyp || 'zzz';
+    };
+    return kopie.sort((a, b) => _kachelVergleich.compare(typ(a), typ(b))
+                             || _kachelVergleich.compare(_kachelName(a), _kachelName(b)));
+  }
+  if (art === 'status') {
+    return kopie.sort((a, b) => _kachelVergleich.compare(statusLabel(getPairData(a.id).status), statusLabel(getPairData(b.id).status))
+                             || _kachelVergleich.compare(_kachelName(a), _kachelName(b)));
+  }
+  return kopie.sort((a, b) => _kachelVergleich.compare(_kachelName(a), _kachelName(b)));
+}
+
 function renderCards() {
   renderFilterButtons();
+  // Steuerung nur in der Kachelansicht zeigen
+  const steuerung = document.getElementById('kachel-steuerung');
+  if (steuerung) {
+    steuerung.style.display = currentOverviewView === 'karten' ? 'flex' : 'none';
+    const sel = document.getElementById('kachel-sort');
+    if (sel) sel.value = kachelSort();
+  }
   const grid  = document.getElementById('cards-grid');
   grid.innerHTML = '';
   const phase = _activePhase;
   const allBp = loadAllBauprojekt();
   const ftProfiles = loadFtProfile();
 
-  getFilteredSorted().forEach(p => {
+  kachelSortieren(getFilteredSorted(), allBp, ftProfiles).forEach(p => {
     const pd     = getPairData(p.id);
     const bpData = { ...p, ...(allBp[p.id] || {}) };
     const kmVal  = p.km_rs || p.km_rks;
@@ -504,15 +606,15 @@ function renderCards() {
       const istSpezial  = ftEintrag ? ftEintrag.typ !== 'standard' : isFtSpezial(fundtyp);
       const neigung     = bpData.neigung || '';
       const massnahmeSet = bpData.massnahme || bpData.bestand || (bpData.fundtyp||'').startsWith('spezial-prov');
-      if (massnahmeSet) badgesHtml += `<div class="card-tag" style="background:${col}18;color:${col};border:1px solid ${col}55;font-weight:600;">${massLabel}</div>`;
+      if (massnahmeSet && kachelZeigt('massnahme')) badgesHtml += `<div class="card-tag" style="background:${col}18;color:${col};border:1px solid ${col}55;font-weight:600;">${massLabel}</div>`;
       // Spezial wird über Form unterschieden, nicht über Farbe: Warnzeichen und
       // kräftigere Umrandung. Ein farbiger Chip stach im monochromen Kachelbild
       // stärker hervor als die Statusfarben, die dort etwas bedeuten.
-      if (fundtyp) badgesHtml += istSpezial
+      if (fundtyp && kachelZeigt('fundtyp')) badgesHtml += istSpezial
         ? `<div class="card-tag" title="Spezialfundament — statischer Nachweis erforderlich" style="background:white;color:#1f2937;border:1px solid #6b7280;font-weight:600;display:inline-flex;align-items:center;gap:4px;">${svgIcon('warnung',{groesse:10})}${fundtyp}</div>`
         : `<div class="card-tag" title="Standardfundament" style="background:white;color:#6b7280;border:1px solid #e5e7eb;">${fundtyp}</div>`;
       // Baupaket + Schicht-Badge (nur Ausführung)
-      if (phase === 'ausfuehrung' && typeof loadSchichtZuw === 'function') {
+      if (phase === 'ausfuehrung' && kachelZeigt('baupaket') && typeof loadSchichtZuw === 'function') {
         const z = loadSchichtZuw()[p.id];
         if (z?.paketId) {
           const pak = (typeof loadBaupakete === 'function' ? loadBaupakete() : []).find(x => x.id === z.paketId);
@@ -556,15 +658,15 @@ function renderCards() {
         <div class="card-id">Mast ${p.mast || '—'}</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">${badgesHtml}</div>
       </div>
-      <div class="card-km">${infoLine}</div>
-      ${subtitle ? `<div class="card-zugang">${subtitle}</div>` : ''}
-      ${customTagsHtml}
+      ${kachelZeigt('km') ? `<div class="card-km">${infoLine}</div>` : ''}
+      ${subtitle && kachelZeigt('untertitel') ? `<div class="card-zugang">${subtitle}</div>` : ''}
+      ${kachelZeigt('tags') ? customTagsHtml : ''}
       <div class="card-footer">
         <div class="qs-wrap" onclick="event.stopPropagation()">
           <button class="qs-badge" style="${qsBadgeStyle(pd.status)}" onclick="toggleQsPicker(${p.id},this)">${statusLabel(pd.status)}<span class="qs-chevron">▾</span></button>
           <div class="qs-picker" id="qs-picker-${p.id}">${buildQsOpts(p.id, pd.status)}</div>
         </div>
-        <div class="card-metas">${metasHtml}</div>
+        <div class="card-metas">${kachelZeigt('symbole') ? metasHtml : ''}</div>
       </div>`;
     grid.appendChild(card);
   });

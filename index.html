@@ -1729,6 +1729,24 @@
           <button class="filter-btn active" id="filter-btn-alle" onclick="setFilter('alle',this)" style="flex-shrink:0;">Alle</button>
           <!-- Status-Filter werden dynamisch durch renderFilterButtons() befüllt -->
         </div>
+        <!-- Reihenfolge und Inhalt der Kacheln — nur in der Kachelansicht -->
+        <div id="kachel-steuerung" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
+          <select id="kachel-sort" onchange="kachelSortSetzen(this.value)" title="Reihenfolge der Kacheln"
+            style="padding:5px 8px;border-radius:8px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;">
+            <option value="alpha">A–Z / Nummer</option>
+            <option value="km">Kilometer</option>
+            <option value="fundtyp">Fundamenttyp</option>
+            <option value="status">Status</option>
+          </select>
+          <div style="position:relative;">
+            <button id="kachel-inhalt-btn" onclick="kachelInhaltPanelUmschalten(event)" title="Welche Angaben die Kachel zeigt"
+              style="padding:5px 8px;border-radius:8px;border:1px solid #d1d5db;background:white;cursor:pointer;color:#6b7280;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Inhalt
+            </button>
+            <div id="kachel-inhalt-panel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.12);min-width:190px;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <!-- Tag filter + Sort row (ausgeblendet) -->
