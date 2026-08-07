@@ -268,11 +268,17 @@ function setPhase(phase) {
     overviewMarkers = [];
     overviewMap.remove();
     overviewMap = null;
+    // Mit der Karte sind auch ihre Ebenen weg. Ohne dieses Vergessen galt die
+    // Bahnebene weiter als aktiv und wurde auf der neuen Karte nicht mehr
+    // angelegt — nach einem Phasenwechsel fehlten die Linien.
+    if (typeof bahnKarteVergessen === 'function') bahnKarteVergessen('overview');
   }
   // Karte-View sofort neu initialisieren (zeigt Platzhalter wenn nicht Baugrundphase)
   if (currentOverviewView === 'karte') {
     initOverviewMap();
     setTimeout(resizeOverviewMap, 50);
+    // Der Ausschnitt gehoert zur neuen Phase, nicht zur vorherigen
+    setTimeout(overviewKarteAufPhaseZentrieren, 350);
   }
   // In Detailansicht: Sidebar mit neuer Phase neu laden
   if (document.getElementById('detail-view')?.style.display === 'block' && currentPairId) {

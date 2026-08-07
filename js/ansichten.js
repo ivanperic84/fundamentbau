@@ -742,19 +742,7 @@ function setOverviewView(view) {
     ovNavAktualisieren();
     setTimeout(resizeOverviewMap, 50);
     setTimeout(() => {
-      // Karte auf Standorte der aktuellen Phase zentrieren
-      if (overviewMap) {
-        const pts = getFilteredSorted().flatMap(p => {
-          const r = [];
-          if (p.rs?.e  && p.rs?.n)  r.push(lv95ToWgs84(p.rs.e,  p.rs.n));
-          if (p.rks?.e && p.rks?.n) r.push(lv95ToWgs84(p.rks.e, p.rks.n));
-          return r;
-        });
-        if (pts.length) {
-          const bounds = L.latLngBounds(pts.map(c => [c.lat, c.lng])).pad(0.15);
-          overviewMap.fitBounds(bounds, { maxZoom: 15, animate: true });
-        }
-      }
+      overviewKarteAufPhaseZentrieren();
       if (_bpHighlightPaketId) refreshBpMapHighlight();
     }, 350);
   }
@@ -2353,20 +2341,40 @@ function _buildListFtOpts(pairId) {
   return html;
 }
 
-function initOverviewMap() {
-  if (overviewMap) {
-    overviewMap.invalidateSize();
-    return;
-  }
-  // Initiale Ansicht: Bounds aller vorhandenen Standorte, Fallback-Koordinaten
-  const _allLL = PAIRS.flatMap(p => {
+// Punkte der Standorte einer Liste — fuer den Kartenausschnitt
+function _standortPunkte(liste) {
+  return liste.flatMap(p => {
     const pts = [];
     if (p.rs?.e  && p.rs?.n)  pts.push(lv95ToWgs84(p.rs.e,  p.rs.n));
     if (p.rks?.e && p.rks?.n) pts.push(lv95ToWgs84(p.rks.e, p.rks.n));
     return pts;
   });
+}
+
+// Kartenausschnitt auf die Standorte der aktiven Phase. Wird beim Wechsel in
+// die Kartenansicht UND beim Phasenwechsel gebraucht: der Phasenwechsel baut
+// die Karte neu auf, und ohne diesen Aufruf blieb sie auf dem Ausschnitt
+// aller Standorte beider Phasen stehen.
+function overviewKarteAufPhaseZentrieren() {
+  if (!overviewMap) return;
+  const pts = _standortPunkte(getFilteredSorted());
+  if (!pts.length) return;
+  const bounds = L.latLngBounds(pts.map(c => [c.lat, c.lng])).pad(0.15);
+  overviewMap.fitBounds(bounds, { maxZoom: 17, animate: true });
+}
+
+function initOverviewMap() {
+  if (overviewMap) {
+    overviewMap.invalidateSize();
+    return;
+  }
+  // Erster Ausschnitt: Standorte der aktiven Phase. Frueher standen hier alle
+  // Standorte beider Phasen — beim Wechsel von Ausfuehrung zu Bauprojekt
+  // begann die Karte dadurch viel zu weit draussen.
+  const _phasePairs = getPhasePairs();
+  const _allLL = _standortPunkte(_phasePairs.length ? _phasePairs : PAIRS);
   const _initView = _allLL.length
-    ? { bounds: L.latLngBounds(_allLL.map(c => [c.lat, c.lng])), opts: { padding: [40, 40], maxZoom: 15 } }
+    ? { bounds: L.latLngBounds(_allLL.map(c => [c.lat, c.lng])), opts: { padding: [40, 40], maxZoom: 17 } }
     : { center: [47.55, 9.10], zoom: 13 };
   overviewMap = _allLL.length
     ? L.map('overview-map', KARTE_DREH_OPT).fitBounds(_initView.bounds, _initView.opts)
