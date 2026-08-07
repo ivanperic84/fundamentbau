@@ -805,25 +805,22 @@
   .karte-nav-halter.offen { display: block; }
   /* Uebersichtskarte: rechts stehen die Knoepfe weiter innen (right:30px) */
   #ov-nav-halter { right: 72px; }
-  /* Im Bauprogramm-Vollbild sitzt nur der GPS-Knopf rechts (right:10px) */
-  #ov-nav-halter.im-bp-vollbild { right: 52px; }
+  /* Im Kopf einer Vollbildansicht steht die Zeile im Textfluss statt ueber
+     der Karte — gleiche Loesung wie in der Abnahme-Checkliste. */
+  .karte-nav-halter.im-kopf {
+    position: static; padding: 0; flex-shrink: 1; min-width: 0;
+  }
+  .karte-nav-halter.im-kopf .pair-nav { max-width: 260px; box-shadow: none; }
+  /* Im Kopf verdeckt sie nichts — kein Zuruecktreten noetig */
+  .karte-nav-halter.im-kopf.leer .pair-nav { opacity: 1; }
 
-  /* Legende als eigene Darstellung an der rechten Seite des
-     Bauprogramm-Vollbilds — mit dem Bauablauf-Schieber. */
-  #bp-fs-legende-halter:empty { display: none; }
-  #bp-fs-legende-halter {
-    position: absolute; z-index: 700;
-    top: 52px; right: 10px; width: 232px;
-  }
-  /* !important, weil die Steuerung ihre Breite inline mitbringt */
-  #ov-legend-outer.legende-seitlich {
-    max-width: none !important; width: 100%;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
-  }
-  #ov-legend-outer.legende-seitlich #ov-legend-body { display: block; }
-  #ov-legend-outer.legende-seitlich #ov-legend-toggle { display: none; }
-  /* Der Schieber ist hier das Werkzeug, nicht eine Randnotiz */
-  #ov-legend-outer.legende-seitlich input[type="range"] { height: 22px; }
+  /* Legende im Bauprogramm-Vollbild: bleibt unten links wie auf den uebrigen
+     Karten, steht dort aber offen und etwas breiter — wegen des
+     Bauablauf-Schiebers. !important, weil die Steuerung ihre Breite als
+     inline-Angabe mitbringt. */
+  #ov-legend-outer.legende-gross { max-width: 232px !important; width: 232px; }
+  #ov-legend-outer.legende-gross #ov-legend-body { display: block; }
+  #ov-legend-outer.legende-gross input[type="range"] { height: 22px; }
   /* Ueber der Karte kompakt: gleiche Hoehe wie die Auswahlfelder am unteren
      Kartenrand, damit die Karte nicht von Bedienelementen zugestellt wird. */
   .karte-nav-halter .pair-nav {
@@ -1785,8 +1782,7 @@
       </button>
     </div>
 
-    <!-- Bottom: kompakte Dropdowns. Wandert mit der Karte ins
-         Bauprogramm-Vollbild (_moveFsMap in js/bauprogramm.js). -->
+    <!-- Bottom: kompakte Dropdowns -->
     <div id="ov-karte-unten" style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:1000;
                 display:flex;gap:8px;align-items:center;">
       <!-- Kartenart -->
@@ -2156,11 +2152,8 @@
       <button onclick="openProjEinstModal()" title="Bauprogramm-Einstellungen" class="btn btn-secondary btn-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <!-- Vollbild -->
-      <button onclick="openBpFullscreen()" title="Vollbild" class="btn btn-secondary btn-sm">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-        Vollbild
-      </button>
+      <!-- Der Vollbildknopf steht bei der Zeitraster-Wahl (siehe unten) —
+           er gehoert zur Darstellung, nicht zum Bearbeiten. -->
       <!-- Undo / Redo -->
       <button id="bp-undo-btn" onclick="bpUndo()" title="Rückgängig (Strg+Z)" class="btn btn-secondary btn-icon" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
@@ -2244,6 +2237,12 @@
       <button id="bp-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
     </div>
     <div id="bp-info-bar" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
+    <!-- Rechts aussen: die Vollbildansicht mit Karte und Gantt -->
+    <button onclick="openBpFullscreen()" title="Bauprogramm mit Karte im Vollbild"
+      class="btn btn-secondary btn-sm" style="margin-left:auto;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Karte
+    </button>
   </div>
 
   <!-- Gantt-Container — volle Breite, mehr Höhe -->
@@ -8255,21 +8254,12 @@ function _ladeScript(pfad) {
   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a3a5c;color:white;flex-shrink:0;">
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-weight:700;font-size:14px;">Bauprogramm</span>
-      <span id="bp-fs-subtitle" style="font-size:11px;opacity:0.6;"></span>
     </div>
+    <!-- Aufnahme fuer die Standort-Navigation. Sie steht im Kopf statt auf der
+         Karte — dieselbe Loesung wie in der Abnahme-Checkliste; der Inhalt
+         wird von _moveFsMap() hierher gehaengt. -->
+    <div id="bp-fs-nav-halter"></div>
     <div style="display:flex;gap:6px;align-items:center;">
-      <div style="display:flex;border:1px solid rgba(255,255,255,0.25);border-radius:6px;overflow:hidden;">
-        <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag');  renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:rgba(255,255,255,0.2);color:white;cursor:pointer;">Tage</button>
-        <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Wochen</button>
-        <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Monate</button>
-        <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Jahre</button>
-      </div>
-      <!-- Die Karte gehoert in dieser Ansicht dazu und ist immer offen; der
-           fruehere Schalter dafuer ist entfallen. Hier steht stattdessen der
-           echte Vollbildmodus des Browsers. -->
-      <button id="bp-fs-native-btn" class="kopf-knopf" onclick="toggleBpNativeFs()" title="Nativer Vollbild">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-      </button>
       <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Schliessen
@@ -8279,18 +8269,29 @@ function _ladeScript(pfad) {
   <!-- Karte oben (versteckt bis Toggle) — #overview-map wird per JS hierhin verschoben -->
   <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;">
     <div class="karten-knopf-spalte">
+      <!-- Vollbild ueber GPS, wie in allen anderen Kartenansichten. Das
+           Zeichen wechselt im fullscreenchange-Handler (js/bauprogramm.js). -->
+      <button id="bp-fs-native-btn" class="karten-knopf" onclick="toggleBpNativeFs()" title="Nativer Vollbild">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
       <button id="btn-bp-fs-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
     </div>
-    <!-- Aufnahme fuer die Legende samt Bauablauf-Schieber. Auf der
-         Uebersichtskarte sitzt sie als Leaflet-Steuerung unten links und ist
-         auf schmalen Geraeten zugeklappt; hier steht sie offen an der Seite,
-         damit der Schieber unmittelbar bedienbar ist (_moveFsMap). -->
-    <div id="bp-fs-legende-halter"></div>
   </div>
   <!-- Gantt + Legende unten -->
   <div id="bp-fs-left" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;min-width:0;">
+    <!-- Zeitraster und Kennzahlen wie in der normalen Bauprogramm-Ansicht:
+         auf hellem Grund ueber dem Gantt, nicht im dunklen Kopf. -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <div class="seg">
+        <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag');  renderBpGantt('bp-fs-gantt-wrap',true);" class="aktiv">Tage</button>
+        <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche');renderBpGantt('bp-fs-gantt-wrap',true);">Wochen</button>
+        <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);">Monate</button>
+        <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);">Jahre</button>
+      </div>
+      <div id="bp-fs-subtitle" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
+    </div>
     <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:10px;">
       <div id="bp-fs-gantt-wrap" style="overflow-x:auto;min-height:120px;"></div>
     </div>
