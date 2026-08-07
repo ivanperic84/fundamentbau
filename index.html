@@ -28,6 +28,13 @@
      Wird auch von sw.js via importScripts() gelesen. -->
 <script src="version.js"></script>
 <script src="lib/leaflet.js"></script>
+<!-- leaflet-rotate 0.2.8 (Raruto, BSD-2-Clause) — Leaflet 1.9 kann von sich aus
+     nicht drehen. Das Paket ergaenzt map.setBearing()/getBearing() und die
+     Zwei-Finger-Drehung, indem es Teile des Leaflet-Kerns ueberschreibt
+     (L.Class.include). Deshalb steht es unmittelbar nach leaflet.js und vor
+     allem eigenen Code. Unveraendert und unkomprimiert abgelegt, damit
+     nachvollziehbar bleibt, was es tut. -->
+<script src="lib/leaflet-rotate.js"></script>
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="lib/jspdf.plugin.autotable.min.js"></script>
@@ -903,6 +910,19 @@
   .karten-knopf.aus { opacity: 0.5; }
   .karten-knopf.an  { background: #1a3a5c; color: #fff; opacity: 1; }
   .karten-knopf.an:hover { background: #244a72; }
+
+  /* Nordzeichen unten rechts auf jeder Karte. Die Nadel dreht gegen die
+     Karte, zeigt also immer nach Norden. Steht die Karte in Nordlage, tritt
+     das Zeichen zurueck — es gibt dann nichts zurueckzustellen. */
+  .nord-zeichen {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.94);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0.7; transition: opacity 0.15s, box-shadow 0.15s;
+  }
+  .nord-zeichen:hover { opacity: 1; box-shadow: 0 3px 10px rgba(0,0,0,0.26); }
+  .nord-zeichen.gedreht { opacity: 1; }
 
   /* Knopfspalte in der oberen rechten Kartenecke */
   .karten-knopf-spalte {

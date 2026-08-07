@@ -542,7 +542,8 @@ function initMap() {
   const center = pairCenter(pair);
   const zoom = center.invalid ? 8 : 19;
 
-  leafletMap = L.map('map', { zoomControl: true }).setView([center.lat, center.lng], zoom);
+  leafletMap = L.map('map', { zoomControl: true, ...KARTE_DREH_OPT }).setView([center.lat, center.lng], zoom);
+  karteDrehungAnmelden(leafletMap);
 
   // Basis-Karte setzen
   setDetailBaseLayer(detailBaseLayerKey);

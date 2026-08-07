@@ -1001,7 +1001,8 @@ function bskSetBgMap() {
       : { lat: 47.566, lng: 9.106 };
 
   setTimeout(() => {
-    _bskMap = L.map('bsk-map-inner').setView([center.lat, center.lng], 18);
+    _bskMap = L.map('bsk-map-inner', KARTE_DREH_OPT).setView([center.lat, center.lng], 18);
+    karteDrehungAnmelden(_bskMap);
     makeTile(detailBaseLayerKey || 'swiss-luft').addTo(_bskMap);
 
     // Transparenter Marker für Standort

@@ -2369,8 +2369,9 @@ function initOverviewMap() {
     ? { bounds: L.latLngBounds(_allLL.map(c => [c.lat, c.lng])), opts: { padding: [40, 40], maxZoom: 15 } }
     : { center: [47.55, 9.10], zoom: 13 };
   overviewMap = _allLL.length
-    ? L.map('overview-map').fitBounds(_initView.bounds, _initView.opts)
-    : L.map('overview-map').setView(_initView.center, _initView.zoom);
+    ? L.map('overview-map', KARTE_DREH_OPT).fitBounds(_initView.bounds, _initView.opts)
+    : L.map('overview-map', KARTE_DREH_OPT).setView(_initView.center, _initView.zoom);
+  karteDrehungAnmelden(overviewMap);
 
   // Basis-Karte setzen (zuletzt gewählte Kartenart)
   setOverviewBaseLayer(overviewBaseLayerKey);

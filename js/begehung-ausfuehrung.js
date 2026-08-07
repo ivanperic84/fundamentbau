@@ -1207,7 +1207,8 @@ function initCkMap() {
   const center = pair ? pairCenter(pair) : { lat: 47.37, lng: 8.55 };
   // Quellenangabe wie auf den uebrigen Karten — swisstopo und, sobald die
   // Bahnebene dazukommt, data.sbb.ch (Nutzungsbedingungen Ziffer 4.1).
-  _ckLeafletMap = L.map('ck-karte', { zoomControl: true }).setView([center.lat, center.lng], 19);
+  _ckLeafletMap = L.map('ck-karte', { zoomControl: true, ...KARTE_DREH_OPT }).setView([center.lat, center.lng], 19);
+  karteDrehungAnmelden(_ckLeafletMap);
   _ckTileLayer  = makeTile(detailBaseLayerKey || 'swiss-luft').addTo(_ckLeafletMap);
   // Kilometrierung ist gerade auf der Abnahmekarte die nuetzlichste Ebene
   if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('abnahme'), 60);

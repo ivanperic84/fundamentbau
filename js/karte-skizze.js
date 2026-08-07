@@ -13,6 +13,99 @@ function makeTile(key, opts={}) {
   return L.tileLayer(d.url, { attribution: d.attr, maxZoom: d.maxZoom, ...opts });
 }
 
+// ============================================================
+// DREHUNG DER KARTEN
+// ============================================================
+// Leaflet dreht von sich aus nicht; das leistet lib/leaflet-rotate.js.
+// Hier steht die gemeinsame Festlegung: EINE Drehung fuer alle Karten der
+// App. Wer sich die Ansicht einmal auf die Blickrichtung vor Ort gedreht hat,
+// findet sie in jeder anderen Karte wieder — auch in den Unterkarten
+// (Erfassung, Abnahme, Begehungsskizze).
+//
+// Gemeinsame Karten-Optionen. rotateControl aus: die Steuerung des Pakets
+// sitzt oben links und sieht fremd aus, das Nordzeichen unten rechts kommt
+// von hier. shiftKeyRotate bleibt an (Umschalt + Ziehen mit der Maus),
+// touchRotate an (zwei Finger auf dem Tablet).
+const KARTE_DREH_OPT = { rotate: true, touchRotate: true, rotateControl: false };
+
+const KARTE_DREHUNG_KEY = 'sp_karte_drehung';
+
+function _karteDrehungLaden() {
+  const roh = parseFloat(store.getItem(KARTE_DREHUNG_KEY));
+  return Number.isFinite(roh) ? roh : 0;
+}
+
+let _karteDrehung  = _karteDrehungLaden();  // aktuelle Drehung in Grad
+let _karteDrehungZuletzt = _karteDrehung;   // letzte Drehung ungleich Norden
+const _karteRegister = new Set();           // alle offenen Karten
+let _karteDrehungLaeuft = false;            // gegen Rueckkopplung beim Verteilen
+
+// Eine Karte anmelden: sie uebernimmt die aktuelle Drehung, bekommt das
+// Nordzeichen und meldet eigene Drehungen an alle uebrigen weiter.
+function karteDrehungAnmelden(karte) {
+  if (!karte || _karteRegister.has(karte)) return;
+  _karteRegister.add(karte);
+  karte.on('unload', () => _karteRegister.delete(karte));
+  if (typeof karte.setBearing === 'function' && _karteDrehung) karte.setBearing(_karteDrehung);
+  nordZeichenAnlegen(karte);
+  karte.on('rotate', () => {
+    if (_karteDrehungLaeuft) return;
+    karteDrehungSetzen(karte.getBearing(), karte);
+  });
+}
+
+function karteDrehungSetzen(grad, ausser) {
+  const wert = ((grad % 360) + 360) % 360;
+  _karteDrehung = wert;
+  if (wert) _karteDrehungZuletzt = wert;
+  store.setItem(KARTE_DREHUNG_KEY, String(wert));
+  _karteDrehungLaeuft = true;
+  _karteRegister.forEach(k => {
+    if (k === ausser || typeof k.setBearing !== 'function') return;
+    // Karten ohne Behaelter im Baum (geschlossene Ansichten) ueberspringen
+    try { if (Math.round(k.getBearing()) !== Math.round(wert)) k.setBearing(wert); } catch {}
+  });
+  _karteDrehungLaeuft = false;
+  nordZeichenAktualisieren();
+}
+
+// Nordzeichen unten rechts. Erstes Druecken stellt nach Norden, das naechste
+// zurueck auf die zuletzt gewaehlte Drehung.
+function nordZeichenUmschalten() {
+  if (Math.round(_karteDrehung) % 360 === 0) karteDrehungSetzen(_karteDrehungZuletzt || 0);
+  else                                       karteDrehungSetzen(0);
+}
+
+function nordZeichenAnlegen(karte) {
+  if (!L.Control || karte._nordZeichen) return;
+  const ctrl = L.control({ position: 'bottomright' });
+  ctrl.onAdd = () => {
+    const el = L.DomUtil.create('div', 'nord-zeichen');
+    el.title = 'Nach Norden ausrichten (nochmals: zurück zur gewählten Drehung)';
+    el.innerHTML =
+      '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">'
+      + '<g class="nz-nadel">'
+      +   '<polygon points="12,3 8.6,13 12,11.2 15.4,13" fill="#b91c1c"/>'
+      +   '<polygon points="12,21 8.6,11 12,12.8 15.4,11" fill="#6b7280"/>'
+      + '</g></svg>';
+    L.DomEvent.disableClickPropagation(el);
+    L.DomEvent.on(el, 'click', nordZeichenUmschalten);
+    return el;
+  };
+  ctrl.addTo(karte);
+  karte._nordZeichen = ctrl;
+  nordZeichenAktualisieren();
+}
+
+// Die Nadel zeigt nach Norden, also gegen die Drehung der Karte.
+function nordZeichenAktualisieren() {
+  document.querySelectorAll('.nord-zeichen').forEach(el => {
+    const nadel = el.querySelector('.nz-nadel');
+    if (nadel) nadel.setAttribute('transform', `rotate(${-_karteDrehung} 12 12)`);
+    el.classList.toggle('gedreht', Math.round(_karteDrehung) % 360 !== 0);
+  });
+}
+
 // Umwelt-WMS-Overlays (GWS + KbS + Schutzgebiete) — werden bei Bedarf hinzugefügt/entfernt
 let _umweltOverlays = [];
 

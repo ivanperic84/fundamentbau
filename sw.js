@@ -64,6 +64,7 @@ const STATISCH = [
   'icon-512-maskable.png',
   'lib/leaflet.css',
   'lib/leaflet.js',
+  'lib/leaflet-rotate.js',
   'lib/xlsx.full.min.js',
   'lib/jspdf.umd.min.js',
   'lib/jspdf.plugin.autotable.min.js',

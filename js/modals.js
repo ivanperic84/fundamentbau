@@ -737,8 +737,9 @@ function initCreateMap(center) {
   if (!el) return;
 
   // Quellenangabe wie auf den uebrigen Karten
-  createMapLeaflet = L.map('create-map', { zoomControl: true })
+  createMapLeaflet = L.map('create-map', { zoomControl: true, ...KARTE_DREH_OPT })
     .setView([center.lat, center.lng], 19);
+  karteDrehungAnmelden(createMapLeaflet);
 
   // Kein bestehender Standort als Anhaltspunkt: erst die vorgegebene Strecke
   // versuchen, sonst die eigene Position. Beides wird nachgeholt, sobald es
