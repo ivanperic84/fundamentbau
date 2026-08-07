@@ -843,6 +843,41 @@ function saveUserProfile() {
 // ============================================================
 // SIDEBAR-SICHTBARKEIT
 // ============================================================
+// ============================================================
+// VORLAGEN FUER DIE SEITENLEISTE
+// ============================================================
+// Die Seitenleiste traegt je nach Phase bis zu zwanzig Gruppen. Wer gerade
+// eine Begehung macht, braucht davon vier. Eine Vorlage blendet den Rest aus
+// — zusaetzlich zur Phasenlogik und zur Sichtbarkeit aus den Einstellungen,
+// nie darueber hinweg: gezeigt wird nur, was ohnehin sichtbar waere.
+const SB_VORLAGE_KEY = 'sp_sb_vorlage';
+
+const SB_VORLAGEN = [
+  { id: 'alles',      label: 'Alle Gruppen', sektionen: null },
+  { id: 'begehung',   label: 'Begehung',     sektionen: ['sec-meta','sec-begehung','sec-zugang','sec-fotos','sec-skizzen','sec-notizen'] },
+  { id: 'bauprojekt', label: 'Bauprojekt',   sektionen: ['sec-meta','sec-phase-bauprojekt','sec-hoehenkoten','sec-bodenkennwerte','sec-naturschutz','sec-notizen'] },
+  { id: 'ausfuehrung',label: 'Ausführung',   sektionen: ['sec-meta','sec-ausfplanung','sec-termine','sec-sicher','sec-aushub','sec-material','sec-abnahme-link','sec-notizen'] },
+  { id: 'bilder',     label: 'Bilder & Notizen', sektionen: ['sec-meta','sec-fotos','sec-skizzen','sec-notizen'] },
+];
+
+function sbVorlageAktiv() {
+  const id = store.getItem(SB_VORLAGE_KEY);
+  return SB_VORLAGEN.find(v => v.id === id) ? id : 'alles';
+}
+
+function sbVorlageSetzen(id) {
+  store.setItem(SB_VORLAGE_KEY, id);
+  applySidebarCfg();
+}
+
+function sbVorlageWahlFuellen() {
+  const sel = document.getElementById('sb-vorlage');
+  if (!sel) return;
+  const aktiv = sbVorlageAktiv();
+  sel.innerHTML = SB_VORLAGEN.map(v =>
+    `<option value="${v.id}"${v.id === aktiv ? ' selected' : ''}>${escHtml(v.label)}</option>`).join('');
+}
+
 function loadSidebarCfg() {
   try { return jsonParse(store.getItem(SIDEBAR_CFG_KEY)) || {}; } catch { return {}; }
 }
@@ -850,15 +885,35 @@ function saveSidebarCfgData(c) { store.setItem(SIDEBAR_CFG_KEY, JSON.stringify(c
 
 // Auf aktive Sidebar anwenden — nur Sektionen ausblenden die der User deaktiviert hat
 // (Phase-basierte Sichtbarkeit wird von showDetail() gesteuert — hier NUR zusätzliche Deaktivierungen)
+// Alle Gruppen, die eine Vorlage betreffen kann
+function _sbAlleSektionen() {
+  return SIDEBAR_SECTIONS.map(s => s.id).concat('sec-notizen');
+}
+
+// Stand nach der Phasenlogik festhalten: welche Gruppe waere sichtbar?
+// Ohne diese Aufnahme wuesste die Vorlage beim Zurueckschalten nicht, was sie
+// wieder einblenden darf, und die Seitenleiste bliebe leer.
+function sbPhasenStandMerken() {
+  _sbAlleSektionen().forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.userHidden === '1') return;
+    el.dataset.phaseAus = el.style.display === 'none' ? '1' : '';
+  });
+}
+
 function applySidebarCfg() {
-  const cfg = loadSidebarCfg();
-  SIDEBAR_SECTIONS.forEach(s => {
-    const el = document.getElementById(s.id);
+  const cfg     = loadSidebarCfg();
+  const vorlage = SB_VORLAGEN.find(v => v.id === sbVorlageAktiv());
+  const erlaubt = vorlage?.sektionen ? new Set(vorlage.sektionen) : null;
+  sbVorlageWahlFuellen();
+  _sbAlleSektionen().forEach(id => {
+    const el = document.getElementById(id);
     if (!el) return;
-    if (cfg[s.id] === false) el.dataset.userHidden = '1';
+    const aus = cfg[id] === false || (erlaubt && !erlaubt.has(id));
+    if (aus) el.dataset.userHidden = '1';
     else delete el.dataset.userHidden;
-    // Nur verstecken wenn Phase das Element ohnehin zeigen würde
-    if (cfg[s.id] === false && el.style.display !== 'none') el.style.display = 'none';
+    // Die Phase hat das letzte Wort: was sie ausblendet, bleibt aus
+    el.style.display = (aus || el.dataset.phaseAus === '1') ? 'none' : '';
   });
 }
 

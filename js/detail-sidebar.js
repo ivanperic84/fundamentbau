@@ -122,8 +122,10 @@ function showDetail(pairId) {
   }
   setTimeout(() => renderSkizzeThumbs(), 50);
   renderPaarNotizen(pairId);
-  // User-Sidebar-Config anwenden (nach Phase-basierter Sichtbarkeit)
-  setTimeout(() => applySidebarCfg(), 0);
+  // User-Sidebar-Config anwenden (nach Phase-basierter Sichtbarkeit).
+  // Vorher festhalten, was die Phase zeigt — sonst kann eine Vorlage zwar
+  // ausblenden, aber beim Zurueckschalten nichts wieder einblenden.
+  setTimeout(() => { sbPhasenStandMerken(); applySidebarCfg(); }, 0);
 
   if (!isInst && isBP) {
     loadBauprojektFelder(pairId);
@@ -351,7 +353,7 @@ function toggleMapFullscreen() {
   const layout = document.querySelector('.detail-layout');
   const btn    = document.getElementById('btn-map-fullscreen');
   layout.classList.toggle('map-fullscreen', _mapFullscreen);
-  pairNavUmhaengen(_mapFullscreen);
+  closePairJump();
   btn.innerHTML = _mapFullscreen
     ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>'
     : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
@@ -370,25 +372,11 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Im Vollbild verschwindet die Seitenleiste — mit ihr die Standort-Navigation.
-// Statt eine zweite Zeile mit denselben Knoepfen aufzubauen (zwei Saetze
-// gleicher ids, zwei Zustaende), wandert die vorhandene Zeile an den oberen
-// Kartenrand und danach zurueck.
-function pairNavUmhaengen(insVollbild) {
-  const nav     = document.getElementById('detail-pair-nav');
-  const halter  = document.getElementById('karte-nav-halter');
-  const leiste  = document.querySelector('.detail-sidebar');
-  if (!nav || !halter || !leiste) return;
-  if (insVollbild) halter.appendChild(nav);
-  else             leiste.insertBefore(nav, leiste.firstChild);
-  closePairJump();
-}
-
 // Beim Verlassen der Detailansicht Vollbild zurücksetzen
 function exitMapFullscreen() {
   if (_mapFullscreen) {
     _mapFullscreen = false;
-    pairNavUmhaengen(false);
+    closePairJump();
     document.querySelector('.detail-layout')?.classList.remove('map-fullscreen');
     const btn = document.getElementById('btn-map-fullscreen');
     if (btn) { btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>'; btn.title = 'Karte Vollbild'; }

@@ -810,8 +810,10 @@
   }
   .detail-layout.map-fullscreen .karte-nav-halter,
   .karte-nav-halter.offen { display: block; }
-  /* Uebersichtskarte: rechts stehen die Knoepfe weiter innen (right:30px) */
-  #ov-nav-halter { right: 72px; }
+  /* Auf der Uebersichtskarte selbst braucht es keine Standortwahl mehr — das
+     Suchfeld im Kopf waehlt den Standort. Die Zeile bleibt im Baum, weil das
+     Bauprogramm-Vollbild sie sich in seinen Kopf holt. */
+  #ov-nav-halter:not(.im-kopf) { display: none; }
   /* Im Kopf einer Vollbildansicht steht die Zeile im Textfluss statt ueber
      der Karte — gleiche Loesung wie in der Abnahme-Checkliste. */
   .karte-nav-halter.im-kopf {
@@ -1806,8 +1808,9 @@
       </button>
     </div>
 
-    <!-- Bottom-right: Schnellnotiz FAB -->
-    <div style="position:absolute;bottom:70px;right:10px;z-index:1000;">
+    <!-- Bottom-right: Schnellnotiz FAB. Hoeher gesetzt, damit er nicht am
+         Nordzeichen in der Kartenecke klebt. -->
+    <div style="position:absolute;bottom:118px;right:10px;z-index:1000;">
       <button onclick="openSchnellNotizModal()" title="Schnellnotiz erfassen"
         style="width:44px;height:44px;border-radius:50%;border:none;background:#1a3a5c;color:white;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1839,12 +1842,7 @@
         <option value="50">50%</option>
         <option value="25">25%</option>
       </select>
-      <!-- Suche über Station, Liniennummer und Kilometer — nur bei aktiver Ebene -->
-      <span id="bahn-suche-wrap" style="display:none;position:relative;align-items:center;">
-        <input class="app-suche auf-karte" id="bahn-suche" type="search" placeholder="Station, Linie, km…"
-               oninput="bahnSucheEingabe(this.value)">
-        <div class="bahn-such-liste" id="bahn-such-liste"></div>
-      </span>
+      <!-- Station, Linie und Kilometer sucht das Feld im Kopf mit -->
     </div>
   </div>
 
@@ -2562,23 +2560,14 @@
     <div class="detail-sidebar">
       <!-- id, weil es seit der Uebersichtskarte mehrere .pair-nav gibt und
            pairNavUmhaengen() genau diese Zeile verschieben muss -->
-      <div class="pair-nav" id="detail-pair-nav">
-        <button class="pair-nav-btn nur-symbol" id="prev-btn" onclick="navigatePair(-1)" title="Vorheriger Standort" aria-label="Vorheriger Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-        <!-- Der Standortname oeffnet eine Liste aller Standorte der Phase mit
-             Suche — bei 25 Positionen ist Blaettern sonst der einzige Weg. -->
-        <div class="pair-jump-wrap">
-          <button id="pair-nav-label" class="pair-jump-btn" onclick="togglePairJump(event)" title="Standort wählen">
-            <span id="pair-nav-text"></span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="pair-jump-panel" id="pair-jump-panel">
-            <input class="app-suche voll" id="pair-jump-such" type="search" placeholder="Standort suchen…"
-                   oninput="renderPairJumpListe(this.value)" onkeydown="pairJumpTaste(event)">
-            <div class="pair-jump-liste" id="pair-jump-liste"></div>
-          </div>
-        </div>
+      <!-- An dieser Stelle stand die Standort-Navigation; sie liegt jetzt auf
+           der Karte. Hier waehlt man stattdessen, welche Gruppen die
+           Seitenleiste zeigt — je nach Aufgabe braucht man ganz andere. -->
+      <div class="pair-nav" id="sb-vorlagen-zeile">
+        <select id="sb-vorlage" onchange="sbVorlageSetzen(this.value)"
+          title="Welche Gruppen die Seitenleiste zeigt"
+          style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #dde3ea;background:white;color:var(--c-text-strong);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;"></select>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button class="pair-nav-btn nur-symbol" id="next-btn" onclick="navigatePair(1)" title="Nächster Standort" aria-label="Nächster Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
           <button id="sb-collapse-all-btn" class="nur-seitenleiste" onclick="toggleAllSections()"
             title="Alle Gruppen auf-/zuklappen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;">
@@ -3730,10 +3719,28 @@
           <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;line-height:1.4;">Kein Standort gesetzt<br><span style="font-size:11px;color:#9ca3af;">Koordinaten via <b>Bearbeiten</b> erfassen</span></p>
         </div>
         <canvas id="sketch-canvas" class="sketch-canvas"></canvas>
-        <!-- Aufnahme fuer die Standort-Navigation im Vollbild. Sie steht nur
-             im Vollbild bereit; die Zeile selbst wird aus der Seitenleiste
-             hierher gehaengt (pairNavUmhaengen). -->
-        <div id="karte-nav-halter" class="karte-nav-halter"></div>
+        <!-- Standort-Navigation der Detailansicht. Sie liegt auf der Karte,
+             nicht in der Seitenleiste: dort nahm sie eine Zeile weg, und im
+             Kartenvollbild war sie gar nicht erreichbar. -->
+        <div id="karte-nav-halter" class="karte-nav-halter offen">
+          <div class="pair-nav" id="detail-pair-nav">
+            <button class="pair-nav-btn nur-symbol" id="prev-btn" onclick="navigatePair(-1)" title="Vorheriger Standort" aria-label="Vorheriger Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <!-- Der Standortname oeffnet eine Liste aller Standorte der Phase
+                 mit Suche — bei 25 Positionen ist Blaettern sonst der einzige Weg. -->
+            <div class="pair-jump-wrap">
+              <button id="pair-nav-label" class="pair-jump-btn" onclick="togglePairJump(event)" title="Standort wählen">
+                <span id="pair-nav-text"></span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="pair-jump-panel" id="pair-jump-panel">
+                <input class="app-suche voll" id="pair-jump-such" type="search" placeholder="Standort suchen…"
+                       oninput="renderPairJumpListe(this.value)" onkeydown="pairJumpTaste(event)">
+                <div class="pair-jump-liste" id="pair-jump-liste"></div>
+              </div>
+            </div>
+            <button class="pair-nav-btn nur-symbol" id="next-btn" onclick="navigatePair(1)" title="Nächster Standort" aria-label="Nächster Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+          </div>
+        </div>
         <!-- Vollbild + GPS oben rechts -->
         <div class="karten-knopf-spalte">
           <button id="btn-map-fullscreen" class="karten-knopf" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>

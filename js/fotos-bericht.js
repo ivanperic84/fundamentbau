@@ -21,14 +21,25 @@ function kopfSuchTreffer(q) {
     .slice(0, 12);
 }
 
+// Auf der Uebersichtskarte kommen Bahntreffer dazu: Station, Liniennummer und
+// Kilometer. Sie hatten frueher ein eigenes Feld am unteren Kartenrand — zwei
+// Suchfelder nebeneinander, die verschiedene Dinge fanden.
+function _kopfSuchBahn(val) {
+  if (currentOverviewView !== 'karte') return [];
+  if (document.getElementById('overview-view')?.style.display === 'none') return [];
+  if (typeof bahnSuche !== 'function' || !bahnEbeneAktiv('overview')) return [];
+  return bahnSuche(val).slice(0, 5);
+}
+
 function kopfSuchListe(val) {
   const panel = document.getElementById('kopf-such-panel');
   const liste = document.getElementById('kopf-such-liste');
   if (!panel || !liste) return;
   const treffer = kopfSuchTreffer(val);
+  const bahn    = _kopfSuchBahn(val);
   _kopfSuchMarkiert = 0;
-  if (!treffer.length) { panel.classList.remove('offen'); return; }
-  liste.innerHTML = treffer.map((p, i) => {
+  if (!treffer.length && !bahn.length) { panel.classList.remove('offen'); return; }
+  const standortHtml = treffer.map((p, i) => {
     const km   = p.km_rs || p.km_rks;
     const name = p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id);
     return '<button class="pair-jump-eintrag' + (i === 0 ? ' markiert' : '')
@@ -37,8 +48,18 @@ function kopfSuchListe(val) {
       + (km ? '<span class="pj-neben">' + escHtml(parseFloat(km).toFixed(3)) + '</span>' : '')
       + '</button>';
   }).join('');
+  const bahnHtml = bahn.map((t, i) =>
+    '<button class="pair-jump-eintrag' + (!treffer.length && i === 0 ? ' markiert' : '')
+    + '" data-kopf-bahn="' + i + '">'
+    + '<span>' + escHtml(t.titel) + '</span>'
+    + '<span class="pj-neben">' + escHtml(t.neben || t.art) + '</span></button>').join('');
+  liste.innerHTML = standortHtml
+    + (bahn.length ? '<div class="pair-jump-leer">Bahn</div>' + bahnHtml : '');
   liste.querySelectorAll('[data-kopf-pair]').forEach(btn => {
     btn.onclick = () => kopfSuchWaehlen(Number(btn.dataset.kopfPair));
+  });
+  liste.querySelectorAll('[data-kopf-bahn]').forEach(btn => {
+    btn.onclick = () => { kopfSuchSchliessen(); bahnTrefferAnfahren(bahn[+btn.dataset.kopfBahn]); };
   });
   panel.classList.add('offen');
 }
