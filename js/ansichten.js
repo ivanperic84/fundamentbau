@@ -635,6 +635,14 @@ function bannerProjektZeigen(zeigen) {
   if (titel) titel.classList.toggle('eingeklappt', !zeigen);
   const btn = document.getElementById('projekte-btn-wrap');
   if (btn) btn.style.visibility = zeigen ? '' : 'hidden';
+  // Das Suchfeld im Kopf filtert die Standortliste. In der Erfassungsansicht
+  // steht es unmittelbar ueber dem Suchfeld der Karte, das etwas ganz anderes
+  // tut — beim Absetzen eines Punktes stiftet das nur Verwirrung.
+  const suche = document.getElementById('search-input');
+  if (suche) {
+    const erfassen = document.getElementById('create-view')?.style.display === 'block';
+    suche.style.display = erfassen ? 'none' : '';
+  }
 }
 
 // Kurzes Einblenden eines gerade sichtbar gemachten Kastens. Die Klasse wird
@@ -722,8 +730,7 @@ function setOverviewView(view) {
     navigator.geolocation.clearWatch(overviewWatchId); overviewWatchId = null;
     if (overviewGpsMarker) { overviewGpsMarker.remove(); overviewGpsMarker = null; }
     if (overviewGpsCircle) { overviewGpsCircle.remove(); overviewGpsCircle = null; }
-    const b = document.getElementById('btn-overview-gps');
-    if (b) { b.style.opacity = '0.5'; b.classList.remove('active'); }
+    _syncOverviewGpsBtn(false);
     const bz = document.getElementById('btn-overview-gps-zoom');
     if (bz) bz.style.display = 'none';
   }
@@ -732,21 +739,10 @@ function setOverviewView(view) {
   if (view==='karte') {
     const mapWasInit = !!overviewMap;
     initOverviewMap();
+    ovNavAktualisieren();
     setTimeout(resizeOverviewMap, 50);
     setTimeout(() => {
-      // Karte auf Standorte der aktuellen Phase zentrieren
-      if (overviewMap) {
-        const pts = getFilteredSorted().flatMap(p => {
-          const r = [];
-          if (p.rs?.e  && p.rs?.n)  r.push(lv95ToWgs84(p.rs.e,  p.rs.n));
-          if (p.rks?.e && p.rks?.n) r.push(lv95ToWgs84(p.rks.e, p.rks.n));
-          return r;
-        });
-        if (pts.length) {
-          const bounds = L.latLngBounds(pts.map(c => [c.lat, c.lng])).pad(0.15);
-          overviewMap.fitBounds(bounds, { maxZoom: 15, animate: true });
-        }
-      }
+      overviewKarteAufPhaseZentrieren();
       if (_bpHighlightPaketId) refreshBpMapHighlight();
     }, 350);
   }
@@ -2345,24 +2341,45 @@ function _buildListFtOpts(pairId) {
   return html;
 }
 
-function initOverviewMap() {
-  if (overviewMap) {
-    overviewMap.invalidateSize();
-    return;
-  }
-  // Initiale Ansicht: Bounds aller vorhandenen Standorte, Fallback-Koordinaten
-  const _allLL = PAIRS.flatMap(p => {
+// Punkte der Standorte einer Liste — fuer den Kartenausschnitt
+function _standortPunkte(liste) {
+  return liste.flatMap(p => {
     const pts = [];
     if (p.rs?.e  && p.rs?.n)  pts.push(lv95ToWgs84(p.rs.e,  p.rs.n));
     if (p.rks?.e && p.rks?.n) pts.push(lv95ToWgs84(p.rks.e, p.rks.n));
     return pts;
   });
+}
+
+// Kartenausschnitt auf die Standorte der aktiven Phase. Wird beim Wechsel in
+// die Kartenansicht UND beim Phasenwechsel gebraucht: der Phasenwechsel baut
+// die Karte neu auf, und ohne diesen Aufruf blieb sie auf dem Ausschnitt
+// aller Standorte beider Phasen stehen.
+function overviewKarteAufPhaseZentrieren() {
+  if (!overviewMap) return;
+  const pts = _standortPunkte(getFilteredSorted());
+  if (!pts.length) return;
+  const bounds = L.latLngBounds(pts.map(c => [c.lat, c.lng])).pad(0.15);
+  overviewMap.fitBounds(bounds, { maxZoom: 17, animate: true });
+}
+
+function initOverviewMap() {
+  if (overviewMap) {
+    overviewMap.invalidateSize();
+    return;
+  }
+  // Erster Ausschnitt: Standorte der aktiven Phase. Frueher standen hier alle
+  // Standorte beider Phasen — beim Wechsel von Ausfuehrung zu Bauprojekt
+  // begann die Karte dadurch viel zu weit draussen.
+  const _phasePairs = getPhasePairs();
+  const _allLL = _standortPunkte(_phasePairs.length ? _phasePairs : PAIRS);
   const _initView = _allLL.length
-    ? { bounds: L.latLngBounds(_allLL.map(c => [c.lat, c.lng])), opts: { padding: [40, 40], maxZoom: 15 } }
+    ? { bounds: L.latLngBounds(_allLL.map(c => [c.lat, c.lng])), opts: { padding: [40, 40], maxZoom: 17 } }
     : { center: [47.55, 9.10], zoom: 13 };
   overviewMap = _allLL.length
-    ? L.map('overview-map').fitBounds(_initView.bounds, _initView.opts)
-    : L.map('overview-map').setView(_initView.center, _initView.zoom);
+    ? L.map('overview-map', KARTE_DREH_OPT).fitBounds(_initView.bounds, _initView.opts)
+    : L.map('overview-map', KARTE_DREH_OPT).setView(_initView.center, _initView.zoom);
+  karteDrehungAnmelden(overviewMap);
 
   // Basis-Karte setzen (zuletzt gewählte Kartenart)
   setOverviewBaseLayer(overviewBaseLayerKey);
@@ -2565,16 +2582,18 @@ function _addOverviewLegend(map) {
 
 const GPS_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
 
+// Der Knopf ist quadratisch und traegt nur das Zeichen. Frueher wurde hier
+// «GPS Aktiv» als Text hineingeschrieben — das verdraengte im 32er-Quadrat
+// das Zeichen. Der Zustand steht jetzt in den Klassen.
 function _syncOverviewGpsBtn(active) {
-  const btn   = document.getElementById('btn-overview-gps');
-  const btnFs = document.getElementById('btn-bp-fs-gps');
-  if (active) {
-    if (btn)   { btn.textContent = 'GPS Aktiv'; btn.style.opacity = '1'; btn.classList.add('active'); }
-    if (btnFs) { btnFs.style.background = '#e0f2fe'; btnFs.style.opacity = '1'; }
-  } else {
-    if (btn)   { btn.innerHTML = GPS_ICON_SVG + ' GPS'; btn.style.opacity = '0.45'; btn.classList.remove('active'); }
-    if (btnFs) { btnFs.style.background = 'white'; btnFs.style.opacity = '0.5'; }
-  }
+  [document.getElementById('btn-overview-gps'),
+   document.getElementById('btn-bp-fs-gps')].forEach(b => {
+    if (!b) return;
+    b.innerHTML = GPS_ICON_SVG;
+    b.classList.toggle('an',  active);
+    b.classList.toggle('aus', !active);
+    b.title = active ? 'GPS aktiv — ausschalten' : 'GPS';
+  });
 }
 
 function toggleOverviewGPS() {
@@ -2588,7 +2607,7 @@ function toggleOverviewGPS() {
     return;
   }
   if (!navigator.geolocation) { ui.toast('GPS wird von diesem Browser nicht unterstützt.', 'fehler'); return; }
-  if (btn) { btn.style.opacity = '1'; btn.innerHTML = GPS_ICON_SVG + ' GPS…'; }
+  if (btn) { btn.classList.remove('aus'); btn.title = 'GPS wird gesucht…'; }
   overviewWatchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude: lat, longitude: lng, accuracy } = pos.coords;
@@ -2621,7 +2640,161 @@ function zoomToOverviewGPS() {
   if (overviewGpsMarker && overviewMap) overviewMap.setView(overviewGpsMarker.getLatLng(), 17);
 }
 
+// ============================================================
+// STANDORT-NAVIGATION AUF KARTEN
+// ============================================================
+// Pfeile, Beschriftung und Sprungliste — dieselbe Bedienung wie in der
+// Seitenleiste der Detailansicht. Die Zeile wird gebaut, nicht abgeschrieben:
+// sie steht auf der Uebersichtskarte und in der Abnahme-Checkliste, und beide
+// tun beim Anwaehlen etwas anderes (Karte anfahren bzw. Checkliste laden).
+const KARTE_NAV_PFEIL = r =>
+  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"`
+  + ` stroke-linecap="round" stroke-linejoin="round"><polyline points="${r}"/></svg>`;
+
+const _karteNavs = {};
+
+// opt: { liste(), waehle(pair), name(pair), aktiv() }
+function karteNavAufbauen(halterId, opt) {
+  const halter = document.getElementById(halterId);
+  if (!halter) return null;
+  const nav = _karteNavs[halterId];
+  if (nav) return nav;
+
+  halter.innerHTML =
+     '<div class="pair-nav">'
+   +   '<button class="pair-nav-btn nur-symbol" data-nav="-1" title="Vorheriger Standort" aria-label="Vorheriger Standort">' + KARTE_NAV_PFEIL('15 18 9 12 15 6') + '</button>'
+   +   '<div class="pair-jump-wrap">'
+   +     '<button class="pair-jump-btn" data-nav-label title="Standort wählen">'
+   +       '<span>Standort wählen</span>'
+   +       '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+   +     '</button>'
+   +     '<div class="pair-jump-panel">'
+   +       '<input class="app-suche voll" type="search" placeholder="Standort suchen…">'
+   +       '<div class="pair-jump-liste"></div>'
+   +     '</div>'
+   +   '</div>'
+   +   '<button class="pair-nav-btn nur-symbol" data-nav="1" title="Nächster Standort" aria-label="Nächster Standort">' + KARTE_NAV_PFEIL('9 18 15 12 9 6') + '</button>'
+   + '</div>';
+
+  const el = {
+    prev:  halter.querySelector('[data-nav="-1"]'),
+    next:  halter.querySelector('[data-nav="1"]'),
+    label: halter.querySelector('[data-nav-label] span'),
+    knopf: halter.querySelector('[data-nav-label]'),
+    panel: halter.querySelector('.pair-jump-panel'),
+    such:  halter.querySelector('.app-suche'),
+    liste: halter.querySelector('.pair-jump-liste'),
+  };
+  const name = opt.name || (p => p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id));
+  let markiert = 0;
+
+  const aktualisieren = () => {
+    const liste = opt.liste();
+    const i = liste.findIndex(p => p.id === opt.aktiv());
+    el.label.textContent = i < 0 ? 'Standort wählen' : `${name(liste[i])} / ${liste.length}`;
+    el.prev.disabled = el.next.disabled = !liste.length;
+    // Ohne Auswahl tritt die Zeile ueber der Karte zurueck (siehe .leer)
+    halter.classList.toggle('leer', i < 0);
+  };
+
+  const zuklappen = () => el.panel.classList.remove('offen');
+
+  const listeZeichnen = filter => {
+    const q = (filter || '').trim();
+    const notAll = q ? loadAllNotizen() : {};
+    const bpAll  = q && typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+    const treffer = opt.liste().filter(p => !q || sucheTrifftStandort(p, q, notAll, bpAll));
+    markiert = 0;
+    if (!treffer.length) {
+      el.liste.innerHTML = '<div class="pair-jump-leer">Kein Standort gefunden</div>';
+      return;
+    }
+    el.liste.innerHTML = treffer.map((p, i) => {
+      const km = p.km_rs || p.km_rks;
+      return '<button class="pair-jump-eintrag'
+        + (p.id === opt.aktiv() ? ' aktiv' : '')
+        + (i === 0 ? ' markiert' : '') + '" data-pair="' + p.id + '">'
+        + '<span>' + escHtml(name(p)) + '</span>'
+        + (km ? '<span class="pj-neben">' + escHtml(parseFloat(km).toFixed(3)) + '</span>' : '')
+        + '</button>';
+    }).join('');
+    el.liste.querySelectorAll('[data-pair]').forEach(btn => {
+      btn.onclick = () => {
+        zuklappen();
+        const ziel = opt.liste().find(p => String(p.id) === btn.dataset.pair);
+        if (ziel) { opt.waehle(ziel); aktualisieren(); }
+      };
+    });
+    el.liste.querySelector('.pair-jump-eintrag.aktiv')?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const gehe = richtung => {
+    const liste = opt.liste();
+    if (!liste.length) return;
+    const i = liste.findIndex(p => p.id === opt.aktiv());
+    // Ohne bisherige Wahl beim ersten bzw. letzten Standort einsteigen
+    const ziel = i < 0 ? (richtung > 0 ? 0 : liste.length - 1)
+                       : (i + richtung + liste.length) % liste.length;
+    opt.waehle(liste[ziel]);
+    aktualisieren();
+  };
+
+  el.prev.onclick = () => gehe(-1);
+  el.next.onclick = () => gehe(1);
+  el.knopf.onclick = ev => {
+    ev.stopPropagation();
+    if (!el.panel.classList.toggle('offen')) return;
+    el.such.value = '';
+    el.such.focus();
+    listeZeichnen('');
+  };
+  el.such.oninput = () => listeZeichnen(el.such.value);
+  el.such.onkeydown = ev => {
+    const eintraege = [...el.liste.querySelectorAll('.pair-jump-eintrag')];
+    if (ev.key === 'Escape') { zuklappen(); return; }
+    if (!eintraege.length) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); eintraege[markiert]?.click(); return; }
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    eintraege[markiert]?.classList.remove('markiert');
+    markiert = (markiert + (ev.key === 'ArrowDown' ? 1 : -1) + eintraege.length) % eintraege.length;
+    eintraege[markiert].classList.add('markiert');
+    eintraege[markiert].scrollIntoView({ block: 'nearest' });
+  };
+
+  _karteNavs[halterId] = { aktualisieren, zuklappen };
+  aktualisieren();
+  return _karteNavs[halterId];
+}
+
+// Klick daneben schliesst jede offene Sprungliste
+document.addEventListener('click', e => {
+  if (e.target.closest('.pair-jump-wrap')) return;
+  Object.values(_karteNavs).forEach(n => n.zuklappen());
+});
+
+// ── Uebersichtskarte ─────────────────────────────────────────
+let _ovNavId = null;
+
+function ovNavZeigeStandort(pair) {
+  const eintrag = overviewMarkers.find(m => m.pairId === pair.id);
+  const marker  = eintrag?.rs || eintrag?.rks || eintrag?.bs;
+  if (!marker || !overviewMap) return;
+  _ovNavId = pair.id;
+  overviewMap.setView(marker.getLatLng(), Math.max(overviewMap.getZoom(), 17));
+  marker.openPopup();
+}
+
+function ovNavAktualisieren() {
+  karteNavAufbauen('ov-nav-halter', {
+    liste:  () => getFilteredSorted(),
+    waehle: ovNavZeigeStandort,
+    aktiv:  () => _ovNavId,
+  })?.aktualisieren();
+}
+
 function refreshOverviewMap() {
+  ovNavAktualisieren();
   // Sondagen-Marker nur in der Baugrundphase anzeigen
   if (_activePhase !== 'baugrund') {
     if (!overviewMap) { initOverviewMap(); setTimeout(resizeOverviewMap, 50); }

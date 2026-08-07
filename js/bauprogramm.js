@@ -1153,14 +1153,9 @@ function setBpZoom(zoom) {
   _bpZoom = zoom;
   bpFundAuswahlLeeren(false);
   ['tag','woche','monat','jahr'].forEach(z => {
-    // Normalleiste: Klasse .aktiv (siehe .seg). Vollbildleiste liegt auf dunklem
-    // Grund und behaelt ihre eigene Hervorhebung.
+    // Beide Leisten stehen auf hellem Grund und tragen dieselbe Hervorhebung
     document.getElementById('bp-zoom-' + z)?.classList.toggle('aktiv', z === zoom);
-    const btnFs = document.getElementById('bp-fs-zoom-' + z);
-    if (btnFs) {
-      btnFs.style.background = z === zoom ? 'rgba(255,255,255,0.2)' : 'transparent';
-      btnFs.style.color      = z === zoom ? 'white' : 'rgba(255,255,255,0.6)';
-    }
+    document.getElementById('bp-fs-zoom-' + z)?.classList.toggle('aktiv', z === zoom);
   });
   renderBauprogrammTab();
 }
@@ -2953,16 +2948,19 @@ function toggleBpFsMap() {
   _bpFsMapOpen = !_bpFsMapOpen;
   const pane = document.getElementById('bp-fs-map-pane');
   if (pane) pane.style.display = _bpFsMapOpen ? 'block' : 'none';
-  _updateBpFsMapBtn();
   if (_bpFsMapOpen) _moveFsMap();
   else _restoreFsMap();
 }
 
-function _updateBpFsMapBtn() {
-  const btn = document.getElementById('bp-fs-map-toggle-btn');
-  if (!btn) return;
-  btn.style.background  = _bpFsMapOpen ? 'rgba(255,255,255,0.2)' : 'transparent';
-  btn.style.borderColor = _bpFsMapOpen ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)';
+// Die Legende bleibt, wo sie auf jeder Karte steht: als Leaflet-Steuerung
+// unten links. Im Bauprogramm-Vollbild wird sie nur aufgeklappt und etwas
+// breiter — dort steckt der Bauablauf-Schieber, der hier das Werkzeug ist und
+// auf schmalen Geraeten sonst hinter dem zugeklappten Koerper liegt.
+function _bpFsLegendeUmhaengen(insVollbild) {
+  const leg = document.getElementById('ov-legend-outer');
+  if (!leg) return;
+  leg.classList.toggle('legende-gross', !!insVollbild);
+  if (insVollbild) leg.querySelector('#ov-legend-body')?.classList.remove('ov-legend-collapsed');
 }
 
 // Verschiebt #overview-map in den Vollbild-Pane und zeigt Paket-Highlight
@@ -2983,6 +2981,25 @@ function _moveFsMap() {
     initOverviewMap();
   }
   pane.insertBefore(mapEl, pane.firstChild);
+  // Die Standort-Navigation gehoert zur Karte, nicht zum Uebersichtskasten —
+  // sonst bliebe sie beim Verschieben zurueck und man koennte im Vollbild
+  // keinen Mast mehr anfahren.
+  // Bedienelemente der Karte wandern mit: Standort-Navigation oben,
+  // Kartenart, Transparenz und Bahn-Suche unten. Blieben sie im
+  // Uebersichtskasten zurueck, waere die Vollbildkarte nicht mehr bedienbar.
+  const nav       = document.getElementById('ov-nav-halter');
+  const navHalter = document.getElementById('bp-fs-nav-halter');
+  if (nav && navHalter) {
+    navHalter.appendChild(nav);
+    nav.classList.add('im-kopf');
+    // Wer direkt ins Bauprogramm geht, hat die Uebersichtskarte nie geoeffnet
+    // — die Zeile ist dann noch leer.
+    ovNavAktualisieren();
+  }
+  // Kartenart, Transparenz und Bahn-Suche bleiben im Uebersichtskasten: hier
+  // wuerden sie die Karte zustellen, und dieselben Einstellungen stehen im
+  // Rechtsklickmenue der Karte (showMapCtxMenu) wie auf den uebrigen Karten.
+  _bpFsLegendeUmhaengen(true);
   mapEl.style.height       = '100%';
   mapEl.style.width        = '100%';
   mapEl.style.borderRadius = '0';
@@ -3003,6 +3020,9 @@ function _restoreFsMap() {
   const wrap  = document.getElementById('overview-map-wrap');
   if (!mapEl || !wrap) return;
   wrap.insertBefore(mapEl, wrap.firstChild);
+  const nav = document.getElementById('ov-nav-halter');
+  if (nav) { wrap.appendChild(nav); nav.classList.remove('im-kopf'); }
+  _bpFsLegendeUmhaengen(false);
   mapEl.style.height       = '';
   mapEl.style.width        = '';
   mapEl.style.borderRadius = '';

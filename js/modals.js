@@ -603,9 +603,9 @@ function openCreateView(id) {
       const last = PAIRS[PAIRS.length - 1];
       const src  = last.rs?.e ? last.rs : (last.rks?.e ? last.rks : null);
       const c    = src ? lv95ToWgs84(src.e, src.n) : null;
-      mapCenter  = (c && !c.invalid) ? c : { lat: 47.566, lng: 9.106 };
+      mapCenter  = (c && !c.invalid) ? c : { ...CREATE_MAP_NOTFALL, ersatz: true };
     } else {
-      mapCenter = { lat: 47.566, lng: 9.106 };
+      mapCenter = { ...CREATE_MAP_NOTFALL, ersatz: true };
     }
   }
 
@@ -650,6 +650,78 @@ function openCreateView(id) {
   }, 80);
 }
 
+// Letzte Rueckfallposition, wenn weder eine Strecke noch ein bestehender
+// Standort noch GPS etwas Besseres liefern: Mitte des bisherigen Projektgebiets.
+const CREATE_MAP_NOTFALL = { lat: 47.566, lng: 9.106 };
+
+// Kartenart der Erfassungskarte — waehrend der Sitzung gemerkt, damit sie
+// nicht bei jedem neuen Standort zurueckspringt.
+let _createBasemapKey  = 'swiss-luft';
+let _createBaseLayer   = null;
+let _createUmweltEbenen = [];
+
+// ── Kartenausschnitt aus Strecke oder Liniennummer ───────────
+// Beim Anlegen steht die Linie meist schon fest, der Punkt noch nicht. Statt
+// die Karte irgendwo stehen zu lassen, wird sie auf diese Linie gestellt.
+let _createStreckeTimer = null;
+
+function onCreateStreckeEingabe() {
+  clearTimeout(_createStreckeTimer);
+  _createStreckeTimer = setTimeout(() => createKarteAusVorgabe(true), 600);
+}
+
+// nurStrecke=true: kein Rueckgriff auf GPS (der Nutzer hat gerade getippt)
+async function createKarteAusVorgabe(nurStrecke) {
+  const karte = createMapLeaflet;
+  if (!karte) return;
+  // Gesetzte Punkte nicht ueberfahren
+  const gesetzt = () => karte !== createMapLeaflet || createRsMarker || createRksMarker;
+  if (gesetzt()) return;
+
+  const nr    = document.getElementById('c-streckennr')?.value.trim() || '';
+  const name  = document.getElementById('c-strecke')?.value.trim() || '';
+  // Die Liniennummer steckt haeufig im Streckennamen («Linie 755 Altstetten…»)
+  const linie = (nr.match(/\d{3}/) || name.match(/\d{3}/) || [])[0];
+
+  // Was bereits geladen ist, kostet keine Abfrage
+  const ausCache = (typeof bahnSuche === 'function' ? bahnSuche(linie || name) : [])[0];
+  if (ausCache && !gesetzt()) { karte.setView([ausCache.lat, ausCache.lon], 15); return; }
+
+  if (linie && typeof bahnLinieOrtOnline === 'function') {
+    const ort = await bahnLinieOrtOnline(linie);
+    if (ort && !gesetzt()) { karte.setView([ort.lat, ort.lon], 14); return; }
+  }
+  if (name && typeof bahnStationSuchenOnline === 'function') {
+    const st = (await bahnStationSuchenOnline(name))[0];
+    if (st && !gesetzt()) { karte.setView([st.lat, st.lon], 15); return; }
+  }
+  if (nurStrecke || !navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    pos => { if (!gesetzt()) karte.setView([pos.coords.latitude, pos.coords.longitude], 18); },
+    () => { /* ohne GPS bleibt die Rueckfallposition stehen */ },
+    { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+  );
+}
+
+function setCreateBaseLayer(key) {
+  _createBasemapKey = key;
+  const sel = document.getElementById('create-basemap-select');
+  if (sel) sel.value = key;
+  if (!createMapLeaflet) return;
+  _createUmweltEbenen.forEach(l => { try { createMapLeaflet.removeLayer(l); } catch {} });
+  _createUmweltEbenen = [];
+  if (_createBaseLayer) createMapLeaflet.removeLayer(_createBaseLayer);
+  // «Umwelt» ist die graue Landeskarte mit den Fachebenen darueber
+  _createBaseLayer = makeTile(key === 'umwelt' ? 'swiss-karte' : key,
+    key === 'umwelt' ? { className: 'umwelt-base-tile' } : {}).addTo(createMapLeaflet);
+  _createBaseLayer.bringToBack();
+  if (key === 'umwelt') {
+    _createUmweltEbenen = _buildUmweltOverlays();
+    _createUmweltEbenen.forEach(l => l.addTo(createMapLeaflet));
+  }
+}
+
 function initCreateMap(center) {
   // Vorherige Instanz bereinigen
   if (createMapLeaflet) {
@@ -664,12 +736,17 @@ function initCreateMap(center) {
   const el = document.getElementById('create-map');
   if (!el) return;
 
-  createMapLeaflet = L.map('create-map', { zoomControl: true, attributionControl: false })
+  // Quellenangabe wie auf den uebrigen Karten
+  createMapLeaflet = L.map('create-map', { zoomControl: true, ...KARTE_DREH_OPT })
     .setView([center.lat, center.lng], 19);
+  karteDrehungAnmelden(createMapLeaflet);
 
-  // Luftbild als Standard-Basiskarte
-  L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg',
-    { maxZoom: 20 }).addTo(createMapLeaflet);
+  // Kein bestehender Standort als Anhaltspunkt: erst die vorgegebene Strecke
+  // versuchen, sonst die eigene Position. Beides wird nachgeholt, sobald es
+  // vorliegt — die Karte steht solange auf der Rueckfallposition.
+  if (center.ersatz) createKarteAusVorgabe();
+
+  setCreateBaseLayer(_createBasemapKey);
 
   // Bahnlinien sind standardmässig an (App-Einstellungen › Kartendarstellung)
   if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('create'), 60);
@@ -1223,20 +1300,29 @@ function onCreateSearch(val) {
 // Suchfeld daneben waere die naheliegende, aber schlechtere Loesung — man
 // muesste erst entscheiden, welches Feld zustaendig ist.
 async function fetchCreateSearch(query) {
-  const bahn = (typeof bahnSuche === 'function' ? bahnSuche(query) : [])
+  const orteHolen = (async () => {
+    try {
+      const url = `https://api.geo.admin.ch/rest/services/ech/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&lang=de&limit=5&sr=4326`;
+      const data = await fetch(url).then(r => r.json());
+      // geo.admin liefert im Suchergebnis y als Breite und x als Laenge
+      return (data.results || []).map(r => ({
+        lat: r.attrs.y, lng: r.attrs.x,
+        titel: r.attrs.label.replace(/<[^>]+>/g, ''), neben: '', art: 'Ort',
+      }));
+    } catch { return []; } // Netzwerkfehler ignorieren — Bahntreffer bleiben nutzbar
+  })();
+  const stationenHolen = typeof bahnStationSuchenOnline === 'function'
+    ? bahnStationSuchenOnline(query) : Promise.resolve([]);
+
+  const bahn = (typeof bahnSuche === 'function' ? bahnSuche(query) : []);
+  const [stationen, orte] = await Promise.all([stationenHolen, orteHolen]);
+
+  // Stationen zuerst: gesucht wird der Bahnhof, nicht das Dorfzentrum.
+  // Was die oertliche Suche schon kennt, kommt nicht doppelt.
+  const bekannt = new Set(bahn.map(t => t.titel));
+  const alleBahn = [...bahn, ...stationen.filter(s => !bekannt.has(s.titel))]
     .map(t => ({ lat: t.lat, lng: t.lon, titel: t.titel, neben: t.neben, art: t.art }));
-  let orte = [];
-  try {
-    const url = `https://api.geo.admin.ch/rest/services/ech/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&lang=de&limit=5&sr=4326`;
-    const data = await fetch(url).then(r => r.json());
-    // geo.admin liefert im Suchergebnis y als Breite und x als Laenge
-    orte = (data.results || []).map(r => ({
-      lat: r.attrs.y, lng: r.attrs.x,
-      titel: r.attrs.label.replace(/<[^>]+>/g, ''), neben: '', art: 'Ort',
-    }));
-  } catch { /* Netzwerkfehler ignorieren — Bahntreffer bleiben nutzbar */ }
-  // Bahntreffer zuerst: sie sind die praezisere Angabe
-  renderCreateSearchResults([...bahn, ...orte]);
+  renderCreateSearchResults([...alleBahn, ...orte]);
 }
 
 let _createSuchTreffer = [];

@@ -3,7 +3,85 @@
 function onSearchInput(val) {
   searchQuery = val.trim();
   refreshCurrentView();
+  kopfSuchListe(val);
 }
+
+// ── Standortwahl aus dem Suchfeld im Kopf ────────────────────
+// Das Feld filterte bisher nur die Liste. Wer einen bestimmten Mast sucht,
+// will ihn aber oeffnen — dieselbe Handlung wie in der Sprungliste der
+// Navigationszeile, nur ohne den Umweg ueber eine der Kartenansichten.
+let _kopfSuchMarkiert = 0;
+
+function kopfSuchTreffer(q) {
+  if (!q || q.trim().length < 1) return [];
+  const notAll = loadAllNotizen();
+  const bpAll  = typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+  return getPhasePairs()
+    .filter(p => sucheTrifftStandort(p, q, notAll, bpAll))
+    .slice(0, 12);
+}
+
+function kopfSuchListe(val) {
+  const panel = document.getElementById('kopf-such-panel');
+  const liste = document.getElementById('kopf-such-liste');
+  if (!panel || !liste) return;
+  const treffer = kopfSuchTreffer(val);
+  _kopfSuchMarkiert = 0;
+  if (!treffer.length) { panel.classList.remove('offen'); return; }
+  liste.innerHTML = treffer.map((p, i) => {
+    const km   = p.km_rs || p.km_rks;
+    const name = p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id);
+    return '<button class="pair-jump-eintrag' + (i === 0 ? ' markiert' : '')
+      + '" data-kopf-pair="' + p.id + '">'
+      + '<span>' + escHtml(name) + '</span>'
+      + (km ? '<span class="pj-neben">' + escHtml(parseFloat(km).toFixed(3)) + '</span>' : '')
+      + '</button>';
+  }).join('');
+  liste.querySelectorAll('[data-kopf-pair]').forEach(btn => {
+    btn.onclick = () => kopfSuchWaehlen(Number(btn.dataset.kopfPair));
+  });
+  panel.classList.add('offen');
+}
+
+function kopfSuchSchliessen() {
+  document.getElementById('kopf-such-panel')?.classList.remove('offen');
+}
+
+// In der Kartenansicht der Uebersicht wird der Standort angefahren, sonst
+// geoeffnet — beides ist «Standort waehlen», nur je nach Ansicht.
+function kopfSuchWaehlen(id) {
+  kopfSuchSchliessen();
+  const pair = PAIRS.find(p => p.id === id);
+  if (!pair) return;
+  if (currentOverviewView === 'karte' && typeof ovNavZeigeStandort === 'function'
+      && document.getElementById('overview-view')?.style.display !== 'none') {
+    ovNavZeigeStandort(pair);
+    ovNavAktualisieren();
+    return;
+  }
+  showDetail(id);
+}
+
+function kopfSuchTaste(ev) {
+  const eintraege = [...document.querySelectorAll('#kopf-such-liste .pair-jump-eintrag')];
+  if (ev.key === 'Escape') { kopfSuchSchliessen(); return; }
+  if (!eintraege.length) return;
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    eintraege[_kopfSuchMarkiert]?.click();
+    return;
+  }
+  if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+  ev.preventDefault();
+  eintraege[_kopfSuchMarkiert]?.classList.remove('markiert');
+  _kopfSuchMarkiert = (_kopfSuchMarkiert + (ev.key === 'ArrowDown' ? 1 : -1) + eintraege.length) % eintraege.length;
+  eintraege[_kopfSuchMarkiert].classList.add('markiert');
+  eintraege[_kopfSuchMarkiert].scrollIntoView({ block: 'nearest' });
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#kopf-such-wrap')) kopfSuchSchliessen();
+});
 
 // ============================================================
 // SCHNELLSTATUS
@@ -106,6 +184,9 @@ function addFotos(input) {
         setPairData(currentPairId, { fotos: allFotos });
         logChange(currentPairId, 'Foto', `${files.length} hinzugefügt (${PHASEN_CONFIG[_activePhase]?.labelKurz || _activePhase})`);
         renderFotos();
+        // Rueckmeldung: der Knopf an der Karte liegt oft ueber der eingeklappten
+        // Fotoliste — ohne Meldung sieht man nicht, dass etwas gespeichert wurde.
+        ui.toast(files.length === 1 ? 'Foto gespeichert' : `${files.length} Fotos gespeichert`, 'erfolg');
       }
     };
     reader.readAsDataURL(file);
@@ -115,6 +196,17 @@ function addFotos(input) {
 
 // Legacy-Alias (falls noch aufgerufen)
 function addFoto(input) { addFotos(input); }
+
+// Schnellfoto-Knopf an der Karte der Detailansicht.
+// Ohne gewaehlten Standort haette addFotos keinen Ort zum Ablegen — dann gar
+// nicht erst die Kamera oeffnen, sondern sagen warum.
+function schnellFotoDetail() {
+  if (!currentPairId) { ui.toast('Kein Standort geöffnet', 'fehler'); return; }
+  const inp = document.getElementById('detail-foto-input');
+  if (!inp) return;
+  inp.value = '';
+  inp.click();
+}
 
 // ── Kamera-Funktionen ───────────────────────────────────────
 let _cameraStream = null;

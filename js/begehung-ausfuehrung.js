@@ -1177,37 +1177,15 @@ let _ckLastOrt      = '';   // Carry-over: letzter eingegebener Ort
 let _ckLastAnwesend = [];   // Carry-over: letzte Personen-Liste
 
 // ── Checkliste: Standort-Navigation ──────────────────────────────────────────
+// Die frueheren zwei Textknoepfe «‹ Standort / Standort ›» konnten nur
+// blaettern. Hier steht dieselbe Zeile wie auf den Karten: Pfeile, Name und
+// Sprungliste mit Suche — bei 25 Positionen der einzige zumutbare Weg.
 function updateCkNavButtons() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  const hasPrev = idx > 0;
-  const hasNext = idx !== -1 && idx < pairs.length - 1;
-  const prevPair = hasPrev ? pairs[idx - 1] : null;
-  const nextPair = hasNext ? pairs[idx + 1] : null;
-  const pairLabel = p => p ? (p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'Nr. ' + p.id)) : '';
-
-  const prevBtn = document.getElementById('ck-nav-prev');
-  if (prevBtn) {
-    prevBtn.style.opacity = hasPrev ? '1' : '0.35';
-    prevBtn.title = hasPrev ? '← ' + pairLabel(prevPair) : 'Kein vorheriger Standort';
-  }
-  const nextBtn = document.getElementById('ck-nav-next');
-  if (nextBtn) {
-    nextBtn.style.opacity = hasNext ? '1' : '0.35';
-    nextBtn.title = hasNext ? pairLabel(nextPair) + ' →' : 'Kein nächster Standort';
-  }
-}
-
-function ckNavPrev() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  if (idx > 0) openCheckliste(pairs[idx - 1].id);
-}
-
-function ckNavNext() {
-  const pairs = getFilteredSorted();
-  const idx   = pairs.findIndex(p => p.id === _ckPairId);
-  if (idx !== -1 && idx < pairs.length - 1) openCheckliste(pairs[idx + 1].id);
+  karteNavAufbauen('ck-nav-halter', {
+    liste:  () => getFilteredSorted(),
+    waehle: p => openCheckliste(p.id),
+    aktiv:  () => _ckPairId,
+  })?.aktualisieren();
 }
 
 // ── Checkliste: Situationskarte ───────────────────────────────────────────────
@@ -1227,8 +1205,13 @@ function initCkMap() {
   }
   const pair   = PAIRS.find(p => p.id === _ckPairId);
   const center = pair ? pairCenter(pair) : { lat: 47.37, lng: 8.55 };
-  _ckLeafletMap = L.map('ck-karte', { zoomControl: true, attributionControl: false }).setView([center.lat, center.lng], 19);
+  // Quellenangabe wie auf den uebrigen Karten — swisstopo und, sobald die
+  // Bahnebene dazukommt, data.sbb.ch (Nutzungsbedingungen Ziffer 4.1).
+  _ckLeafletMap = L.map('ck-karte', { zoomControl: true, ...KARTE_DREH_OPT }).setView([center.lat, center.lng], 19);
+  karteDrehungAnmelden(_ckLeafletMap);
   _ckTileLayer  = makeTile(detailBaseLayerKey || 'swiss-luft').addTo(_ckLeafletMap);
+  // Kilometrierung ist gerade auf der Abnahmekarte die nuetzlichste Ebene
+  if (typeof bahnStandardAnwenden === 'function') setTimeout(() => bahnStandardAnwenden('abnahme'), 60);
   _updateCkMapCenter();
 }
 
@@ -1278,13 +1261,13 @@ function _updateCkMapCenter() {
 function destroyCkMap() {
   if (_ckGpsWatchId !== null) { navigator.geolocation.clearWatch(_ckGpsWatchId); _ckGpsWatchId = null; }
   _ckGpsActive = false;
-  const gpsBtn = document.getElementById('ck-gps-btn');
-  if (gpsBtn) { gpsBtn.style.opacity = '0.5'; gpsBtn.style.background = 'white'; }
+  _ckGpsKnopf(false);
   if (_ckGpsMarker)  { _ckGpsMarker.remove();  _ckGpsMarker  = null; }
   if (_ckGpsCircle)  { _ckGpsCircle.remove();  _ckGpsCircle  = null; }
   if (_ckPairMarker) { _ckPairMarker.remove(); _ckPairMarker = null; }
   _ckNeighbourMarkers.forEach(m => m.remove()); _ckNeighbourMarkers = [];
   if (_ckLeafletMap) { _ckLeafletMap.remove(); _ckLeafletMap = null; }
+  if (typeof bahnKarteVergessen === 'function') bahnKarteVergessen('abnahme');
   _ckTileLayer = null;
 }
 
@@ -1294,30 +1277,60 @@ function toggleCkKarte() {
   if (!wrap) return;
   const visible = wrap.style.display !== 'none';
   if (visible) {
+    if (_ckKarteGross) toggleCkKarteGross();   // beim naechsten Oeffnen wieder als Streifen
     wrap.style.display = 'none';
-    if (btn) btn.style.background = 'rgba(255,255,255,0.12)';
+    if (btn) btn.classList.remove('an');
     destroyCkMap();
   } else {
     wrap.style.display = 'block';
-    if (btn) btn.style.background = 'rgba(255,255,255,0.28)';
+    if (btn) btn.classList.add('an');
     setTimeout(initCkMap, 50); // nach DOM-Paint initialisieren
   }
 }
 
+// Die Situationskarte ist ein 220 Pixel hoher Streifen ueber der Liste. Zum
+// Verorten reicht das nicht immer — der Knopf schaltet sie auf volle Hoehe,
+// wie die Vollbildkarten der uebrigen Ansichten.
+let _ckKarteGross = false;
+
+function toggleCkKarteGross() {
+  const wrap = document.getElementById('ck-karte-wrap');
+  const btn  = document.getElementById('ck-vollbild-btn');
+  if (!wrap) return;
+  _ckKarteGross = !_ckKarteGross;
+  wrap.style.height = _ckKarteGross ? 'calc(100vh - 54px)' : '220px';
+  if (btn) {
+    btn.classList.toggle('an', _ckKarteGross);
+    btn.title = _ckKarteGross ? 'Karte verkleinern' : 'Karte vergrössern';
+    btn.innerHTML = _ckKarteGross
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+  }
+  setTimeout(() => _ckLeafletMap?.invalidateSize(), 60);
+}
+
+// Zustand der Kartenknoepfe steckt in den Klassen (.an/.aus), nicht in
+// einzelnen Stilangaben — siehe .karten-knopf in index.html.
+function _ckGpsKnopf(an) {
+  const btn = document.getElementById('ck-gps-btn');
+  if (!btn) return;
+  btn.classList.toggle('an', an);
+  btn.classList.toggle('aus', !an);
+}
+
 function toggleCkGps() {
   if (!_ckLeafletMap) return;
-  const btn = document.getElementById('ck-gps-btn');
   if (_ckGpsActive) {
     // GPS deaktivieren
     if (_ckGpsWatchId !== null) { navigator.geolocation.clearWatch(_ckGpsWatchId); _ckGpsWatchId = null; }
     if (_ckGpsMarker) { _ckGpsMarker.remove(); _ckGpsMarker = null; }
     if (_ckGpsCircle) { _ckGpsCircle.remove(); _ckGpsCircle = null; }
     _ckGpsActive = false;
-    if (btn) { btn.style.opacity = '0.5'; btn.style.background = 'white'; }
+    _ckGpsKnopf(false);
   } else {
     // GPS aktivieren
     if (!navigator.geolocation) { ui.toast('Geolocation nicht verfügbar.', 'fehler'); return; }
-    if (btn) { btn.style.opacity = '1'; btn.style.background = '#e0f2fe'; }
+    _ckGpsKnopf(true);
     _ckGpsActive = true;
     _ckGpsWatchId = navigator.geolocation.watchPosition(pos => {
       const { latitude: lat, longitude: lng, accuracy } = pos.coords;
@@ -1326,7 +1339,7 @@ function toggleCkGps() {
         _ckGpsMarker = L.circleMarker([lat, lng], { radius: 7, color: '#0284c7', fillColor: '#38bdf8', fillOpacity: 0.85, weight: 2 }).addTo(_ckLeafletMap);
         _ckGpsCircle = L.circle([lat, lng], { radius: accuracy, color: '#0284c7', fillColor: '#bae6fd', fillOpacity: 0.2, weight: 1 }).addTo(_ckLeafletMap);
       }
-    }, () => { _ckGpsActive = false; if (btn) { btn.style.opacity = '0.5'; btn.style.background = 'white'; } },
+    }, () => { _ckGpsActive = false; _ckGpsKnopf(false); },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
   }
 }

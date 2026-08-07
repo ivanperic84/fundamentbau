@@ -13,6 +13,149 @@ function makeTile(key, opts={}) {
   return L.tileLayer(d.url, { attribution: d.attr, maxZoom: d.maxZoom, ...opts });
 }
 
+// ============================================================
+// DREHUNG DER KARTEN
+// ============================================================
+// Leaflet dreht von sich aus nicht; das leistet lib/leaflet-rotate.js.
+// Hier steht die gemeinsame Festlegung: EINE Drehung fuer alle Karten der
+// App. Wer sich die Ansicht einmal auf die Blickrichtung vor Ort gedreht hat,
+// findet sie in jeder anderen Karte wieder — auch in den Unterkarten
+// (Erfassung, Abnahme, Begehungsskizze).
+//
+// Gemeinsame Karten-Optionen. rotateControl aus: die Steuerung des Pakets
+// sitzt oben links und sieht fremd aus, das Nordzeichen unten rechts kommt
+// von hier. shiftKeyRotate bleibt an (Umschalt + Ziehen mit der Maus),
+// touchRotate an (zwei Finger auf dem Tablet).
+const KARTE_DREH_OPT = { rotate: true, touchRotate: true, rotateControl: false };
+
+// Zwei Finger auf der Karte heissen meistens «zoomen». Das Paket dreht aber
+// schon bei einem Grad Verdrehung mit, und beim Aufziehen stehen die Finger
+// nie exakt gleich — die Karte kippte dadurch unbeabsichtigt. Deshalb eine
+// Totzone: gedreht wird erst ab dieser Verdrehung. Ist sie einmal
+// ueberschritten, bleibt das Drehen fuer den Rest der Geste frei.
+const KARTE_DREH_TOTZONE = 12;  // Grad
+
+(function drehTotzoneEinbauen() {
+  const G = L.Map && L.Map.TouchGestures;
+  if (!G) return;
+  const startAlt = G.prototype._onTouchStart;
+  const moveAlt  = G.prototype._onTouchMove;
+
+  G.prototype._onTouchStart = function (e) {
+    this._drehFrei = false;
+    startAlt.call(this, e);
+  };
+
+  G.prototype._onTouchMove = function (e) {
+    // Nur solange auch gezoomt wird — sonst wuerde die Sperre die einzige
+    // Wirkung der Geste unterdruecken.
+    if (this.rotate && this._zooming && !this._drehFrei
+        && e.touches && e.touches.length === 2) {
+      const map = this._map;
+      const p1 = map.mouseEventToContainerPoint(e.touches[0]);
+      const p2 = map.mouseEventToContainerPoint(e.touches[1]);
+      const v  = p1.subtract(p2);
+      // Der Winkel aus atan springt um 180 Grad, wenn die Finger die Seite
+      // wechseln; hier interessiert nur die Verdrehung gegen den Start.
+      let delta = (Math.atan(v.x / v.y) - this._startTheta) * L.DomUtil.RAD_TO_DEG;
+      delta = ((delta % 180) + 270) % 180 - 90;
+
+      if (Math.abs(delta) < KARTE_DREH_TOTZONE) {
+        const merk = this._rotating;
+        this._rotating = false;      // dieser Schritt zoomt nur
+        moveAlt.call(this, e);
+        this._rotating = merk;
+        return;
+      }
+      // Freigabe: ohne Nachfuehren des Startwinkels spraenge die Karte hier
+      // um die volle Totzone weiter.
+      this._drehFrei = true;
+      this._startTheta   = Math.atan(v.x / v.y);
+      this._startBearing = map.getBearing();
+      if (v.y < 0) this._startBearing += 180;
+    }
+    moveAlt.call(this, e);
+  };
+})();
+
+const KARTE_DREHUNG_KEY = 'sp_karte_drehung';
+
+function _karteDrehungLaden() {
+  const roh = parseFloat(store.getItem(KARTE_DREHUNG_KEY));
+  return Number.isFinite(roh) ? roh : 0;
+}
+
+let _karteDrehung  = _karteDrehungLaden();  // aktuelle Drehung in Grad
+let _karteDrehungZuletzt = _karteDrehung;   // letzte Drehung ungleich Norden
+const _karteRegister = new Set();           // alle offenen Karten
+let _karteDrehungLaeuft = false;            // gegen Rueckkopplung beim Verteilen
+
+// Eine Karte anmelden: sie uebernimmt die aktuelle Drehung, bekommt das
+// Nordzeichen und meldet eigene Drehungen an alle uebrigen weiter.
+function karteDrehungAnmelden(karte) {
+  if (!karte || _karteRegister.has(karte)) return;
+  _karteRegister.add(karte);
+  karte.on('unload', () => _karteRegister.delete(karte));
+  if (typeof karte.setBearing === 'function' && _karteDrehung) karte.setBearing(_karteDrehung);
+  nordZeichenAnlegen(karte);
+  karte.on('rotate', () => {
+    if (_karteDrehungLaeuft) return;
+    karteDrehungSetzen(karte.getBearing(), karte);
+  });
+}
+
+function karteDrehungSetzen(grad, ausser) {
+  const wert = ((grad % 360) + 360) % 360;
+  _karteDrehung = wert;
+  if (wert) _karteDrehungZuletzt = wert;
+  store.setItem(KARTE_DREHUNG_KEY, String(wert));
+  _karteDrehungLaeuft = true;
+  _karteRegister.forEach(k => {
+    if (k === ausser || typeof k.setBearing !== 'function') return;
+    // Karten ohne Behaelter im Baum (geschlossene Ansichten) ueberspringen
+    try { if (Math.round(k.getBearing()) !== Math.round(wert)) k.setBearing(wert); } catch {}
+  });
+  _karteDrehungLaeuft = false;
+  nordZeichenAktualisieren();
+}
+
+// Nordzeichen unten rechts. Erstes Druecken stellt nach Norden, das naechste
+// zurueck auf die zuletzt gewaehlte Drehung.
+function nordZeichenUmschalten() {
+  if (Math.round(_karteDrehung) % 360 === 0) karteDrehungSetzen(_karteDrehungZuletzt || 0);
+  else                                       karteDrehungSetzen(0);
+}
+
+function nordZeichenAnlegen(karte) {
+  if (!L.Control || karte._nordZeichen) return;
+  const ctrl = L.control({ position: 'bottomright' });
+  ctrl.onAdd = () => {
+    const el = L.DomUtil.create('div', 'nord-zeichen');
+    el.title = 'Nach Norden ausrichten (nochmals: zurück zur gewählten Drehung)';
+    el.innerHTML =
+      '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">'
+      + '<g class="nz-nadel">'
+      +   '<polygon points="12,3 8.6,13 12,11.2 15.4,13" fill="#b91c1c"/>'
+      +   '<polygon points="12,21 8.6,11 12,12.8 15.4,11" fill="#6b7280"/>'
+      + '</g></svg>';
+    L.DomEvent.disableClickPropagation(el);
+    L.DomEvent.on(el, 'click', nordZeichenUmschalten);
+    return el;
+  };
+  ctrl.addTo(karte);
+  karte._nordZeichen = ctrl;
+  nordZeichenAktualisieren();
+}
+
+// Die Nadel zeigt nach Norden, also gegen die Drehung der Karte.
+function nordZeichenAktualisieren() {
+  document.querySelectorAll('.nord-zeichen').forEach(el => {
+    const nadel = el.querySelector('.nz-nadel');
+    if (nadel) nadel.setAttribute('transform', `rotate(${-_karteDrehung} 12 12)`);
+    el.classList.toggle('gedreht', Math.round(_karteDrehung) % 360 !== 0);
+  });
+}
+
 // Umwelt-WMS-Overlays (GWS + KbS + Schutzgebiete) — werden bei Bedarf hinzugefügt/entfernt
 let _umweltOverlays = [];
 
@@ -757,12 +900,15 @@ function updateMapToCurrentPair() {
 function toggleGPS() {
   const btn    = document.getElementById('btn-gps');
   const btnTop = document.getElementById('btn-gps-top');
+  const btnAuto = document.getElementById('btn-gps-auto');
   const syncGpsBtn = (active) => {
     if (btn)    { btn.classList.toggle('active', active); btn.style.opacity = active ? '1' : '0.45'; }
-    if (btnTop) btnTop.style.opacity = active ? '1' : '0.5';
+    if (btnTop) btnTop.classList.toggle('aus', !active);
+    if (btnAuto) btnAuto.style.display = active ? 'flex' : 'none';
   };
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId); watchId = null;
+    gpsAutoStandortSetzen(false);
     if (gpsMarker)  { gpsMarker.remove();  gpsMarker  = null; }
     if (gpsCircle)  { gpsCircle.remove();  gpsCircle  = null; }
     if (btn) { btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> GPS'; }
@@ -792,6 +938,7 @@ function toggleGPS() {
       syncGpsBtn(true);
       document.getElementById('btn-gps-zoom').style.display = '';
       updateDistances(lat, lng);
+      gpsAutoStandortAnwenden(lat, lng);
     },
     err => {
       if (btn) btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> GPS';
@@ -818,6 +965,78 @@ function zoomToGPS() {
   if (gpsMarker && leafletMap) {
     leafletMap.setView(gpsMarker.getLatLng(), 18);
   }
+}
+
+// ── Automatische Standortwahl nach GPS ───────────────────────
+// Auf der Baustelle geht man die Standorte der Reihe nach ab. Statt jedes Mal
+// von Hand umzuschalten, uebernimmt dieser Schalter die Wahl: bei jeder neuen
+// Position wird der naechstgelegene Standort geoeffnet.
+let _gpsAutoStandort = false;
+let _gpsAutoHighlight = null;
+
+// Gewechselt wird erst, wenn der andere Standort deutlich naeher liegt.
+// Ohne diesen Abstand springt die Ansicht zwischen zwei fast gleich weit
+// entfernten Standorten hin und her, sobald das GPS um ein paar Meter wandert.
+const GPS_AUTO_VORSPRUNG_M = 15;
+
+function toggleGpsAutoStandort() {
+  gpsAutoStandortSetzen(!_gpsAutoStandort);
+  if (_gpsAutoStandort) {
+    const p = gpsMarker?.getLatLng();
+    if (p) gpsAutoStandortAnwenden(p.lat, p.lng);
+    else ui.toast('Warte auf GPS-Position…');
+  }
+}
+
+function gpsAutoStandortSetzen(an) {
+  _gpsAutoStandort = !!an;
+  const btn = document.getElementById('btn-gps-auto');
+  if (btn) {
+    btn.classList.toggle('an',  _gpsAutoStandort);
+    btn.classList.toggle('aus', !_gpsAutoStandort);
+  }
+  if (!_gpsAutoStandort) standortHighlightEntfernen();
+}
+
+function gpsAutoStandortAnwenden(lat, lng) {
+  if (!_gpsAutoStandort) return;
+  // pairCenter liefert fuer Standorte ohne Koordinaten die Schweizmitte —
+  // ein gueltiger Punkt, der die Auswahl verfaelschen wuerde. Deshalb wird
+  // hier am Datensatz geprueft, nicht am berechneten Mittelpunkt.
+  const kandidaten = PAIRS
+    .filter(p => p.rs?.e || p.rks?.e || p.fund?.e)
+    .map(p => ({ p, c: pairCenter(p) }))
+    .filter(x => !x.c.invalid)
+    .map(x => ({ id: x.p.id, dist: haversine(lat, lng, x.c.lat, x.c.lng) }))
+    .sort((a, b) => a.dist - b.dist);
+  if (!kandidaten.length) return;
+  const naechster = kandidaten[0];
+  if (naechster.id === currentPairId) { standortHighlightZeigen(currentPairId); return; }
+  const aktuell = kandidaten.find(k => k.id === currentPairId);
+  if (aktuell && aktuell.dist - naechster.dist < GPS_AUTO_VORSPRUNG_M) return;
+  showDetail(naechster.id);
+  standortHighlightZeigen(naechster.id);
+  const pair = PAIRS.find(p => p.id === naechster.id);
+  ui.toast(`Standort ${pair?.mast || naechster.id} · ${formatDist(naechster.dist)}`);
+}
+
+// Der gewaehlte Standort wird auf der Karte hervorgehoben — sonst ist bei
+// dicht beieinanderliegenden Punkten nicht erkennbar, welcher gerade gilt.
+function standortHighlightZeigen(pairId) {
+  const pair = PAIRS.find(p => p.id === pairId);
+  if (!pair || !leafletMap) return;
+  if (!(pair.rs?.e || pair.rks?.e || pair.fund?.e)) return;
+  const c = pairCenter(pair);
+  if (c.invalid) return;
+  standortHighlightEntfernen();
+  _gpsAutoHighlight = L.circleMarker([c.lat, c.lng], {
+    radius: 22, color: '#1a3a5c', weight: 3, opacity: 0.9,
+    fillColor: '#1a3a5c', fillOpacity: 0.12, interactive: false,
+  }).addTo(leafletMap);
+}
+
+function standortHighlightEntfernen() {
+  if (_gpsAutoHighlight) { _gpsAutoHighlight.remove(); _gpsAutoHighlight = null; }
 }
 
 // ============================================================

@@ -281,6 +281,7 @@ function bahnKmAusPunkten(e, n, punkte, optionen) {
 function _bahnKarte(welche) {
   if (welche === 'detail') return leafletMap;
   if (welche === 'create') return createMapLeaflet;
+  if (welche === 'abnahme') return typeof _ckLeafletMap !== 'undefined' ? _ckLeafletMap : null;
   return overviewMap;
 }
 
@@ -288,9 +289,16 @@ function bahnEbeneAktiv(welche) {
   return !!_bahnEbenen[welche]?.aktiv;
 }
 
-// Quellenangabe ein-/ausblenden. Die Erfassungskarte wird ohne
-// Attributionsleiste erzeugt — die Nennung von data.sbb.ch ist aber Pflicht
-// (Nutzungsbedingungen Ziffer 4.1), also wird sie dort angelegt.
+// Wird eine Karte abgeraeumt, sind auch ihre Ebenen weg. Ohne dieses
+// Vergessen gilt die Ebene beim naechsten Oeffnen als bereits aktiv und
+// bahnStandardAnwenden() legt sie nicht neu an.
+function bahnKarteVergessen(welche) {
+  delete _bahnEbenen[welche];
+}
+
+// Quellenangabe ein-/ausblenden. Sollte eine Karte ohne Attributionsleiste
+// erzeugt worden sein, wird sie hier angelegt — die Nennung von data.sbb.ch
+// ist Pflicht (Nutzungsbedingungen Ziffer 4.1).
 function _bahnQuelleZeigen(karte, an) {
   if (!karte.attributionControl) {
     if (!an) return;
@@ -323,7 +331,7 @@ function bahnStandardAnwenden(welche) {
 // Auf allen offenen Karten anwenden — nach einer Aenderung in den Optionen
 function bahnOptionenAnwenden() {
   const an = ladeKartenOptionen().bahnAn;
-  ['overview', 'detail', 'create'].forEach(welche => {
+  ['overview', 'detail', 'create', 'abnahme'].forEach(welche => {
     if (!_bahnKarte(welche)) return;
     if (an !== bahnEbeneAktiv(welche)) bahnEbeneSetzen(welche, an);
     else if (an) bahnMarkenZeichnen(welche);
@@ -596,6 +604,52 @@ function bahnSuche(text) {
     }
   }
   return treffer.slice(0, 8);
+}
+
+// Namenssuche direkt bei data.sbb.ch. bahnSuche() kennt nur Stationen aus
+// bereits geladenen Kartenausschnitten — beim Anlegen eines neuen Standorts
+// ist dieser Bestand in der Regel leer, und die Ortssuche landet dann im
+// Dorfzentrum statt am Bahnhof.
+async function bahnStationSuchenOnline(text) {
+  const q = (text || '').trim().replace(/["\\]/g, '');
+  if (q.length < 2) return [];
+  try {
+    const treffer = await _bahnAbfrage(
+      'linie-mit-betriebspunkten', `search(bezeichnung_offiziell, "${q}")`,
+      p => (!p.geopos || !p.bezeichnung_offiziell) ? null : {
+        art: 'Station', titel: p.bezeichnung_offiziell,
+        neben: `Linie ${p.linie}${p.km != null ? ' · km ' + (+p.km).toFixed(1) : ''}`,
+        lat: p.geopos.lat, lon: p.geopos.lon,
+      }, 100);
+    // Ein Betriebspunkt steht je Linie einmal im Datensatz — der erste
+    // Eintrag genuegt, die Lage ist dieselbe.
+    const gesehen = new Set();
+    return treffer.filter(t => {
+      if (gesehen.has(t.titel)) return false;
+      gesehen.add(t.titel);
+      return true;
+    }).slice(0, 6);
+  } catch {
+    return []; // ohne Netz bleibt die oertliche Suche
+  }
+}
+
+// Mitte einer Linie, ueber die Kilometrierungspunkte bei data.sbb.ch. Dient
+// dazu, eine Karte auf eine eingegebene Liniennummer zu stellen, bevor
+// ueberhaupt ein Punkt gesetzt ist.
+async function bahnLinieOrtOnline(linienr) {
+  const nr = parseInt(linienr, 10);
+  if (!nr) return null;
+  try {
+    const punkte = await _bahnAbfrage('linienkilometrierung', `linienr=${nr}`, p =>
+      (!p.geo_point_2d || p.km == null) ? null
+        : { lat: p.geo_point_2d.lat, lon: p.geo_point_2d.lon, km: +p.km }, 100);
+    if (!punkte.length) return null;
+    punkte.sort((a, b) => a.km - b.km);
+    return punkte[Math.floor(punkte.length / 2)];
+  } catch {
+    return null;
+  }
 }
 
 function bahnSucheEingabe(text) {

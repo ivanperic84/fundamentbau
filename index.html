@@ -28,6 +28,13 @@
      Wird auch von sw.js via importScripts() gelesen. -->
 <script src="version.js"></script>
 <script src="lib/leaflet.js"></script>
+<!-- leaflet-rotate 0.2.8 (Raruto, BSD-2-Clause) — Leaflet 1.9 kann von sich aus
+     nicht drehen. Das Paket ergaenzt map.setBearing()/getBearing() und die
+     Zwei-Finger-Drehung, indem es Teile des Leaflet-Kerns ueberschreibt
+     (L.Class.include). Deshalb steht es unmittelbar nach leaflet.js und vor
+     allem eigenen Code. Unveraendert und unkomprimiert abgelegt, damit
+     nachvollziehbar bleibt, was es tut. -->
+<script src="lib/leaflet-rotate.js"></script>
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="lib/jspdf.plugin.autotable.min.js"></script>
@@ -338,18 +345,38 @@
   }
   .pb-green { background: #34d399; transition: width 0.4s; }
   .pb-amber { background: #fbbf24; transition: width 0.4s; }
-  .kopf-suche {
+  /* ── Suchfelder ─────────────────────────────────────────────
+     Eine Festlegung fuer die ganze App: Kopfband, Karten, Panels.
+     Vorher trug jedes Feld seine eigenen Masse — gleiche Aufgabe,
+     drei verschiedene Hoehen und Rundungen.
+       .dunkel     im dunklen Kopfband
+       .auf-karte  ueber einer Karte (Schatten, heller Grund)
+       .voll       fuellt seinen Behaelter, waechst nicht */
+  .app-suche {
     width: 150px; flex-shrink: 1; min-width: 90px;
     padding: 5px 10px; border-radius: var(--r-sm);
-    border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.08);
-    color: #fff; font-size: var(--fs-md); font-family: inherit;
+    border: 1px solid #e0e4ea; background: #fff;
+    color: var(--c-text-strong); font-size: var(--fs-md); font-family: inherit;
+    outline: none;
     transition: background 0.15s, border-color 0.15s, width 0.15s;
   }
-  .kopf-suche::placeholder { color: rgba(255,255,255,0.45); }
-  .kopf-suche:focus {
-    outline: none; width: 210px;
+  .app-suche::placeholder { color: #9ca3af; }
+  .app-suche:focus { width: 210px; border-color: #94a3b8; }
+
+  .app-suche.dunkel {
+    border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.08); color: #fff;
+  }
+  .app-suche.dunkel::placeholder { color: rgba(255,255,255,0.45); }
+  .app-suche.dunkel:focus {
     background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.45);
   }
+
+  .app-suche.auf-karte {
+    background: rgba(255,255,255,0.96); box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+  }
+
+  .app-suche.voll { width: 100%; min-width: 0; }
+  .app-suche.voll:focus { width: 100%; }
   /* Zaehler an den Statusfiltern — ersetzt den frueheren Zahlenblock */
   .filter-btn .fb-zahl { margin-left: 6px; opacity: 0.6; font-variant-numeric: tabular-nums; }
   .filter-btn.active .fb-zahl { opacity: 0.75; }
@@ -771,6 +798,68 @@
   }
   .detail-fab:hover { background: #244a72; }
 
+  /* Standort-Navigation am oberen Kartenrand (nur im Vollbild).
+     Rechts bleibt Platz fuer die gestapelten Knoepfe Vollbild/GPS. */
+  .karte-nav-halter {
+    display: none;
+    position: absolute; z-index: 700;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    /* links die Zoomknoepfe von Leaflet, rechts Vollbild und GPS */
+    left: 52px; right: 50px;
+    pointer-events: none;
+  }
+  .detail-layout.map-fullscreen .karte-nav-halter,
+  .karte-nav-halter.offen { display: block; }
+  /* Uebersichtskarte: rechts stehen die Knoepfe weiter innen (right:30px) */
+  #ov-nav-halter { right: 72px; }
+  /* Im Kopf einer Vollbildansicht steht die Zeile im Textfluss statt ueber
+     der Karte — gleiche Loesung wie in der Abnahme-Checkliste. */
+  .karte-nav-halter.im-kopf {
+    position: static; padding: 0; flex-shrink: 1; min-width: 0;
+  }
+  .karte-nav-halter.im-kopf .pair-nav { max-width: 260px; box-shadow: none; }
+  /* Im Kopf verdeckt sie nichts — kein Zuruecktreten noetig */
+  .karte-nav-halter.im-kopf.leer .pair-nav { opacity: 1; }
+
+  /* Legende im Bauprogramm-Vollbild: bleibt unten links wie auf den uebrigen
+     Karten, steht dort aber offen und etwas breiter — wegen des
+     Bauablauf-Schiebers. !important, weil die Steuerung ihre Breite als
+     inline-Angabe mitbringt. */
+  #ov-legend-outer.legende-gross { max-width: 232px !important; width: 232px; }
+  #ov-legend-outer.legende-gross #ov-legend-body { display: block; }
+  #ov-legend-outer.legende-gross input[type="range"] { height: 22px; }
+  /* Ueber der Karte kompakt: gleiche Hoehe wie die Auswahlfelder am unteren
+     Kartenrand, damit die Karte nicht von Bedienelementen zugestellt wird. */
+  .karte-nav-halter .pair-nav {
+    pointer-events: auto;
+    position: static; margin: 0 auto; max-width: 260px;
+    padding: 3px 4px; gap: 2px;
+    border-bottom: none; border-radius: 8px;
+    background: rgba(255,255,255,0.96);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .karte-nav-halter .pair-nav-btn.nur-symbol { width: 24px; height: 24px; }
+  .karte-nav-halter .pair-jump-btn { padding: 2px 6px; font-size: 12px; }
+
+  /* Ohne gewaehlten Standort tritt die Zeile zurueck — sie ist dann ein
+     Angebot, kein Zustand. Beim Annaehern wird sie wieder voll sichtbar. */
+  .karte-nav-halter.leer .pair-nav { opacity: 0.45; }
+  .karte-nav-halter.leer:hover .pair-nav,
+  .karte-nav-halter.leer:focus-within .pair-nav { opacity: 1; }
+  /* Gruppen auf-/zuklappen und Reihenfolge zuruecksetzen betreffen die
+     Seitenleiste — im Vollbild ist sie nicht da. */
+  /* !important, weil die Knoepfe ihr display inline tragen */
+  .karte-nav-halter .nur-seitenleiste { display: none !important; }
+
+  /* Dieselbe Zeile im dunklen Kopf der Abnahme-Checkliste — dort steht sie
+     im Textfluss, nicht ueber einer Karte. */
+  .karte-nav-leiste { flex-shrink: 0; min-width: 0; }
+  .karte-nav-leiste .pair-nav {
+    position: static; margin: 0; border-bottom: none; border-radius: 8px;
+    padding: 5px 6px; gap: 4px; background: rgba(255,255,255,0.96);
+    min-width: 220px;
+  }
+
   /* Karten-Vollbildmodus in der Detailansicht */
   .detail-layout.map-fullscreen .detail-sidebar { display: none; }
   .detail-layout.map-fullscreen .detail-main {
@@ -804,14 +893,54 @@
   .leaflet-bar a:last-child  { border-radius: 0 0 7px 7px !important; }
   .leaflet-disabled { opacity: 0.4 !important; cursor: default !important; }
 
-  #btn-map-fullscreen {
-    position: absolute; top: 10px; right: 10px; z-index: 700;
-    background: rgba(255,255,255,0.92); border: 1px solid #d1d5db;
-    border-radius: 7px; padding: 5px 9px; cursor: pointer;
-    line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    transition: all 0.15s; display: flex; align-items: center;
+  /* ── Kartenknoepfe ──────────────────────────────────────────
+     Vollbild, GPS und Verwandtes — auf jeder Karte gleich. Vorher
+     trug jeder Knopf seine Masse inline: 32 und 34 Pixel, Radius 7
+     und 8, drei verschiedene Schatten.
+       .an   eingeschaltet (dunkel hinterlegt)
+       .aus  vorhanden, aber inaktiv (halbdurchsichtig) */
+  .karten-knopf {
+    width: 32px; height: 32px; border-radius: 7px; border: none;
+    background: rgba(255,255,255,0.94); color: var(--c-text-strong);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; flex-shrink: 0; transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
   }
-  #btn-map-fullscreen:hover { background: white; box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
+  .karten-knopf:hover { background: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.26); }
+  .karten-knopf.aus { opacity: 0.5; }
+  .karten-knopf.an  { background: #1a3a5c; color: #fff; opacity: 1; }
+  .karten-knopf.an:hover { background: #244a72; }
+
+  /* Nordzeichen unten rechts auf jeder Karte. Die Nadel dreht gegen die
+     Karte, zeigt also immer nach Norden. Steht die Karte in Nordlage, tritt
+     das Zeichen zurueck — es gibt dann nichts zurueckzustellen. */
+  .nord-zeichen {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.94);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0.7; transition: opacity 0.15s, box-shadow 0.15s;
+  }
+  .nord-zeichen:hover { opacity: 1; box-shadow: 0 3px 10px rgba(0,0,0,0.26); }
+  .nord-zeichen.gedreht { opacity: 1; }
+
+  /* Knopfspalte in der oberen rechten Kartenecke */
+  .karten-knopf-spalte {
+    position: absolute; top: 10px; right: 10px; z-index: 700;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  /* Knoepfe im dunklen Kopf einer Vollbildansicht (Abnahme, Bauprogramm).
+     Damit sieht das Verlassen einer Ansicht ueberall gleich aus. */
+  .kopf-knopf {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12);
+    color: #fff; font-size: 11px; font-weight: 600; font-family: inherit;
+    cursor: pointer; white-space: nowrap;
+  }
+  .kopf-knopf:hover { background: rgba(255,255,255,0.22); }
+  .kopf-knopf.an { background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.6); }
   .tool-group { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
   .tool-btn {
     padding: 5px 9px; border-radius: 6px; border: 1px solid #d1d5db;
@@ -870,10 +999,11 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.14); padding: 8px;
   }
   .pair-jump-panel.offen { display: block; }
-  .pair-jump-such {
-    width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db;
-    font-size: 12px; font-family: inherit; margin-bottom: 6px;
-  }
+  /* Das Suchfeld selbst kommt von .app-suche.voll */
+  .pair-jump-panel .app-suche { margin-bottom: 6px; }
+  /* Trefferliste unter dem Suchfeld im Kopf: sie haengt am Feld, nicht an
+     einer Zeile mit Pfeilen — deshalb linksbuendig statt mittig. */
+  #kopf-such-panel { left: 0; transform: none; width: 260px; z-index: 3000; }
   .pair-jump-liste { max-height: 260px; overflow-y: auto; }
   .pair-jump-eintrag {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -1105,12 +1235,7 @@
   .bahn-linie { background: rgba(255,255,255,0.95); color: #111827; font-weight: 700; }
   .bahn-bp    { background: rgba(26,58,92,0.9);     color: #fff; padding: 1px 5px; font-weight: 700; }
 
-  /* Suche nach Station, Linie oder Kilometer */
-  .bahn-suche {
-    width: 150px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e0e4ea;
-    background: rgba(255,255,255,0.96); font-size: 11px; font-family: inherit;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.14); outline: none;
-  }
+  /* Suche nach Station, Linie oder Kilometer — Feld: .app-suche.auf-karte */
   .bahn-such-liste {
     display: none; position: absolute; bottom: calc(100% + 6px); left: 0;
     width: 250px; max-height: 240px; overflow-y: auto; z-index: 1001;
@@ -1371,12 +1496,7 @@
 
   /* ── Vollbild-Erfassungsansicht: Suchfeld-Ergebnisse ── */
   .create-search-wrap { position: relative; }
-  .create-search-input {
-    width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #e0e4ea;
-    font-size: 13px; font-family: inherit; outline: none; background: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  }
-  .create-search-input:focus { border-color: #3b82f6; }
+  /* Feld: .app-suche.voll.auf-karte */
   .create-search-results {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
     background: white; border-radius: 8px; border: 1px solid #e0e4ea;
@@ -1480,8 +1600,21 @@
       <span id="progress-label">0/0</span>
     </div>
     <span style="flex:1 1 auto;min-width:8px;"></span>
-    <input class="kopf-suche" id="search-input" type="search" placeholder="Suchen…"
-           title="Standort suchen (Name, KM, Mast, Notiz)" oninput="onSearchInput(this.value)">
+    <!-- Suchfeld mittig: die beiden Zwischenraeume links und rechts sind
+         gleich stark, damit es unabhaengig von der Breite der Nachbarn in der
+         Mitte steht. Die Trefferliste darunter waehlt einen Standort. -->
+    <div id="kopf-such-wrap" style="position:relative;flex-shrink:1;min-width:0;">
+      <input class="app-suche dunkel" id="search-input" type="search" placeholder="Suchen…"
+             title="Standort suchen und wählen — Text sucht in Bezeichnung, Strecke, Fundamenttyp, Zugang, Kommentar, Schlagwort und Notizen; Zahlen gelten als Mast-/Positionsnummer oder Kilometer"
+             autocomplete="off"
+             oninput="onSearchInput(this.value)"
+             onfocus="kopfSuchListe(this.value)"
+             onkeydown="kopfSuchTaste(event)">
+      <div class="pair-jump-panel" id="kopf-such-panel">
+        <div class="pair-jump-liste" id="kopf-such-liste"></div>
+      </div>
+    </div>
+    <span style="flex:1 1 auto;min-width:8px;"></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;padding-left:20px;">
     <!-- Verlaufs-Navigation. Der frühere Knopf «Übersicht» stand daneben und
@@ -1653,18 +1786,22 @@
   <div id="overview-map-wrap">
     <div id="overview-map"></div>
 
-    <!-- Top-right: Vollbild + GPS -->
-    <div style="position:absolute;top:10px;right:30px;z-index:1000;display:flex;flex-direction:column;gap:6px;">
-      <button id="btn-ov-fullscreen" onclick="toggleOverviewFullscreen()" title="Vollbild"
-        style="width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+    <!-- Standort-Navigation am oberen Rand. Gleiche Bedienung wie in der
+         Detailansicht, nur springt sie hier auf der Karte von Standort zu
+         Standort, statt die Ansicht zu wechseln. Bei langen Perimetern ist
+         das der einzige zumutbare Weg zu einer bestimmten Position. -->
+    <!-- Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
+    <div class="karte-nav-halter offen" id="ov-nav-halter"></div>
+
+    <!-- Vollbild + GPS oben rechts -->
+    <div class="karten-knopf-spalte" style="right:30px;">
+      <button id="btn-ov-fullscreen" class="karten-knopf" onclick="toggleOverviewFullscreen()" title="Vollbild">
         <svg id="btn-ov-fullscreen-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
-      <button id="btn-overview-gps" onclick="toggleOverviewGPS()" title="GPS"
-        style="width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
+      <button id="btn-overview-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
-      <button id="btn-overview-gps-zoom" onclick="zoomToOverviewGPS()" title="Zu meinem Standort"
-        style="display:none;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;align-items:center;justify-content:center;">
+      <button id="btn-overview-gps-zoom" class="karten-knopf" onclick="zoomToOverviewGPS()" title="Zu meinem Standort" style="display:none;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
@@ -1681,7 +1818,7 @@
     </div>
 
     <!-- Bottom: kompakte Dropdowns -->
-    <div style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:1000;
+    <div id="ov-karte-unten" style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:1000;
                 display:flex;gap:8px;align-items:center;">
       <!-- Kartenart -->
       <select id="ov-basemap-select" onchange="setOverviewBaseLayer(this.value)"
@@ -1704,7 +1841,7 @@
       </select>
       <!-- Suche über Station, Liniennummer und Kilometer — nur bei aktiver Ebene -->
       <span id="bahn-suche-wrap" style="display:none;position:relative;align-items:center;">
-        <input class="bahn-suche" id="bahn-suche" type="search" placeholder="Station, Linie, km…"
+        <input class="app-suche auf-karte" id="bahn-suche" type="search" placeholder="Station, Linie, km…"
                oninput="bahnSucheEingabe(this.value)">
         <div class="bahn-such-liste" id="bahn-such-liste"></div>
       </span>
@@ -2050,11 +2187,8 @@
       <button onclick="openProjEinstModal()" title="Bauprogramm-Einstellungen" class="btn btn-secondary btn-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <!-- Vollbild -->
-      <button onclick="openBpFullscreen()" title="Vollbild" class="btn btn-secondary btn-sm">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-        Vollbild
-      </button>
+      <!-- Der Vollbildknopf steht bei der Zeitraster-Wahl (siehe unten) —
+           er gehoert zur Darstellung, nicht zum Bearbeiten. -->
       <!-- Undo / Redo -->
       <button id="bp-undo-btn" onclick="bpUndo()" title="Rückgängig (Strg+Z)" class="btn btn-secondary btn-icon" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
@@ -2138,6 +2272,12 @@
       <button id="bp-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
     </div>
     <div id="bp-info-bar" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
+    <!-- Rechts aussen: die Vollbildansicht mit Karte und Gantt -->
+    <button onclick="openBpFullscreen()" title="Bauprogramm mit Karte im Vollbild"
+      class="btn btn-secondary btn-sm" style="margin-left:auto;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Karte
+    </button>
   </div>
 
   <!-- Gantt-Container — volle Breite, mehr Höhe -->
@@ -2420,7 +2560,9 @@
 <div id="detail-view">
   <div class="detail-layout">
     <div class="detail-sidebar">
-      <div class="pair-nav">
+      <!-- id, weil es seit der Uebersichtskarte mehrere .pair-nav gibt und
+           pairNavUmhaengen() genau diese Zeile verschieben muss -->
+      <div class="pair-nav" id="detail-pair-nav">
         <button class="pair-nav-btn nur-symbol" id="prev-btn" onclick="navigatePair(-1)" title="Vorheriger Standort" aria-label="Vorheriger Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
         <!-- Der Standortname oeffnet eine Liste aller Standorte der Phase mit
              Suche — bei 25 Positionen ist Blaettern sonst der einzige Weg. -->
@@ -2430,21 +2572,21 @@
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div class="pair-jump-panel" id="pair-jump-panel">
-            <input class="pair-jump-such" id="pair-jump-such" type="search" placeholder="Standort suchen…"
+            <input class="app-suche voll" id="pair-jump-such" type="search" placeholder="Standort suchen…"
                    oninput="renderPairJumpListe(this.value)" onkeydown="pairJumpTaste(event)">
             <div class="pair-jump-liste" id="pair-jump-liste"></div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="pair-nav-btn nur-symbol" id="next-btn" onclick="navigatePair(1)" title="Nächster Standort" aria-label="Nächster Standort"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-          <button id="sb-collapse-all-btn" onclick="toggleAllSections()"
+          <button id="sb-collapse-all-btn" class="nur-seitenleiste" onclick="toggleAllSections()"
             title="Alle Gruppen auf-/zuklappen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;">
             <svg id="sb-collapse-all-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
-          <button onclick="resetSbOrder()" title="Gruppen-Reihenfolge zurücksetzen"
+          <button onclick="resetSbOrder()" class="nur-seitenleiste" title="Gruppen-Reihenfolge zurücksetzen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;line-height:1;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
         </div>
       </div>
@@ -2686,9 +2828,7 @@
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               <input type="file" accept="image/*" id="foto-input" style="display:none" multiple onchange="addFotos(this)">
             </label>
-            <button onclick="event.stopPropagation();openCamera()" title="Foto aufnehmen" style="cursor:pointer;background:none;border:none;padding:6px;color:#6b7280;display:flex;align-items:center;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            </button>
+            <!-- Aufnehmen laeuft ueber den Schnellfoto-Knopf an der Karte -->
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
@@ -2726,12 +2866,7 @@
         <h3 onclick="toggleSection('sec-notizen')">
           <span>Notizen</span>
           <span style="display:flex;align-items:center;gap:6px;">
-            <button onclick="event.stopPropagation();notizNeu()" title="Neue Notiz"
-              style="cursor:pointer;background:none;border:none;padding:6px;color:#6b7280;display:flex;align-items:center;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
+            <!-- Erfassen laeuft ueber den Schnellnotiz-Knopf an der Karte -->
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
@@ -3595,21 +3730,35 @@
           <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;line-height:1.4;">Kein Standort gesetzt<br><span style="font-size:11px;color:#9ca3af;">Koordinaten via <b>Bearbeiten</b> erfassen</span></p>
         </div>
         <canvas id="sketch-canvas" class="sketch-canvas"></canvas>
-        <!-- Vollbild + GPS top-right -->
-        <button id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
-        <button id="btn-gps-top" onclick="toggleGPS()" title="GPS"
-          style="position:absolute;top:46px;right:10px;z-index:500;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </button>
+        <!-- Aufnahme fuer die Standort-Navigation im Vollbild. Sie steht nur
+             im Vollbild bereit; die Zeile selbst wird aus der Seitenleiste
+             hierher gehaengt (pairNavUmhaengen). -->
+        <div id="karte-nav-halter" class="karte-nav-halter"></div>
+        <!-- Vollbild + GPS oben rechts -->
+        <div class="karten-knopf-spalte">
+          <button id="btn-map-fullscreen" class="karten-knopf" onclick="toggleMapFullscreen()" title="Karte Vollbild"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+          <button id="btn-gps-top" class="karten-knopf aus" onclick="toggleGPS()" title="GPS">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+          <!-- Erscheint erst mit laufendem GPS: schaltet die Detailansicht
+               fortlaufend auf den nächstgelegenen Standort um. -->
+          <button id="btn-gps-auto" class="karten-knopf aus" onclick="toggleGpsAutoStandort()" title="Nächsten Standort automatisch wählen" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="2.5"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>
+          </button>
+        </div>
         <!-- Schnellzugriff unten rechts: Notiz und Foto zum aktuellen Standort.
              Dieselbe Handlung wie in der Übersicht, nur ohne Standortauswahl —
              der Standort steht in der Detailansicht bereits fest. -->
         <div class="detail-fabs">
-          <label class="detail-fab" title="Schnellfoto aufnehmen" aria-label="Schnellfoto aufnehmen">
+          <!-- Der Auslöser ist ein Knopf, nicht ein <label> um das Feld. Auf dem
+               Tablet öffnete sich über das Label nicht zuverlässig die Kamera;
+               der Knopf löst das Dateifeld ausdrücklich per click() aus und
+               meldet zurück, wenn kein Standort geöffnet ist. -->
+          <button class="detail-fab" onclick="schnellFotoDetail()" title="Schnellfoto aufnehmen" aria-label="Schnellfoto aufnehmen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <!-- capture=environment: auf dem Tablet öffnet direkt die Rückkamera -->
-            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="addFotos(this)">
-          </label>
+          </button>
+          <!-- capture=environment: auf dem Tablet öffnet direkt die Rückkamera -->
+          <input id="detail-foto-input" type="file" accept="image/*" capture="environment" style="display:none;" onchange="addFotos(this)">
           <button class="detail-fab" onclick="notizNeu()" title="Schnellnotiz erfassen" aria-label="Schnellnotiz erfassen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -4351,14 +4500,14 @@ function _ladeScript(pfad) {
           <div class="create-field">
             <label class="create-lbl">Strecke <span style="color:#9ca3af;font-weight:400;font-size:10px;">(SBB auto)</span></label>
             <div style="display:flex;gap:4px;align-items:center;">
-              <input class="create-input" id="c-strecke" placeholder="wird abgefragt…" style="flex:1;min-width:0;">
+              <input class="create-input" id="c-strecke" placeholder="wird abgefragt…" oninput="onCreateStreckeEingabe()" style="flex:1;min-width:0;">
               <button onclick="refreshSbbCreate()" title="Strecke von SBB neu abfragen" style="flex:0 0 auto;padding:5px 7px;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;color:#6b7280;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
             </div>
           </div>
           <div class="create-field">
             <label class="create-lbl">Streckennr. <span style="color:#9ca3af;font-weight:400;font-size:10px;">(SBB auto)</span></label>
             <div style="display:flex;gap:4px;align-items:center;">
-              <input class="create-input" id="c-streckennr" placeholder="z.B. 850" style="flex:1;min-width:0;">
+              <input class="create-input" id="c-streckennr" placeholder="z.B. 850" oninput="onCreateStreckeEingabe()" style="flex:1;min-width:0;">
               <button onclick="refreshSbbCreate()" title="Streckennr. von SBB neu abfragen" style="flex:0 0 auto;padding:5px 7px;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;color:#6b7280;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
             </div>
           </div>
@@ -4570,28 +4719,36 @@ function _ladeScript(pfad) {
     <div class="create-main">
       <div id="create-map"></div>
 
-      <!-- Suchfeld über der Karte — kompakter -->
+      <!-- Suchfeld über der Karte, mittig — wie in den übrigen Kartenansichten -->
       <div class="create-map-search-wrap">
-        <div style="display:flex;align-items:center;gap:6px;max-width:380px;margin:0 auto;">
-          <div class="create-search-wrap" style="flex:1;">
-            <input id="create-map-search" class="create-search-input" type="search"
-                   placeholder="Ort suchen…"
-                   oninput="onCreateSearch(this.value)"
-                   onkeydown="if(event.key==='Escape'){this.value='';document.getElementById('create-search-results').style.display='none';}"
-                   autocomplete="off" style="font-size:12px;">
-            <div id="create-search-results" class="create-search-results" style="display:none;"></div>
-          </div>
-          <!-- Vollbild -->
-          <button onclick="toggleCreateMapFullscreen()" title="Vollbild"
-            style="width:32px;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,0.8);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.2);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-          </button>
-          <!-- GPS -->
-          <button onclick="locateCreateMap()" title="Mein Standort"
-            style="width:32px;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,0.8);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.2);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2"/></svg>
-          </button>
+        <div class="create-search-wrap" style="max-width:380px;margin:0 auto;">
+          <input id="create-map-search" class="app-suche voll auf-karte" type="search"
+                 placeholder="Ort, Station, Linie suchen…"
+                 oninput="onCreateSearch(this.value)"
+                 onkeydown="if(event.key==='Escape'){this.value='';document.getElementById('create-search-results').style.display='none';}"
+                 autocomplete="off">
+          <div id="create-search-results" class="create-search-results" style="display:none;"></div>
         </div>
+      </div>
+      <!-- Vollbild + eigener Standort oben rechts, wie auf den übrigen Karten -->
+      <div class="karten-knopf-spalte" style="z-index:1000;">
+        <button class="karten-knopf" onclick="toggleCreateMapFullscreen()" title="Vollbild">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        <button class="karten-knopf" onclick="locateCreateMap()" title="Mein Standort">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2"/></svg>
+        </button>
+      </div>
+      <!-- Kartenart wie in der Übersicht -->
+      <div style="position:absolute;bottom:24px;left:16px;z-index:1000;">
+        <select id="create-basemap-select" onchange="setCreateBaseLayer(this.value)"
+          style="padding:6px 10px;border-radius:8px;border:1px solid #e0e4ea;background:rgba(255,255,255,0.96);
+                 font-size:11px;font-family:inherit;font-weight:600;cursor:pointer;
+                 box-shadow:0 2px 8px rgba(0,0,0,0.14);outline:none;">
+          <option value="swiss-luft">Luftbild</option>
+          <option value="swiss-karte">swisstopo</option>
+          <option value="umwelt">Umwelt</option>
+        </select>
       </div>
 
       <!-- Distanz-Badge auf der Karte -->
@@ -5741,36 +5898,32 @@ function _ladeScript(pfad) {
       <div style="font-size:14px;font-weight:700;">Abnahme-Checkliste FL-Fundamente</div>
       <div id="ck-header-sub" style="font-size:11px;opacity:0.7;margin-top:1px;">—</div>
     </div>
-    <!-- Standort-Navigation -->
-    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-      <button id="ck-nav-prev" onclick="ckNavPrev()" title="Vorheriger Standort"
-        style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:11px;font-weight:600;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Standort
-      </button>
-      <button id="ck-nav-next" onclick="ckNavNext()" title="Nächster Standort"
-        style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:11px;font-weight:600;">
-        Standort
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-    </div>
+    <!-- Standort-Navigation — gleiche Zeile wie auf den Karten,
+         Inhalt baut karteNavAufbauen() (js/ansichten.js) -->
+    <div id="ck-nav-halter" class="karte-nav-leiste"></div>
     <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
-      <button id="ck-karte-btn" onclick="toggleCkKarte()" title="Situationskarte ein-/ausblenden"
-        style="display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;font-size:11px;font-weight:600;cursor:pointer;">
+      <button id="ck-karte-btn" class="kopf-knopf" onclick="toggleCkKarte()" title="Situationskarte ein-/ausblenden">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         Karte
       </button>
-      <button onclick="closeCheckliste()" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;font-size:14px;cursor:pointer;padding:0;" title="Schliessen">✕</button>
+      <button class="kopf-knopf" onclick="closeCheckliste()" title="Abnahme schliessen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schliessen
+      </button>
     </div>
   </div>
 
   <!-- Situationskarte (toggle) -->
   <div id="ck-karte-wrap" style="display:none;position:sticky;top:54px;z-index:9;height:220px;border-bottom:2px solid #1a3a5c;">
     <div id="ck-karte" style="width:100%;height:100%;"></div>
-    <button id="ck-gps-btn" onclick="toggleCkGps()" title="GPS-Standort anzeigen"
-      style="position:absolute;top:8px;right:8px;z-index:1000;width:32px;height:32px;border-radius:7px;border:none;background:white;box-shadow:0 2px 6px rgba(0,0,0,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;pointer-events:all;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-    </button>
+    <div class="karten-knopf-spalte" style="z-index:1000;">
+      <button id="ck-vollbild-btn" class="karten-knopf" onclick="toggleCkKarteGross()" title="Karte vergrössern">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <button id="ck-gps-btn" class="karten-knopf aus" onclick="toggleCkGps()" title="GPS-Standort anzeigen">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
   </div>
 
   <div style="max-width:680px;margin:0 auto;padding:16px;">
@@ -8136,31 +8289,44 @@ function _ladeScript(pfad) {
   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a3a5c;color:white;flex-shrink:0;">
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-weight:700;font-size:14px;">Bauprogramm</span>
-      <span id="bp-fs-subtitle" style="font-size:11px;opacity:0.6;"></span>
     </div>
+    <!-- Aufnahme fuer die Standort-Navigation. Sie steht im Kopf statt auf der
+         Karte — dieselbe Loesung wie in der Abnahme-Checkliste; der Inhalt
+         wird von _moveFsMap() hierher gehaengt. -->
+    <div id="bp-fs-nav-halter"></div>
     <div style="display:flex;gap:6px;align-items:center;">
-      <div style="display:flex;border:1px solid rgba(255,255,255,0.25);border-radius:6px;overflow:hidden;">
-        <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag');  renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:rgba(255,255,255,0.2);color:white;cursor:pointer;">Tage</button>
-        <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Wochen</button>
-        <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Monate</button>
-        <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);" style="padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Jahre</button>
-      </div>
-      <button onclick="closeBpFullscreen()"
-        style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:white;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Schliessen
       </button>
     </div>
   </div>
   <!-- Karte oben (versteckt bis Toggle) — #overview-map wird per JS hierhin verschoben -->
   <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;">
-    <button id="btn-bp-fs-gps" onclick="toggleOverviewGPS()" title="GPS"
-      style="position:absolute;top:10px;right:10px;z-index:500;width:34px;height:34px;border-radius:8px;border:none;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.5;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-    </button>
+    <div class="karten-knopf-spalte">
+      <!-- Vollbild ueber GPS, wie in allen anderen Kartenansichten. Das
+           Zeichen wechselt im fullscreenchange-Handler (js/bauprogramm.js). -->
+      <button id="bp-fs-native-btn" class="karten-knopf" onclick="toggleBpNativeFs()" title="Nativer Vollbild">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button id="btn-bp-fs-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
   </div>
   <!-- Gantt + Legende unten -->
   <div id="bp-fs-left" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;min-width:0;">
+    <!-- Zeitraster und Kennzahlen wie in der normalen Bauprogramm-Ansicht:
+         auf hellem Grund ueber dem Gantt, nicht im dunklen Kopf. -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <div class="seg">
+        <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag');  renderBpGantt('bp-fs-gantt-wrap',true);" class="aktiv">Tage</button>
+        <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche');renderBpGantt('bp-fs-gantt-wrap',true);">Wochen</button>
+        <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);">Monate</button>
+        <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);">Jahre</button>
+      </div>
+      <div id="bp-fs-subtitle" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
+    </div>
     <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:10px;">
       <div id="bp-fs-gantt-wrap" style="overflow-x:auto;min-height:120px;"></div>
     </div>
