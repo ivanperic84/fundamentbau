@@ -409,6 +409,15 @@ function schichtenAufteilung() {
   const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
   const muster = typeof loadSperrmuster === 'function' ? loadSperrmuster() : [];
   const aufteilung = { total: 0, nacht: 0, sonntag: 0 };
+
+  // Ohne Bauprogramm — oder wenn bewusst ohne gerechnet wird — gibt es keine
+  // Termine und damit keine Wochentage. Dann gelten alle Schichten als
+  // Nachtschichten, weil in der Sperrpause gearbeitet wird; Sonntage bleiben
+  // bei null, denn geraten wird nicht.
+  if (!pakete.length || mkSchichtQuelle() !== 'auto') {
+    const n = schichtenGesamt();
+    return { total: n, nacht: n, sonntag: 0, ohneTermine: true };
+  }
   if (typeof bpGetSchichten !== 'function') return aufteilung;
 
   const istNacht = sp => {
@@ -433,7 +442,40 @@ function schichtenAufwandGesamt() {
   return lkVergleich().reduce((s, z) => s + (z.schichtenAufwand || 0), 0);
 }
 
+// Woher die Schichten kommen sollen. 'auto' nimmt das Bauprogramm, sobald es
+// steht — wer frueh schaetzt oder eine Variante ohne Programm rechnet, stellt
+// auf 'aufwand' und bleibt bei den Aufwandswerten. 'hand' setzt die Zahl
+// direkt: fuer die Offerte, bei der die Schichtzahl vorgegeben ist.
+const MK_SCHICHT_QUELLE_KEY = () => 'sp_mk_schichtquelle__' + _activeId;
+const MK_SCHICHT_HAND_KEY   = () => 'sp_mk_schichthand__' + _activeId;
+
+function mkSchichtQuelle() {
+  const q = store.getItem(MK_SCHICHT_QUELLE_KEY());
+  return ['auto', 'aufwand', 'hand'].includes(q) ? q : 'auto';
+}
+
+function mkSchichtQuelleSetzen(wert) {
+  store.setItem(MK_SCHICHT_QUELLE_KEY(), wert);
+  renderMassenView();
+  if (document.getElementById('mk-einst-modal')?.style.display === 'flex') _mkParameterTab();
+}
+
+function mkSchichtHand() {
+  const n = parseFloat(store.getItem(MK_SCHICHT_HAND_KEY()));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function mkSchichtHandSetzen(wert) {
+  const n = parseFloat(String(wert).replace(',', '.'));
+  if (Number.isFinite(n) && n > 0) store.setItem(MK_SCHICHT_HAND_KEY(), String(n));
+  else store.removeItem(MK_SCHICHT_HAND_KEY());
+  renderMassenView();
+}
+
 function schichtenGesamt() {
+  const quelle = mkSchichtQuelle();
+  if (quelle === 'hand')    return mkSchichtHand();
+  if (quelle === 'aufwand') return schichtenAufwandGesamt();
   return schichtenBauprogramm() ?? schichtenAufwandGesamt();
 }
 
@@ -547,15 +589,20 @@ function _mkLwTabelle() {
 // gehoert offen hingeschrieben: aus dem Bauprogramm ist es die terminierte
 // Zahl, aus den Aufwandswerten die geschaetzte.
 function _mkSchichtQuelle(sumAufwand) {
-  const bp = schichtenBauprogramm();
-  const abzug = mkAbzugStunden();
+  const bp     = schichtenBauprogramm();
+  const quelle = mkSchichtQuelle();
+  const abzug  = mkAbzugStunden();
   const abzugText = abzug ? ` · Abzug Installation und Anfahrt ${_mkZahl(abzug * 60, 0)} min je Schicht` : '';
+  const woher = {
+    hand:    `<b>${mkSchichtHand()} Schichten von Hand</b>`,
+    aufwand: `<b>${sumAufwand} Schichten aus den Aufwandswerten</b> — das Bauprogramm bleibt aussen vor`,
+    auto:    bp != null
+      ? `<b>${bp} Schichten aus dem Bauprogramm</b> (${sumAufwand} aus den Aufwandswerten)`
+      : `<b>${sumAufwand} Schichten aus den Aufwandswerten</b> — sobald Baupakete terminiert sind, gilt das Bauprogramm`,
+  }[quelle];
   return `<div style="padding:8px 14px;font-size:11px;color:#6b7280;border-top:1px solid #f0f2f5;">`
-    + (bp != null
-        ? `Massgebend für das Verzeichnis: <b>${bp} Schichten aus dem Bauprogramm</b> `
-          + `(${sumAufwand} aus den Aufwandswerten)${abzugText}`
-        : `Massgebend für das Verzeichnis: <b>${sumAufwand} Schichten aus den Aufwandswerten</b> — `
-          + `sobald Baupakete terminiert sind, gilt das Bauprogramm${abzugText}`)
+    + `Massgebend für das Verzeichnis: ${woher}${abzugText}`
+    + ` · <a onclick="mkModalOeffnen('parameter')" style="color:#1a3a5c;cursor:pointer;text-decoration:underline;">ändern</a>`
     + '</div>';
 }
 
@@ -1220,9 +1267,10 @@ function mkTabWechseln(tab) {
 function _mkParameterTab() {
   const el = document.getElementById('mk-tab-parameter');
   if (!el) return;
-  const e     = loadMkEinstellungen();
-  const bp    = schichtenBauprogramm();
-  const abzug = mkAbzugStunden();
+  const e      = loadMkEinstellungen();
+  const bp     = schichtenBauprogramm();
+  const abzug  = mkAbzugStunden();
+  const quelle = mkSchichtQuelle();
 
   const feld = (label, id, wert, schritt, einheit, hinweis) =>
     `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
@@ -1246,11 +1294,33 @@ function _mkParameterTab() {
            ${LK_INTERVALLE.map(h => `<option value="${h}"${h === lkIntervall() ? ' selected' : ''}>${h} h</option>`).join('')}
          </select><span style="flex:0 0 26px;"></span>
        </label>`
+    + `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
+         <span style="flex:1 1 auto;">Schichtzahl aus<br><span style="font-size:10px;color:#9ca3af;">Womit die zeitabhängigen Positionen rechnen</span></span>
+         <select onchange="mkSchichtQuelleSetzen(this.value)"
+                 style="width:186px;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;">
+           <option value="auto"${quelle === 'auto' ? ' selected' : ''}>Bauprogramm, sonst Aufwandswerte</option>
+           <option value="aufwand"${quelle === 'aufwand' ? ' selected' : ''}>nur Aufwandswerte</option>
+           <option value="hand"${quelle === 'hand' ? ' selected' : ''}>von Hand</option>
+         </select>
+       </label>`
+    + (quelle === 'hand'
+        ? `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
+             <span style="flex:1 1 auto;">Anzahl Schichten</span>
+             <input type="number" step="1" min="0" value="${mkSchichtHand() || ''}"
+                    onchange="mkSchichtHandSetzen(this.value)"
+                    style="width:84px;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;
+                           font-size:12px;font-family:inherit;text-align:right;">
+             <span style="flex:0 0 26px;"></span></label>`
+        : '')
     + `<div style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;
                    font-size:11px;color:#6b7280;line-height:1.6;margin-top:8px;">`
-      + (bp != null
-          ? `Massgebend sind <b>${bp} Schichten aus dem Bauprogramm</b>. `
-          : `Noch keine Baupakete terminiert — massgebend sind <b>${schichtenAufwandGesamt()} Schichten aus den Aufwandswerten</b>. `)
+      + `Massgebend: <b>${schichtenGesamt()} Schichten</b>`
+      + (quelle === 'auto'
+          ? (bp != null ? ' aus dem Bauprogramm. ' : ` aus den Aufwandswerten — noch keine Baupakete terminiert. `)
+          : quelle === 'aufwand' ? ' aus den Aufwandswerten. ' : ' von Hand gesetzt. ')
+      + (quelle !== 'auto'
+          ? 'Ohne Bauprogramm gibt es keine Termine: alle Schichten zählen als Nachtschichten, Sonntage bleiben bei null. '
+          : '')
       + (abzug
           ? `Der Abzug für Installation und Anfahrt beträgt ${_mkZahl(abzug * 60, 0)} min je Schicht und gilt als Vorschlag für die Rüstzeit.`
           : `Im Bauprogramm ist kein Abzug für Installation und Anfahrt hinterlegt.`)

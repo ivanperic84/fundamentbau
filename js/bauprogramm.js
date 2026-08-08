@@ -707,11 +707,39 @@ function bpSchichtDatum(paketId, schichtNr, paketeList) {
   return bpFmtDate(bpAddDays(bpParseDate(pak.startDatum), (schichtNr || 1) - 1));
 }
 
-// Prüft ob ein Standort ein Mehrpfahlfundament ist
+// Bauweisen, die zuerst gebohrt und dann betoniert werden. Der Monopfahl
+// gehoert dazu — er wurde frueher uebersehen und lief wie ein Blockfundament
+// durch, obwohl auch er eine Bohrschicht braucht.
+const BP_PFAHL_ARTEN = ['mehrpfahl', 'monopfahl'];
+
+function bpIstPfahlTyp(ft) {
+  if (!ft || !BP_PFAHL_ARTEN.includes(ft.fundamentArt)) return false;
+  // Der Monopfahl fuehrt die 1 nicht zwingend als Feld
+  const anzahl = parseInt(ft.anzahlPfaehle);
+  return ft.fundamentArt === 'monopfahl' ? true : anzahl > 0;
+}
+
+// Prüft ob ein Standort ein Pfahlfundament ist. Der Typ kommt ueber
+// ftTypZuStandort — dieselbe Zuordnung wie im Massenauszug und in der
+// Materialliste. Die frueher benutzte Zuweisungstabelle ist eine zweite
+// Quelle, die nur beim Speichern ueber die Seitenleiste nachgezogen wird.
 function bpIstMehrpfahl(pairId) {
-  const ftId = loadFtZuweisungen()[pairId];
-  const ft   = loadFtProfile().find(t => t.id === ftId);
-  return !!(ft?.fundamentArt === 'mehrpfahl' && parseInt(ft.anzahlPfaehle) > 0);
+  const bp = { ...(PAIRS.find(p => p.id === pairId) || {}), ...(loadAllBauprojekt()[pairId] || {}) };
+  return bpIstPfahlTyp(ftTypZuStandort(loadFtProfile(), bp));
+}
+
+// Pfahltypen, die im Projekt vorkommen, aber weder am Typ noch am Profil eine
+// Bohrleistung fuehren. Ohne sie laesst sich die Bohrzeit nicht rechnen — das
+// gehoert sichtbar gemacht und nicht durch eine andere Groesse ersetzt.
+function bpPfahlTypenOhneLeistung() {
+  const prof  = loadFtProfile();
+  const allBp = loadAllBauprojekt();
+  const namen = new Set();
+  getFundamente().forEach(p => {
+    const ft = ftTypZuStandort(prof, { ...p, ...(allBp[p.id] || {}) });
+    if (bpIstPfahlTyp(ft) && !_resolvePfahlLeistung(ft)) namen.add(ft.name);
+  });
+  return [...namen];
 }
 
 // Pile-Schichten berechnen: Bohr-Schichten + Beton-Schichten
@@ -729,8 +757,11 @@ function _bpWarnSvg(x, yBasis, farbe, kante) {
 }
 
 function _calcPfahlSchichten(ft, nettoH, abzugMin) {
-  const anzahl = parseInt(ft.anzahlPfaehle) || 0;
-  const pleis  = parseFloat(ft.pfahlLeistung) || 0;
+  const anzahl = parseInt(ft.anzahlPfaehle) || (ft.fundamentArt === 'monopfahl' ? 1 : 0);
+  // Die Bohrleistung wird HIER aufgeloest — am Typ, sonst am Leistungsprofil.
+  // Frueher tat das nur der Zuweisungslauf; Gantt und Auslastung riefen roh
+  // auf und bekamen null, obwohl das Profil einen Wert fuehrte.
+  const pleis  = _resolvePfahlLeistung(ft) || 0;
   if (!anzahl || !pleis || !nettoH) return null;
   const effH   = Math.max(0.1, nettoH - (abzugMin || 0) / 60);
   const pilesPerShift = effH / pleis;
@@ -2111,7 +2142,9 @@ function updateBpInfoBar() {
   const abzug    = einst.abzugMinuten ? ' · Abzug: ' + einst.abzugMinuten + ' min/Schicht' : '';
   const pfahlAnz   = pairs.filter(p => zuw[p.id]?.isPfahlFund).length;
   const gruppenAnz = loadBaugruppen().length;
-  const pfahlInfo  = pfahlAnz ? ' · ' + pfahlAnz + ' Pfahlfundamente in ' + gruppenAnz + ' Gruppen' : '';
+  const ohneBohr   = bpPfahlTypenOhneLeistung();
+  const pfahlInfo  = (pfahlAnz ? ' · ' + pfahlAnz + ' Pfahlfundamente in ' + gruppenAnz + ' Gruppen' : '')
+    + (ohneBohr.length ? ' · ohne Bohrleistung: ' + ohneBohr.join(', ') : '');
   const abbInfo    = abbPairs.length  ? ' · Abbruch: '    + zugewABB  + '/' + abbPairs.length  : '';
   const sichInfo   = sichPairs.length ? ' · Sicherung: '  + zugewSich + '/' + sichPairs.length : '';
   const provInfo   = provPairs.length ? ' · Provisorium: ' + zugewProv + '/' + provPairs.length : '';
@@ -4637,15 +4670,15 @@ async function autoZuweisenSchichten(config) {
     const ftId   = ftZuw[p.id];
     const ft     = ftList.find(t => t.id === ftId);
     if (!ft) return false;
-    const istPfahl = ft.fundamentArt === 'mehrpfahl' && parseInt(ft.anzahlPfaehle) > 0;
+    const istPfahl = bpIstPfahlTyp(ft);
     if (istPfahl) {
       // Pfahlfundament: Baugruppe + Bohrschichten + optionaler Betonteil
-      const anzahlPfähle = parseInt(ft.anzahlPfaehle);
-      const effPL = _resolvePfahlLeistung(ft);
-      const pfahlCalc    = _calcPfahlSchichten(effPL ? { ...ft, pfahlLeistung: effPL } : ft, curSp?.nettoH, einst.abzugMinuten);
-      const pilesPerShift = pfahlCalc
-        ? pfahlCalc.pilesPerShift
-        : Math.max(1, Math.floor(getFtLeistung(ft, curSp?.nettoH, einst.abzugMinuten) || 1));
+      const anzahlPfähle = parseInt(ft.anzahlPfaehle) || 1;
+      const pfahlCalc    = _calcPfahlSchichten(ft, curSp?.nettoH, einst.abzugMinuten);
+      // Ohne Bohrleistung gibt es keine Pfahlrechnung. Der frueher benutzte
+      // Rueckfall auf die FUNDAMENTE-je-Schicht war eine andere Groesse und
+      // ergab stillschweigend eine falsche Zahl Bohrschichten.
+      const pilesPerShift = pfahlCalc ? pfahlCalc.pilesPerShift : anzahlPfähle;
       const numBohrSchichten = pfahlCalc ? pfahlCalc.bohrShifts : Math.ceil(anzahlPfähle / pilesPerShift);
       const numBetonSchichten = pfahlCalc ? pfahlCalc.betonShifts : 0;
       const totalSchichten = numBohrSchichten + numBetonSchichten;
