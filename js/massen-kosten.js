@@ -131,147 +131,8 @@ function saveMkEinstellungen(e) {
 // Gewicht. Sobald die Vorlage des Anwenders Kilogramm je Typ mitbringt, ist
 // hier die Stelle dafuer.
 
-// «600×600 mm» → 0.6 (Seitenlaenge in Metern, quadratisch angenommen)
-function _mkSeite(mass) {
-  const m = String(mass || '').match(/(\d+(?:[.,]\d+)?)\s*[×x*]\s*(\d+(?:[.,]\d+)?)/);
-  if (!m) return null;
-  const a = parseFloat(m[1].replace(',', '.'));
-  const b = parseFloat(m[2].replace(',', '.'));
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  // Angaben in Millimetern, wenn die Zahl gross ist
-  const f = a > 20 ? 0.001 : 1;
-  return { a: a * f, b: b * f };
-}
-
-function _mkZahlFeld(w) {
-  const n = parseFloat(String(w).replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
-}
-
-// ── Mengenansaetze je Typ ────────────────────────────────────
-// Die Geometrie traegt nur der Standardtyp. Ein Spezialtyp beschreibt eine
-// LAGE («Felsiger Baugrund», «Mast an Mauer»), keine Abmessung — und ein
-// Standort mit frei geschriebenem Fundamenttyp trifft ueberhaupt keinen
-// Bibliothekseintrag. Beide sind damit nicht rechenbar. Statt zu schaetzen
-// bekommen sie hier eine Stelle, an der die Menge JE FUNDAMENT hinterlegt
-// wird; der Auszug multipliziert sie mit der Anzahl.
-// Welche Angaben eine Fundamentart braucht. Dieselbe Zuordnung, mit der der
-// Typ-Editor die Felder ein- und ausblendet (onFtArtChange) — eine Bauweise,
-// bei der ein Feld gar nicht erhoben wird, darf es hier nicht vermissen.
-const MK_ART_FELDER = {
-  blockfundament: ['kopf', 'kopfHoehe', 'block', 'tiefe'],
-  mehrpfahl:      ['kopf', 'kopfHoehe', 'pfaehle', 'pfahlLaenge'],
-  monopfahl:      ['kopf', 'kopfHoehe', 'pfahlLaenge'],
-  fels:           ['pfahlLaenge', 'tiefe', 'anker'],
-  mauer:          ['anker'],
-  bauwerk:        ['anker'],
-  sonstige:       ['kopf', 'kopfHoehe', 'block', 'tiefe'],
-};
-
-const MK_FELD_LABEL = {
-  kopf:        'Kopfabmessung',
-  kopfHoehe:   'Kopfhöhe',
-  block:       'Blockabmessung',
-  tiefe:       'Tiefe',
-  pfaehle:     'Anzahl Pfähle',
-  pfahlLaenge: 'Pfahl-/Ankerlänge',
-  anker:       'Ankerbolzen',
-  buegel:      'Bügelbewehrung',
-};
-
-// Meter-Gewicht von Betonstahl: 7850 kg/m³ × Kreisflaeche, Durchmesser in mm
-const _mkStahlKgProM = (dmm) => (Number(dmm) > 0 ? 0.006165 * dmm * dmm : null);
-
-// Alle Mengen eines Fundamenttyps JE FUNDAMENT, ausschliesslich aus den
-// Feldern des Typ-Moduls. Was die Bauweise braucht, aber nicht traegt, steht
-// in «fehlend» — gerechnet wird nur, was vollstaendig hinterlegt ist.
-// Geschaetzt wird nichts.
-function _mkTypDaten(ft) {
-  if (!ft) return null;
-  const art   = ft.fundamentArt || 'blockfundament';
-  const noetig = MK_ART_FELDER[art] || MK_ART_FELDER.blockfundament;
-
-  const kopf   = _mkSeite(ft.kopfAbmessung);
-  const block  = _mkSeite(ft.blockAbmessung);
-  const kopfH  = _mkZahlFeld(ft.kopfHoehe);
-  const tiefe  = _mkZahlFeld(ft.tiefe);
-  const stk    = _mkZahlFeld(ft.anzahlPfaehle);
-  const laenge = _mkZahlFeld(ft.pfahlLaenge);
-  const schr   = _mkZahlFeld(ft.schraubenAnzahl);
-
-  const vorhanden = {
-    kopf: !!kopf, kopfHoehe: kopfH != null, block: !!block, tiefe: tiefe != null,
-    pfaehle: stk != null, pfahlLaenge: laenge != null, anker: schr != null,
-  };
-  const fehlend = noetig.filter(f => !vorhanden[f]).map(f => MK_FELD_LABEL[f]);
-
-  const d = { beton: null, aushub: null, schalung: null, buegel: null,
-              schraub: null, fixierung: null, vfk: null,
-              pfahlStk: null, pfahlMeter: null,
-              ankerStk: null, ankerMeter: null };
-
-  // Kopf: bei allen Bauweisen mit Fundamentkopf dasselbe Quader-Volumen.
-  // Geschalt wird NUR der Kopf — der Block steht im Baugrund und wird gegen
-  // das Erdreich betoniert. Flaeche = Umfang × Kopfhoehe.
-  const kopfVol     = (kopf && kopfH != null) ? kopf.a * kopf.b * kopfH : null;
-  const kopfSchalung= (kopf && kopfH != null) ? 2 * (kopf.a + kopf.b) * kopfH : null;
-
-  if (art === 'blockfundament' || art === 'sonstige') {
-    if (kopfVol != null && block && tiefe != null) {
-      const blockH = Math.max(0, tiefe - kopfH);
-      d.beton    = kopfVol + block.a * block.b * blockH;
-      d.aushub   = block.a * block.b * tiefe;
-      d.schalung = kopfSchalung;
-    }
-  } else if (art === 'mehrpfahl' || art === 'monopfahl') {
-    // Der Pfahlbeton haengt am Bohrdurchmesser, den der Typ nicht fuehrt —
-    // abgerechnet werden Pfaehle ohnehin nach Stueck und Bohrmeter.
-    if (kopfVol != null) { d.beton = kopfVol; d.aushub = kopfVol; d.schalung = kopfSchalung; }
-    const anzahl = art === 'monopfahl' ? (stk ?? 1) : stk;
-    d.pfahlStk   = anzahl;
-    d.pfahlMeter = (anzahl != null && laenge != null) ? anzahl * laenge : null;
-  }
-
-  // Anker: bei Verankerung in Fels und Befestigung an Mauer fuehren die
-  // Schraubenfelder die Anker, nicht die Fundamentschrauben.
-  if (art === 'fels' || art === 'mauer') {
-    d.ankerStk   = schr;
-    d.ankerMeter = (schr != null && laenge != null) ? schr * laenge : null;
-  } else {
-    d.schraub = schr;
-  }
-
-  // Buegel nach STUECK, wie sie bestellt werden — dieselbe Zahl, die die
-  // Materialliste je Artikelnummer fuehrt. Ein Kilogewicht liesse sich zwar
-  // rechnen, waere aber ohne die Laengseisen keine Bewehrungsmenge.
-  const bAnz = _mkZahlFeld(ft.buegelAnzahl);
-  if (bAnz != null) d.buegel = bAnz;
-  else if (d.beton != null) fehlend.push(MK_FELD_LABEL.buegel);
-
-  // Fixierung der Fundamentschrauben unten: Flacheisen je Fundamentfamilie,
-  // aus derselben Tabelle wie die Materialliste (FIXIERUNG_FL_DB).
-  d.fixierung = _mkFixierungStk(ft);
-
-  // Vorgefertigter Fundamentkopf: der Typ fuehrt dazu eine Zeichnungsnummer.
-  // Leer heisst «kein VFK verfuegbar», nicht «unbekannt».
-  d.vfk = ft.vfkZeichnungsNr ? 1 : 0;
-
-  return { ...d, fehlend };
-}
-
-// Stueckzahl der Fixierungs-Flacheisen je Fundament. Die Zuordnung steht in
-// begehung-ausfuehrung.js und gilt je Fundamentfamilie (DP1a, DG2a …) — eine
-// zweite Tabelle hier waere genau die Doppelquelle, die vermieden gehoert.
-function _mkFixierungStk(ft) {
-  if (typeof FIXIERUNG_FL_DB !== 'object' || !ft?.name) return null;
-  // ftNameZerlegen liefert die Familie klein geschrieben, die Tabelle fuehrt
-  // sie als «DP1a» — verglichen wird deshalb ohne Ruecksicht auf Gross-Klein.
-  const familie = ftNameZerlegen(ft.name).familie;
-  const schluessel = Object.keys(FIXIERUNG_FL_DB).find(k => k.toLowerCase() === familie);
-  const eintrag = schluessel ? FIXIERUNG_FL_DB[schluessel] : null;
-  if (!eintrag) return null;
-  return eintrag.reduce((s, f) => s + (f.anzPro || 0), 0);
-}
+// Die Mengen je Fundament stehen in js/fundament-mengen.js — dieselbe Quelle,
+// aus der die Materialliste ihr Material zieht. Hier wird nur summiert.
 
 // Ein Eintrag je Gruppe, mit den Summen aller Groessen und der Zahl der
 // Standorte, bei denen eine Angabe fehlt.
@@ -302,7 +163,7 @@ function massenauszugRechnen(gliederung) {
     }
     const g = gruppen.get(schluessel);
     g.anzahl++;
-    const d = _mkTypDaten(eintrag);
+    const d = fmMengen(eintrag);
     // Markiert wird jede Gruppe, deren Typ nicht vollstaendig hinterlegt ist —
     // und jeder Standort ohne Typ aus der Bibliothek. Beides fuehrt dazu, dass
     // im Auszug eine Menge fehlt, und das darf nicht stillschweigend passieren.
@@ -1424,7 +1285,7 @@ function mkTypenImProjekt() {
         art: ft ? (ft.typ === 'standard' ? 'Standard' : 'Spezial') : 'kein Bibliothekstyp',
         bauart: ft?.fundamentArt || '',
         anzahl: 0,
-        daten: _mkTypDaten(ft),
+        daten: fmMengen(ft),
       });
     }
     map.get(schluessel).anzahl++;

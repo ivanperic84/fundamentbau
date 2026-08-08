@@ -34,6 +34,7 @@ const CACHE_NAME    = 'sondagen-' + CACHE_VERSION;
 // muessen sie unter genau diesem Schluessel im Cache liegen.
 const APP_MODULE = [
   'js/kern.js',
+  'js/fundament-mengen.js',
   'js/uebersicht.js',
   'js/detail-sidebar.js',
   'js/karte-skizze.js',
