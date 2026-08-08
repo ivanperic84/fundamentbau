@@ -69,11 +69,15 @@ const MASSEN_GROESSEN = [
   { id: 'beton',      label: 'Beton',             einheit: 'm³'  },
   { id: 'aushub',     label: 'Aushub',            einheit: 'm³'  },
   { id: 'schalung',   label: 'Schalung',          einheit: 'm²'  },
-  { id: 'bewehr',     label: 'Bügelstahl',        einheit: 'kg',
-    hinweis: 'Bügel aus dem Fundamenttyp (Anzahl × Umfang × Meter­gewicht). Längseisen führt die Typenbibliothek nicht — sie sind bei den Standardtypen durch die Typenprüfung gedeckt.' },
+  { id: 'buegel',     label: 'Bügel',             einheit: 'Stk',
+    hinweis: 'Bügel je Fundament aus der Typenbibliothek — dieselbe Stückzahl, die die Materialliste je Artikelnummer führt' },
   // Materiell Teil der Bewehrung, abgerechnet aber nach Stueck
   { id: 'schraub',    label: 'Schrauben',         einheit: 'Stk',
     hinweis: 'Fundamentschrauben — materiell Teil der Bewehrung, abgerechnet nach Stück' },
+  { id: 'fixierung',  label: 'Fixierung',         einheit: 'Stk',
+    hinweis: 'Flacheisen zur Fixierung der Fundamentschrauben unten, je Fundamentfamilie — gleiche Quelle wie die Materialliste' },
+  { id: 'vfk',        label: 'VFK',               einheit: 'Stk',
+    hinweis: 'Fundamente mit vorgefertigtem Fundamentkopf (Zeichnungs-Nr. am Typ hinterlegt)' },
   // Pfaehle werden nach Stueck und Bohrmeter abgerechnet, nicht nach Volumen
   { id: 'pfahlStk',   label: 'Pfähle',            einheit: 'Stk' },
   { id: 'pfahlMeter', label: 'Pfahllänge',        einheit: 'm'   },
@@ -90,7 +94,8 @@ const _mkSpaltenSichtbar = (summen) =>
   MASSEN_GROESSEN.filter(g => g.id === 'anzahl' || (Number(summen[g.id]) || 0) > 0);
 
 // Groessen, die als ganze Zahl angeschrieben werden
-const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'bewehr', 'ankerStk']);
+const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'buegel',
+                             'ankerStk', 'fixierung', 'vfk']);
 
 // ── Speicher ─────────────────────────────────────────────────
 function loadLvPositionen() {
@@ -200,25 +205,28 @@ function _mkTypDaten(ft) {
   };
   const fehlend = noetig.filter(f => !vorhanden[f]).map(f => MK_FELD_LABEL[f]);
 
-  const d = { beton: null, aushub: null, schalung: null, bewehr: null,
-              schraub: null, pfahlStk: null, pfahlMeter: null,
+  const d = { beton: null, aushub: null, schalung: null, buegel: null,
+              schraub: null, fixierung: null, vfk: null,
+              pfahlStk: null, pfahlMeter: null,
               ankerStk: null, ankerMeter: null };
 
-  // Kopf: bei allen Bauweisen mit Fundamentkopf dasselbe Quader-Volumen
-  const kopfVol   = (kopf && kopfH != null) ? kopf.a * kopf.b * kopfH : null;
-  const kopfMantel= (kopf && kopfH != null) ? 2 * (kopf.a + kopf.b) * kopfH : null;
+  // Kopf: bei allen Bauweisen mit Fundamentkopf dasselbe Quader-Volumen.
+  // Geschalt wird NUR der Kopf — der Block steht im Baugrund und wird gegen
+  // das Erdreich betoniert. Flaeche = Umfang × Kopfhoehe.
+  const kopfVol     = (kopf && kopfH != null) ? kopf.a * kopf.b * kopfH : null;
+  const kopfSchalung= (kopf && kopfH != null) ? 2 * (kopf.a + kopf.b) * kopfH : null;
 
   if (art === 'blockfundament' || art === 'sonstige') {
     if (kopfVol != null && block && tiefe != null) {
       const blockH = Math.max(0, tiefe - kopfH);
       d.beton    = kopfVol + block.a * block.b * blockH;
       d.aushub   = block.a * block.b * tiefe;
-      d.schalung = kopfMantel + 2 * (block.a + block.b) * blockH;
+      d.schalung = kopfSchalung;
     }
   } else if (art === 'mehrpfahl' || art === 'monopfahl') {
     // Der Pfahlbeton haengt am Bohrdurchmesser, den der Typ nicht fuehrt —
     // abgerechnet werden Pfaehle ohnehin nach Stueck und Bohrmeter.
-    if (kopfVol != null) { d.beton = kopfVol; d.aushub = kopfVol; d.schalung = kopfMantel; }
+    if (kopfVol != null) { d.beton = kopfVol; d.aushub = kopfVol; d.schalung = kopfSchalung; }
     const anzahl = art === 'monopfahl' ? (stk ?? 1) : stk;
     d.pfahlStk   = anzahl;
     d.pfahlMeter = (anzahl != null && laenge != null) ? anzahl * laenge : null;
@@ -233,20 +241,36 @@ function _mkTypDaten(ft) {
     d.schraub = schr;
   }
 
-  // Bewehrung aus den Buegeln des Typs. Laengseisen fuehrt die Bibliothek
-  // nicht — bei den Standardtypen sind sie durch die Typenpruefung gedeckt
-  // und nicht als Feld erfasst. Deshalb wird der Buegelstahl ausgewiesen und
-  // nicht als Gesamtbewehrung ausgegeben.
-  const bAnz   = _mkZahlFeld(ft.buegelAnzahl);
-  const bDm    = _mkZahlFeld(ft.buegelDurchmesser);
-  const bSeite = _mkZahlFeld(ft.buegelSeitenlaenge);
-  if (bAnz != null && bDm != null && bSeite != null) {
-    d.bewehr = bAnz * 4 * (bSeite / 1000) * _mkStahlKgProM(bDm);
-  } else if (d.beton != null) {
-    fehlend.push(MK_FELD_LABEL.buegel);
-  }
+  // Buegel nach STUECK, wie sie bestellt werden — dieselbe Zahl, die die
+  // Materialliste je Artikelnummer fuehrt. Ein Kilogewicht liesse sich zwar
+  // rechnen, waere aber ohne die Laengseisen keine Bewehrungsmenge.
+  const bAnz = _mkZahlFeld(ft.buegelAnzahl);
+  if (bAnz != null) d.buegel = bAnz;
+  else if (d.beton != null) fehlend.push(MK_FELD_LABEL.buegel);
+
+  // Fixierung der Fundamentschrauben unten: Flacheisen je Fundamentfamilie,
+  // aus derselben Tabelle wie die Materialliste (FIXIERUNG_FL_DB).
+  d.fixierung = _mkFixierungStk(ft);
+
+  // Vorgefertigter Fundamentkopf: der Typ fuehrt dazu eine Zeichnungsnummer.
+  // Leer heisst «kein VFK verfuegbar», nicht «unbekannt».
+  d.vfk = ft.vfkZeichnungsNr ? 1 : 0;
 
   return { ...d, fehlend };
+}
+
+// Stueckzahl der Fixierungs-Flacheisen je Fundament. Die Zuordnung steht in
+// begehung-ausfuehrung.js und gilt je Fundamentfamilie (DP1a, DG2a …) — eine
+// zweite Tabelle hier waere genau die Doppelquelle, die vermieden gehoert.
+function _mkFixierungStk(ft) {
+  if (typeof FIXIERUNG_FL_DB !== 'object' || !ft?.name) return null;
+  // ftNameZerlegen liefert die Familie klein geschrieben, die Tabelle fuehrt
+  // sie als «DP1a» — verglichen wird deshalb ohne Ruecksicht auf Gross-Klein.
+  const familie = ftNameZerlegen(ft.name).familie;
+  const schluessel = Object.keys(FIXIERUNG_FL_DB).find(k => k.toLowerCase() === familie);
+  const eintrag = schluessel ? FIXIERUNG_FL_DB[schluessel] : null;
+  if (!eintrag) return null;
+  return eintrag.reduce((s, f) => s + (f.anzPro || 0), 0);
 }
 
 // Ein Eintrag je Gruppe, mit den Summen aller Groessen und der Zahl der
@@ -482,10 +506,21 @@ async function lvZeileLoeschen(id) {
 
 // Menge einer Position. Drei Herkuenfte:
 //   ''          von Hand — die Zahl steht in der Zeile (globale Angabe)
-//   'schicht'   Anzahl Schichten (Bauleitung, Sicherung, Maschinen je Nacht)
+//   'schicht'          Anzahl Schichten (Bauleitung, Sicherung, Maschinen)
+//   'schichtNacht'     nur die Schichten im Nachtfenster (Nachtzuschlag)
+//   'schichtSonntag'   nur die Schichten an Sonntagen (Sonntagszuschlag)
 //   <Groesse>   eine Groesse des Massenauszugs
+// Herkuenfte, die an der Schichtzahl haengen, samt Erklaerung fuer die Zeile
+const MK_SCHICHT_HERKUNFT = {
+  schicht:        'Anzahl Schichten',
+  schichtNacht:   'Schichten im Nachtfenster',
+  schichtSonntag: 'Schichten an Sonntagen',
+};
+
 function lvMenge(zeile, summen) {
-  if (zeile.herkunft === 'schicht') return schichtenGesamt();
+  if (zeile.herkunft === 'schicht')         return schichtenGesamt();
+  if (zeile.herkunft === 'schichtNacht')    return schichtenAufteilung().nacht;
+  if (zeile.herkunft === 'schichtSonntag')  return schichtenAufteilung().sonntag;
   if (zeile.herkunft && summen[zeile.herkunft] != null) return summen[zeile.herkunft];
   return zeile.menge || 0;
 }
@@ -500,6 +535,37 @@ function schichtenBauprogramm() {
   const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
   const n = pakete.reduce((s, p) => s + (Number(p.anzahlNaechte) || 0), 0);
   return n > 0 ? n : null;
+}
+
+// Aufteilung der Schichten nach Zuschlagsgrund. Die Zuschlaege sind eigene
+// Positionen mit eigenem Preis — sie haengen aber nicht an ALLEN Schichten:
+// der Nachtzuschlag an denen im Nachtfenster, der Sonntagszuschlag an den
+// Schichten, die auf einen Sonntag fallen. Beides steht im Bauprogramm; hier
+// wird nur gezaehlt.
+//
+// Nacht heisst: das Sperrmuster beginnt ab 18 Uhr oder endet bis 08 Uhr.
+function schichtenAufteilung() {
+  const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
+  const muster = typeof loadSperrmuster === 'function' ? loadSperrmuster() : [];
+  const aufteilung = { total: 0, nacht: 0, sonntag: 0 };
+  if (typeof bpGetSchichten !== 'function') return aufteilung;
+
+  const istNacht = sp => {
+    const von = parseInt(String(sp?.von || '').split(':')[0], 10);
+    const bis = parseInt(String(sp?.bis || '').split(':')[0], 10);
+    return (Number.isFinite(von) && von >= 18) || (Number.isFinite(bis) && bis <= 8);
+  };
+
+  pakete.forEach(pak => {
+    (bpGetSchichten(pak) || []).forEach(s => {
+      aufteilung.total++;
+      const sp = muster.find(m => m.id === s.spId);
+      if (istNacht(sp)) aufteilung.nacht++;
+      const d = new Date(s.datum + 'T00:00:00');
+      if (d.getDay() === 0) aufteilung.sonntag++;
+    });
+  });
+  return aufteilung;
 }
 
 function schichtenAufwandGesamt() {
@@ -743,18 +809,20 @@ function _mkLvTabelle(summen) {
              style="padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-family:inherit;background:white;">
        <option value="">von Hand</option>
        <option value="schicht"${z.herkunft === 'schicht' ? ' selected' : ''}>Anzahl Schichten</option>
+       <option value="schichtNacht"${z.herkunft === 'schichtNacht' ? ' selected' : ''}>Schichten Nacht</option>
+       <option value="schichtSonntag"${z.herkunft === 'schichtSonntag' ? ' selected' : ''}>Schichten Sonntag</option>
        ${MASSEN_GROESSEN.map(g => `<option value="${g.id}"${z.herkunft === g.id ? ' selected' : ''}>${g.label}</option>`).join('')}
      </select>`;
 
   const zeileHtml = (z, menge, betrag) => {
-    const gebunden = z.herkunft === 'schicht' || !!(z.herkunft && summen[z.herkunft] != null);
+    const gebunden = MK_SCHICHT_HERKUNFT[z.herkunft] || !!(z.herkunft && summen[z.herkunft] != null);
     return `<tr>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${eingabe(z.id,'pos',z.pos,'70px')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${eingabe(z.id,'text',z.text,'100%')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${eingabe(z.id,'einheit',z.einheit,'52px')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">
         ${gebunden
-          ? `<span title="${z.herkunft === 'schicht' ? 'Anzahl Schichten aus den Aufwandswerten' : 'aus dem Massenauszug'}" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(menge, 1)}</span>`
+          ? `<span title="${MK_SCHICHT_HERKUNFT[z.herkunft] || 'aus dem Massenauszug'}" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(menge, 1)}</span>`
           : eingabe(z.id,'menge',z.menge,'80px','zahl')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${herkunftWahl(z)}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">${eingabe(z.id,'preis',z.preis,'90px','zahl')}</td>

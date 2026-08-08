@@ -578,8 +578,11 @@ function _calcMateriallisteData(selectedIds) {
     if (selectedIds && !selectedIds.includes(p.id)) return null;
     const bp = allBp[p.id] || {};
     if (bp.bestand !== 'neu' && bp.bestand !== 'prov') return null;
-    const ft = bp.fundtyp ? ftProf.find(t => t.name === bp.fundtyp && t.typ === 'standard') : null;
-    if (!ft) return null;
+    // Zuordnung wie im Massenauszug: ueber die stabile Kennung, sonst ueber
+    // Familie und Tiefe. Der frueher benutzte Namensvergleich verfehlte jeden
+    // Standort, der «DP1a / 1.80» statt «DP1a / 1.8» trug.
+    const ft = ftTypZuStandort(ftProf, { ...p, ...bp });
+    if (!ft || ft.typ !== 'standard') return null;
     return { pair: p, bp, ft, family: ft.name.split('/')[0].trim() };
   }).filter(Boolean);
 
@@ -617,7 +620,9 @@ function _calcMateriallisteData(selectedIds) {
       dim: ft.buegelSeitenlaenge, material: ft.buegelMaterial || 'B500B',
       anzStueck: 0, families: new Set(),
     };
-    buegelAgg[an].anzStueck += 2;
+    // Stueckzahl aus dem Typ statt der festen 2 — DG2a und DG3a fuehren
+    // andere Buegelzahlen, und der Massenauszug rechnet mit demselben Feld.
+    buegelAgg[an].anzStueck += +ft.buegelAnzahl || 2;
     buegelAgg[an].families.add(family);
   });
 
