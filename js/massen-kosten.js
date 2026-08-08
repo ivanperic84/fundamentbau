@@ -69,13 +69,18 @@ const MASSEN_GROESSEN = [
   { id: 'beton',      label: 'Beton',             einheit: 'm³'  },
   { id: 'aushub',     label: 'Aushub',            einheit: 'm³'  },
   { id: 'schalung',   label: 'Schalung',          einheit: 'm²'  },
-  { id: 'bewehr',     label: 'Bewehrung',         einheit: 'kg'  },
+  { id: 'bewehr',     label: 'Bügelstahl',        einheit: 'kg',
+    hinweis: 'Bügel aus dem Fundamenttyp (Anzahl × Umfang × Meter­gewicht). Längseisen führt die Typenbibliothek nicht — sie sind bei den Standardtypen durch die Typenprüfung gedeckt.' },
   // Materiell Teil der Bewehrung, abgerechnet aber nach Stueck
   { id: 'schraub',    label: 'Schrauben',         einheit: 'Stk',
     hinweis: 'Fundamentschrauben — materiell Teil der Bewehrung, abgerechnet nach Stück' },
   // Pfaehle werden nach Stueck und Bohrmeter abgerechnet, nicht nach Volumen
   { id: 'pfahlStk',   label: 'Pfähle',            einheit: 'Stk' },
   { id: 'pfahlMeter', label: 'Pfahllänge',        einheit: 'm'   },
+  // Verankerung in Fels und Befestigung an Mauer: dort fuehren dieselben
+  // Schraubenfelder des Typs die Anker, nicht die Fundamentschrauben.
+  { id: 'ankerStk',   label: 'Anker',             einheit: 'Stk' },
+  { id: 'ankerMeter', label: 'Ankerlänge',        einheit: 'm'   },
 ];
 
 // Spalten, die nur erscheinen, wenn sie eine Menge tragen. Pfahl- und
@@ -85,7 +90,7 @@ const _mkSpaltenSichtbar = (summen) =>
   MASSEN_GROESSEN.filter(g => g.id === 'anzahl' || (Number(summen[g.id]) || 0) > 0);
 
 // Groessen, die als ganze Zahl angeschrieben werden
-const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'bewehr']);
+const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'bewehr', 'ankerStk']);
 
 // ── Speicher ─────────────────────────────────────────────────
 function loadLvPositionen() {
@@ -145,76 +150,103 @@ function _mkZahlFeld(w) {
 // Bibliothekseintrag. Beide sind damit nicht rechenbar. Statt zu schaetzen
 // bekommen sie hier eine Stelle, an der die Menge JE FUNDAMENT hinterlegt
 // wird; der Auszug multipliziert sie mit der Anzahl.
-const MK_ANSATZ_KEY = 'sp_mk_ansaetze';
+// Welche Angaben eine Fundamentart braucht. Dieselbe Zuordnung, mit der der
+// Typ-Editor die Felder ein- und ausblendet (onFtArtChange) — eine Bauweise,
+// bei der ein Feld gar nicht erhoben wird, darf es hier nicht vermissen.
+const MK_ART_FELDER = {
+  blockfundament: ['kopf', 'kopfHoehe', 'block', 'tiefe'],
+  mehrpfahl:      ['kopf', 'kopfHoehe', 'pfaehle', 'pfahlLaenge'],
+  monopfahl:      ['kopf', 'kopfHoehe', 'pfahlLaenge'],
+  fels:           ['pfahlLaenge', 'tiefe', 'anker'],
+  mauer:          ['anker'],
+  bauwerk:        ['anker'],
+  sonstige:       ['kopf', 'kopfHoehe', 'block', 'tiefe'],
+};
 
-function loadMkAnsaetze() {
-  try { return jsonParse(store.getItem(MK_ANSATZ_KEY)) || {}; } catch { return {}; }
-}
-function saveMkAnsaetze(a) { store.setItem(MK_ANSATZ_KEY, JSON.stringify(a)); }
+const MK_FELD_LABEL = {
+  kopf:        'Kopfabmessung',
+  kopfHoehe:   'Kopfhöhe',
+  block:       'Blockabmessung',
+  tiefe:       'Tiefe',
+  pfaehle:     'Anzahl Pfähle',
+  pfahlLaenge: 'Pfahl-/Ankerlänge',
+  anker:       'Ankerbolzen',
+  buegel:      'Bügelbewehrung',
+};
 
-// Bibliothekstypen ueber ihre Id, freie Schreibweisen ueber den Namen
-function mkAnsatzSchluessel(ft, bp) {
-  return ft?.id || ('name:' + String(bp?.fundtyp || '—').trim());
-}
+// Meter-Gewicht von Betonstahl: 7850 kg/m³ × Kreisflaeche, Durchmesser in mm
+const _mkStahlKgProM = (dmm) => (Number(dmm) > 0 ? 0.006165 * dmm * dmm : null);
 
-function mkAnsatzSetzen(schluessel, feld, roh) {
-  const alle = loadMkAnsaetze();
-  if (!alle[schluessel]) alle[schluessel] = {};
-  const n = parseFloat(String(roh).replace(',', '.'));
-  if (Number.isFinite(n) && n >= 0) alle[schluessel][feld] = n;
-  else delete alle[schluessel][feld];
-  if (!Object.keys(alle[schluessel]).length) delete alle[schluessel];
-  saveMkAnsaetze(alle);
-  renderMassenView();
-  if (document.getElementById('mk-einst-modal')?.style.display === 'flex') _mkAnsatzTab();
-}
-
+// Alle Mengen eines Fundamenttyps JE FUNDAMENT, ausschliesslich aus den
+// Feldern des Typ-Moduls. Was die Bauweise braucht, aber nicht traegt, steht
+// in «fehlend» — gerechnet wird nur, was vollstaendig hinterlegt ist.
+// Geschaetzt wird nichts.
 function _mkTypDaten(ft) {
   if (!ft) return null;
-  const schraub = _mkZahlFeld(ft.schraubenAnzahl);
-  const kopf    = _mkSeite(ft.kopfAbmessung);
-  const block   = _mkSeite(ft.blockAbmessung);
-  const kopfH   = _mkZahlFeld(ft.kopfHoehe);
-  const tiefe   = _mkZahlFeld(ft.tiefe);
+  const art   = ft.fundamentArt || 'blockfundament';
+  const noetig = MK_ART_FELDER[art] || MK_ART_FELDER.blockfundament;
 
-  // Pfaehle: Stueckzahl und Bohrmeter je Fundament. Ein Betonvolumen liesse
-  // sich erst mit dem Pfahldurchmesser rechnen — den fuehrt der Typ nicht.
-  const pfahlStk   = _mkZahlFeld(ft.anzahlPfaehle);
-  const pfahlLaenge= _mkZahlFeld(ft.pfahlLaenge);
-  const pfahlMeter = (pfahlStk != null && pfahlLaenge != null) ? pfahlStk * pfahlLaenge : null;
+  const kopf   = _mkSeite(ft.kopfAbmessung);
+  const block  = _mkSeite(ft.blockAbmessung);
+  const kopfH  = _mkZahlFeld(ft.kopfHoehe);
+  const tiefe  = _mkZahlFeld(ft.tiefe);
+  const stk    = _mkZahlFeld(ft.anzahlPfaehle);
+  const laenge = _mkZahlFeld(ft.pfahlLaenge);
+  const schr   = _mkZahlFeld(ft.schraubenAnzahl);
 
-  const leer = { beton: null, aushub: null, schalung: null, bewehr: null,
-                 schraub, pfahlStk, pfahlMeter };
-
-  // Ohne Kopf- und Blockmass oder ohne Tiefe laesst sich der Block nicht rechnen
-  if (!kopf || !block || kopfH == null || tiefe == null) return leer;
-
-  const blockH   = Math.max(0, tiefe - kopfH);
-  const kopfVol  = kopf.a * kopf.b * kopfH;
-  const blockVol = block.a * block.b * blockH;
-  const schalung = 2 * (kopf.a + kopf.b) * kopfH + 2 * (block.a + block.b) * blockH;
-
-  return {
-    ...leer,
-    beton:    kopfVol + blockVol,
-    aushub:   block.a * block.b * tiefe,
-    schalung,
+  const vorhanden = {
+    kopf: !!kopf, kopfHoehe: kopfH != null, block: !!block, tiefe: tiefe != null,
+    pfaehle: stk != null, pfahlLaenge: laenge != null, anker: schr != null,
   };
-}
+  const fehlend = noetig.filter(f => !vorhanden[f]).map(f => MK_FELD_LABEL[f]);
 
-// Menge je Fundament: gerechnete Geometrie, ueberschrieben vom hinterlegten
-// Ansatz. Der eigene Wert gilt vor der Rechnung — wer eine Menge einträgt,
-// weiss mehr als die Formel.
-function _mkMengeJeFundament(ft, bp) {
-  const gerechnet = _mkTypDaten(ft) || { beton: null, aushub: null, schalung: null,
-                                         bewehr: null, schraub: null, pfahlStk: null, pfahlMeter: null };
-  const ansatz = loadMkAnsaetze()[mkAnsatzSchluessel(ft, bp)];
-  if (!ansatz) return gerechnet;
-  const zusammen = { ...gerechnet };
-  MASSEN_GROESSEN.forEach(({ id }) => {
-    if (id !== 'anzahl' && ansatz[id] != null) zusammen[id] = ansatz[id];
-  });
-  return zusammen;
+  const d = { beton: null, aushub: null, schalung: null, bewehr: null,
+              schraub: null, pfahlStk: null, pfahlMeter: null,
+              ankerStk: null, ankerMeter: null };
+
+  // Kopf: bei allen Bauweisen mit Fundamentkopf dasselbe Quader-Volumen
+  const kopfVol   = (kopf && kopfH != null) ? kopf.a * kopf.b * kopfH : null;
+  const kopfMantel= (kopf && kopfH != null) ? 2 * (kopf.a + kopf.b) * kopfH : null;
+
+  if (art === 'blockfundament' || art === 'sonstige') {
+    if (kopfVol != null && block && tiefe != null) {
+      const blockH = Math.max(0, tiefe - kopfH);
+      d.beton    = kopfVol + block.a * block.b * blockH;
+      d.aushub   = block.a * block.b * tiefe;
+      d.schalung = kopfMantel + 2 * (block.a + block.b) * blockH;
+    }
+  } else if (art === 'mehrpfahl' || art === 'monopfahl') {
+    // Der Pfahlbeton haengt am Bohrdurchmesser, den der Typ nicht fuehrt —
+    // abgerechnet werden Pfaehle ohnehin nach Stueck und Bohrmeter.
+    if (kopfVol != null) { d.beton = kopfVol; d.aushub = kopfVol; d.schalung = kopfMantel; }
+    const anzahl = art === 'monopfahl' ? (stk ?? 1) : stk;
+    d.pfahlStk   = anzahl;
+    d.pfahlMeter = (anzahl != null && laenge != null) ? anzahl * laenge : null;
+  }
+
+  // Anker: bei Verankerung in Fels und Befestigung an Mauer fuehren die
+  // Schraubenfelder die Anker, nicht die Fundamentschrauben.
+  if (art === 'fels' || art === 'mauer') {
+    d.ankerStk   = schr;
+    d.ankerMeter = (schr != null && laenge != null) ? schr * laenge : null;
+  } else {
+    d.schraub = schr;
+  }
+
+  // Bewehrung aus den Buegeln des Typs. Laengseisen fuehrt die Bibliothek
+  // nicht — bei den Standardtypen sind sie durch die Typenpruefung gedeckt
+  // und nicht als Feld erfasst. Deshalb wird der Buegelstahl ausgewiesen und
+  // nicht als Gesamtbewehrung ausgegeben.
+  const bAnz   = _mkZahlFeld(ft.buegelAnzahl);
+  const bDm    = _mkZahlFeld(ft.buegelDurchmesser);
+  const bSeite = _mkZahlFeld(ft.buegelSeitenlaenge);
+  if (bAnz != null && bDm != null && bSeite != null) {
+    d.bewehr = bAnz * 4 * (bSeite / 1000) * _mkStahlKgProM(bDm);
+  } else if (d.beton != null) {
+    fehlend.push(MK_FELD_LABEL.buegel);
+  }
+
+  return { ...d, fehlend };
 }
 
 // Ein Eintrag je Gruppe, mit den Summen aller Groessen und der Zahl der
@@ -240,23 +272,30 @@ function massenauszugRechnen(gliederung) {
     }
 
     if (!gruppen.has(schluessel)) {
-      const leer = { name: schluessel, fehlend: 0 };
+      const leer = { name: schluessel, fehlend: 0, maengel: new Set() };
       MASSEN_GROESSEN.forEach(g => { leer[g.id] = 0; });
       gruppen.set(schluessel, leer);
     }
     const g = gruppen.get(schluessel);
     g.anzahl++;
-    const d = _mkMengeJeFundament(eintrag, bp);
-    // Fehlend heisst: zu diesem Standort laesst sich gar keine Menge rechnen.
-    // Ein Pfahlfundament ohne Betonvolumen, aber mit Bohrmetern zaehlt nicht
-    // dazu — es ist erfasst, nur anders bemessen.
-    if (!d || (d.beton == null && d.pfahlMeter == null)) g.fehlend++;
-    if (d) MASSEN_GROESSEN.forEach(({ id }) => {
-      if (id !== 'anzahl' && d[id] != null) g[id] += d[id];
-    });
+    const d = _mkTypDaten(eintrag);
+    // Markiert wird jede Gruppe, deren Typ nicht vollstaendig hinterlegt ist —
+    // und jeder Standort ohne Typ aus der Bibliothek. Beides fuehrt dazu, dass
+    // im Auszug eine Menge fehlt, und das darf nicht stillschweigend passieren.
+    if (!d) {
+      g.fehlend++;
+      g.maengel.add('kein Fundamenttyp aus der Bibliothek');
+    } else {
+      if (d.fehlend.length) { g.fehlend++; d.fehlend.forEach(f => g.maengel.add(f)); }
+      MASSEN_GROESSEN.forEach(({ id }) => {
+        if (id !== 'anzahl' && d[id] != null) g[id] += d[id];
+      });
+    }
   });
 
-  return [...gruppen.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return [...gruppen.values()]
+    .map(g => ({ ...g, maengel: [...g.maengel] }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
 function massenSummen(zeilen) {
@@ -634,8 +673,8 @@ function _mkMassenTabelle(zeilen, summen, gliederung) {
            `<th ${g.hinweis ? `title="${escHtml(g.hinweis)}"` : ''} style="text-align:right;padding:7px 10px;font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${g.label}<br><span style="font-weight:400;text-transform:none;">${g.einheit}</span></th>`).join('')}
        </tr></thead>
        <tbody>
-         ${zeilen.map(z => `<tr>
-           ${zelle(escHtml(z.name) + (z.fehlend ? ` <span title="${z.fehlend} Standort(e) ohne rechenbare Menge" style="color:#b45309;">·</span>` : ''))}
+         ${zeilen.map(z => `<tr${z.fehlend ? ' style="background:#fffbeb;"' : ''}>
+           ${zelle(escHtml(z.name) + (z.fehlend ? _mkMangelZeichen(z) : ''))}
            ${spalten.map(g => zelle(wert(z, g), true)).join('')}
          </tr>`).join('')}
        </tbody>
@@ -644,8 +683,33 @@ function _mkMassenTabelle(zeilen, summen, gliederung) {
          ${spalten.map(g => zelle(wert(summen, g), true)).join('')}
        </tr></tfoot>
      </table>`
+    + _mkMangelHinweis(zeilen)
     + (weg.length ? `<div style="padding:7px 12px;font-size:10px;color:#9ca3af;border-top:1px solid #f0f2f5;">`
         + `Ohne Menge, deshalb ausgeblendet: ${escHtml(weg.join(', '))}</div>` : '');
+}
+
+// Markierung unvollstaendiger Positionen. Was der Typ nicht traegt, kann der
+// Auszug nicht rechnen — das gehoert an die Zeile geschrieben und nicht in
+// eine stille Null.
+function _mkMangelZeichen(z) {
+  const was = z.maengel?.length ? z.maengel.join(', ') : 'unvollständig';
+  return ` <span title="${escHtml(z.fehlend + ' Standort(e): ' + was)}"
+      style="display:inline-block;padding:0 5px;border:1px solid #fcd34d;border-radius:4px;
+             background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;
+             vertical-align:middle;">${z.fehlend}</span>`;
+}
+
+function _mkMangelHinweis(zeilen) {
+  const betroffen = zeilen.filter(z => z.fehlend);
+  if (!betroffen.length) return '';
+  return `<div style="padding:8px 12px;font-size:11px;color:#92400e;background:#fffbeb;
+               border-top:1px solid #fde68a;line-height:1.6;">
+      <b>Unvollständige Fundamenttypen</b> — die fehlenden Mengen sind nicht geschätzt, sondern nicht enthalten:<br>`
+    + betroffen.map(z =>
+        `<span style="color:#78350f;">${escHtml(z.name)}</span>
+         <span style="color:#b45309;">(${z.fehlend}×): ${escHtml(z.maengel.join(', '))}</span>`)
+        .join('<br>')
+    + `<br><span style="font-size:10px;color:#b45309;">Ergänzen im Fundamenttyp-Modul — der Auszug rechnet ausschliesslich von dort.</span></div>`;
 }
 
 function _mkLvTabelle(summen) {
@@ -1274,10 +1338,9 @@ function mkParameterSpeichern() {
   renderMassenView();
 }
 
-// ── Tab 2: Mengenansaetze je Fundamenttyp ────────────────────
-// Jeder Typ, der im Projekt vorkommt — auch die frei geschriebenen. Grau
-// steht, was sich aus der Geometrie rechnen laesst; das Feld daneben nimmt
-// den eigenen Wert. Leer heisst «Rechnung gilt».
+// ── Uebersicht der Fundamenttypen ────────────────────────────
+// Nur zur Ansicht: was die Bibliothek je Typ traegt und was ihr fehlt.
+// Geaendert wird im Fundamenttyp-Modul — der Auszug hat keine zweite Quelle.
 function mkTypenImProjekt() {
   const ftProfile = typeof loadFtProfile === 'function' ? loadFtProfile() : [];
   const allBp     = typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
@@ -1285,14 +1348,15 @@ function mkTypenImProjekt() {
   getFundamente().forEach(p => {
     const bp = { ...p, ...(allBp[p.id] || {}) };
     const ft = ftTypZuStandort(ftProfile, bp);
-    const schluessel = mkAnsatzSchluessel(ft, bp);
+    const schluessel = ft?.id || ('name:' + String(bp.fundtyp || '—').trim());
     if (!map.has(schluessel)) {
       map.set(schluessel, {
         schluessel,
         name: ft?.name || bp.fundtyp || '— kein Typ —',
-        art: ft ? (ft.typ === 'standard' ? 'Standard' : 'Spezial') : 'frei erfasst',
+        art: ft ? (ft.typ === 'standard' ? 'Standard' : 'Spezial') : 'kein Bibliothekstyp',
+        bauart: ft?.fundamentArt || '',
         anzahl: 0,
-        gerechnet: _mkTypDaten(ft),
+        daten: _mkTypDaten(ft),
       });
     }
     map.get(schluessel).anzahl++;
@@ -1300,19 +1364,10 @@ function mkTypenImProjekt() {
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
-// Ueber den Index statt den Schluessel: der Schluessel traegt bei frei
-// geschriebenen Typen den Namen und damit Zeichen, die in einem
-// Inline-Handler quotiert werden muessten.
-function mkAnsatzSetzenIdx(index, feld, wert) {
-  const typ = mkTypenImProjekt()[index];
-  if (typ) mkAnsatzSetzen(typ.schluessel, feld, wert);
-}
-
 function _mkAnsatzTab() {
   const el = document.getElementById('mk-tab-ansaetze');
   if (!el) return;
   const typen  = mkTypenImProjekt();
-  const alle   = loadMkAnsaetze();
   const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
 
   if (!typen.length) {
@@ -1324,12 +1379,15 @@ function _mkAnsatzTab() {
   const th = (t, rechts) =>
     `<th style="text-align:${rechts ? 'right' : 'left'};padding:6px 8px;font-size:10px;color:#6b7280;
          text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t}</th>`;
+  const zahl = (w, g) => w == null
+    ? '<span style="color:#d1d5db;">—</span>'
+    : _mkZahl(w, MASSEN_GANZ.has(g.id) ? 0 : 2);
 
   el.innerHTML =
     `<div style="font-size:11px;color:#6b7280;line-height:1.6;margin-bottom:10px;">
-       Menge <b>je Fundament</b>. Grau steht der aus der Geometrie gerechnete Wert — Spezialtypen
-       und frei geschriebene Fundamenttypen tragen keine Abmessung und bleiben deshalb leer.
-       Ein eigener Wert gilt vor der Rechnung; ein leeres Feld heisst «Rechnung gilt».
+       Menge <b>je Fundament</b>, gerechnet aus den Feldern des Fundamenttyps. Geändert wird
+       im Fundamenttyp-Modul — der Massenauszug hat keine zweite Quelle. Ein Strich heisst:
+       diese Bauweise führt die Grösse nicht oder das Feld ist leer.
      </div>
      <div style="overflow-x:auto;">
      <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -1337,96 +1395,39 @@ function _mkAnsatzTab() {
          ${th('Fundamenttyp')}${th('Anzahl', true)}
          ${felder.map(g => th(g.label + '<br><span style="font-weight:400;text-transform:none;">' + g.einheit + '</span>', true)).join('')}
        </tr></thead>
-       <tbody>${typen.map((t, i) => {
-         const eigen = alle[t.schluessel] || {};
-         return `<tr>
+       <tbody>${typen.map(t => {
+         const luecke = !t.daten || t.daten.fehlend.length;
+         return `<tr${luecke ? ' style="background:#fffbeb;"' : ''}>
            <td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;">
              ${escHtml(t.name)}
-             <span style="font-size:10px;color:#9ca3af;">· ${t.art}</span></td>
+             <span style="font-size:10px;color:#9ca3af;">· ${escHtml(t.art)}</span>
+             ${luecke ? `<br><span style="font-size:10px;color:#b45309;">fehlt: ${
+               escHtml(t.daten ? t.daten.fehlend.join(', ') : 'kein Bibliothekstyp')}</span>` : ''}</td>
            <td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;
                font-variant-numeric:tabular-nums;">${t.anzahl}</td>
-           ${felder.map(g => {
-             const vor = t.gerechnet?.[g.id];
-             return `<td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;">
-               <input type="number" step="0.01" min="0" value="${eigen[g.id] ?? ''}"
-                      placeholder="${vor != null ? _mkZahl(vor, MASSEN_GANZ.has(g.id) ? 0 : 2) : ''}"
-                      onchange="mkAnsatzSetzenIdx(${i},'${g.id}',this.value)"
-                      title="${escHtml(t.name)} — ${escHtml(g.label)} je Fundament"
-                      style="width:74px;padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;
-                             font-size:12px;font-family:inherit;text-align:right;
-                             font-variant-numeric:tabular-nums;"></td>`;
-           }).join('')}
+           ${felder.map(g => `<td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;
+               font-variant-numeric:tabular-nums;">${zahl(t.daten?.[g.id], g)}</td>`).join('')}
          </tr>`;
        }).join('')}</tbody>
      </table></div>
      <div style="display:flex;gap:6px;margin-top:12px;">
-       <button onclick="mkAnsatzExport()" class="btn btn-secondary btn-sm">Ansätze ausgeben</button>
-       <label class="btn btn-secondary btn-sm" style="cursor:pointer;">Ansätze einlesen
-         <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="mkAnsatzImport(this)"></label>
+       <button onclick="mkAnsatzExport()" class="btn btn-secondary btn-sm">Ausgeben</button>
+       <button onclick="mkModalSchliessen();setOverviewView('fundamente')" class="btn btn-secondary btn-sm">Zum Fundamenttyp-Modul</button>
      </div>`;
 }
 
-function _mkAnsatzSpalte(g)    { return g.label + ' [' + g.einheit + ']'; }
-function _mkAnsatzSpalteRef(g) { return g.label + ' gerechnet'; }
-
-// Ausgegeben werden zwei Spalten je Groesse: der EIGENE Wert, der beim
-// Einlesen zurueckkommt, und daneben der gerechnete zur Ansicht. Stuende in
-// der Eingabespalte der gerechnete Wert, machte ihn ein Rundlauf durch Excel
-// stillschweigend zum eigenen — spaetere Aenderungen an der Geometrie kaemen
-// dann nicht mehr an.
 function mkAnsatzExport() {
   const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
-  const alle   = loadMkAnsaetze();
   const zeilen = mkTypenImProjekt().map(t => {
-    const eigen = alle[t.schluessel] || {};
-    const z = { 'Schlüssel': t.schluessel, 'Fundamenttyp': t.name, 'Art': t.art, 'Anzahl': t.anzahl };
-    felder.forEach(g => {
-      z[_mkAnsatzSpalte(g)]    = eigen[g.id] ?? '';
-      z[_mkAnsatzSpalteRef(g)] = t.gerechnet?.[g.id] ?? '';
-    });
+    const z = { 'Fundamenttyp': t.name, 'Art': t.art, 'Bauweise': t.bauart, 'Anzahl': t.anzahl };
+    felder.forEach(g => { z[g.label + ' [' + g.einheit + ']'] = t.daten?.[g.id] ?? ''; });
+    z['Fehlende Angaben'] = t.daten ? t.daten.fehlend.join(', ') : 'kein Bibliothekstyp';
     return z;
   });
   if (!zeilen.length) { ui.toast('Keine Fundamenttypen im Projekt.', 'fehler'); return; }
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(zeilen), 'Mengenansaetze');
-  XLSX.writeFile(wb, 'Mengenansaetze.xlsx');
-}
-
-// Eingelesen wird ueber die Spalte «Schluessel» — der Name allein waere nicht
-// eindeutig, sobald zwei Bibliothekstypen gleich heissen.
-function mkAnsatzImport(input) {
-  const datei = input.files?.[0];
-  if (!datei) return;
-  const leser = new FileReader();
-  leser.onload = ev => {
-    try {
-      const wb     = XLSX.read(ev.target.result, { type: 'array' });
-      const roh    = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-      const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
-      const alle = loadMkAnsaetze();
-      let gesehen = 0, mitWert = 0;
-      roh.forEach(z => {
-        const schluessel = String(z['Schlüssel'] || z['Schluessel'] || '').trim();
-        if (!schluessel) return;
-        gesehen++;
-        const eintrag = {};
-        felder.forEach(g => {
-          const wert = parseFloat(String(z[_mkAnsatzSpalte(g)] ?? '').replace(',', '.'));
-          if (Number.isFinite(wert) && wert >= 0) eintrag[g.id] = wert;
-        });
-        // Eine leere Zeile loescht den Ansatz — dann gilt wieder die Rechnung
-        if (Object.keys(eintrag).length) { alle[schluessel] = eintrag; mitWert++; }
-        else delete alle[schluessel];
-      });
-      if (!gesehen) throw new Error('Keine Zeile mit Spalte «Schlüssel» erkannt.');
-      saveMkAnsaetze(alle);
-      _mkAnsatzTab();
-      renderMassenView();
-      ui.toast(`${gesehen} Typen gelesen, ${mitWert} mit eigenem Ansatz`, 'erfolg');
-    } catch (err) { ui.toast(err.message, 'fehler'); }
-    input.value = '';
-  };
-  leser.readAsArrayBuffer(datei);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(zeilen), 'Mengen je Typ');
+  XLSX.writeFile(wb, 'Mengen-je-Fundamenttyp.xlsx');
 }
 
 // ── Tab 3: Positionsdatenbank ────────────────────────────────
