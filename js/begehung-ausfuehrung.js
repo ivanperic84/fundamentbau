@@ -539,36 +539,10 @@ function renderMaterialliste() {
     </div>`;
 }
 
-// ── Statische Zubehör- und Fixierungsdaten für Stückliste ────────────────────
-const SCHRAUB_ZUBEHOER_DB = {
-  'M30': [
-    { artNr:'370.00.111',  bez:'6kt-Mu ISO 4032-M30-8',  material:'St tZn', anzPro:2 },
-    { artNr:'481.10.1302', bez:'U-Scheibe M30 33×56×4',   material:'St tZn', anzPro:2 },
-  ],
-  'M36': [
-    { artNr:'370.00.131',  bez:'6kt-Mu ISO 4032-M36-8',  material:'St tZn', anzPro:2 },
-    { artNr:'481.10.1362', bez:'U-Scheibe M36 39×66×5',   material:'St tZn', anzPro:2 },
-  ],
-};
-const FIXIERUNG_FL_DB = {
-  'DP1a': [{ artNr:'371.06.153', bez:'FL DIN 174-25×3-440',                      anzPro:4 }],
-  'DP2a': [{ artNr:'371.06.153', bez:'FL DIN 174-25×3-440',                      anzPro:4 }],
-  'DG1a': [{ artNr:'371.06.154', bez:'FL DIN 174-25×3-600',                      anzPro:4 }],
-  'DG2a': [{ artNr:'371.06.155', bez:'FL DIN 174-25×3-850 (lange Seite)',         anzPro:2 },
-            { artNr:'371.06.156', bez:'FL DIN 174-25×3-360 (kurze Seite)',        anzPro:2 }],
-  'DG3a': [{ artNr:'371.06.155', bez:'FL DIN 174-25×3-850 (lange Seite)',         anzPro:2 },
-            { artNr:'371.06.156', bez:'FL DIN 174-25×3-360 (kurze Seite)',        anzPro:2 }],
-  'HP1a': [{ artNr:'371.06.157', bez:'FL DIN 174-25×3-500',                      anzPro:6 }],
-  'HP2a': [{ artNr:'371.06.157', bez:'FL DIN 174-25×3-500',                      anzPro:6 }],
-};
-const BUEGEL_ABGEW_DB = {
-  '371.06.158': 1.86, '371.06.159': 1.96, '371.06.160': 2.60,
-  '371.06.161': 2.20, '371.06.162': 2.20,
-};
-const BUEGEL_SCREW_DB = {
-  '371.06.158': 'M30', '371.06.159': 'M36', '371.06.160': 'M36',
-  '371.06.161': 'M36', '371.06.162': 'M36',
-};
+// Die Zubehoer- und Fixierungstabellen stehen in js/fundament-mengen.js:
+// SCHRAUB_ZUBEHOER_DB, FIXIERUNG_FL_DB, BUEGEL_ABGEW_DB, BUEGEL_SCREW_DB.
+// Sie gehoeren zum Fundament, nicht zu der Ansicht, die sie gerade braucht —
+// und der Massenauszug fuehrt die Fixierung aus derselben Quelle.
 
 /** Aggregiert Materialien aus Neubau/Prov-Positionen mit Standardtyp. selectedIds: Array<pairId> oder null = alle */
 function _calcMateriallisteData(selectedIds) {
@@ -578,8 +552,11 @@ function _calcMateriallisteData(selectedIds) {
     if (selectedIds && !selectedIds.includes(p.id)) return null;
     const bp = allBp[p.id] || {};
     if (bp.bestand !== 'neu' && bp.bestand !== 'prov') return null;
-    const ft = bp.fundtyp ? ftProf.find(t => t.name === bp.fundtyp && t.typ === 'standard') : null;
-    if (!ft) return null;
+    // Zuordnung wie im Massenauszug: ueber die stabile Kennung, sonst ueber
+    // Familie und Tiefe. Der frueher benutzte Namensvergleich verfehlte jeden
+    // Standort, der «DP1a / 1.80» statt «DP1a / 1.8» trug.
+    const ft = ftTypZuStandort(ftProf, { ...p, ...bp });
+    if (!ft || ft.typ !== 'standard') return null;
     return { pair: p, bp, ft, family: ft.name.split('/')[0].trim() };
   }).filter(Boolean);
 
@@ -602,7 +579,7 @@ function _calcMateriallisteData(selectedIds) {
 
   const zubehoerAgg = {};
   Object.values(schrAgg).forEach(s => {
-    (SCHRAUB_ZUBEHOER_DB[s.durchm] || []).forEach(z => {
+    fmZubehoer(s.durchm).forEach(z => {
       if (!zubehoerAgg[z.artNr]) zubehoerAgg[z.artNr] = { artNr:z.artNr, bez:z.bez, material:z.material, anzStueck:0 };
       zubehoerAgg[z.artNr].anzStueck += s.anzStueck * z.anzPro;
     });
@@ -617,13 +594,15 @@ function _calcMateriallisteData(selectedIds) {
       dim: ft.buegelSeitenlaenge, material: ft.buegelMaterial || 'B500B',
       anzStueck: 0, families: new Set(),
     };
-    buegelAgg[an].anzStueck += 2;
+    // Stueckzahl aus dem Typ statt der festen 2 — DG2a und DG3a fuehren
+    // andere Buegelzahlen, und der Massenauszug rechnet mit demselben Feld.
+    buegelAgg[an].anzStueck += +ft.buegelAnzahl || 2;
     buegelAgg[an].families.add(family);
   });
 
   const fixAgg = {};
-  positionen.forEach(({ family }) => {
-    (FIXIERUNG_FL_DB[family] || []).forEach(fix => {
+  positionen.forEach(({ ft, family }) => {
+    fmFixierung(ft).forEach(fix => {
       if (!fixAgg[fix.artNr]) fixAgg[fix.artNr] = {
         artNr: fix.artNr, bez: fix.bez, material: 'S235JRG2', anzStueck: 0, families: new Set(),
       };

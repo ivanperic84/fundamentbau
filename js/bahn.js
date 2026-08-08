@@ -652,43 +652,18 @@ async function bahnLinieOrtOnline(linienr) {
   }
 }
 
-function bahnSucheEingabe(text) {
-  const liste = document.getElementById('bahn-such-liste');
-  if (!liste) return;
-  const treffer = bahnSuche(text);
-  if (!treffer.length) {
-    liste.innerHTML = (text || '').trim().length >= 2
-      ? '<div class="bahn-such-leer">Kein Treffer</div>' : '';
-    liste.style.display = liste.innerHTML ? 'block' : 'none';
-    return;
-  }
-  liste.innerHTML = treffer.map((t, i) =>
-    `<button class="bahn-such-eintrag" data-idx="${i}">`
-    + `<span>${escHtml(t.titel)}</span><span class="bs-neben">${escHtml(t.neben)}</span></button>`
-  ).join('');
-  liste.style.display = 'block';
-  liste.querySelectorAll('[data-idx]').forEach(btn => {
-    btn.onclick = () => {
-      const t = treffer[+btn.dataset.idx];
-      const karte = _bahnKarte('overview');
-      if (karte) karte.setView([t.lat, t.lon], Math.max(karte.getZoom(), 16));
-      liste.style.display = 'none';
-    };
-  });
+// Ein Bahntreffer auf der Uebersichtskarte anfahren. Aufgerufen aus der
+// Trefferliste des Suchfelds im Kopf — ein eigenes Suchfeld auf der Karte
+// gibt es nicht mehr.
+function bahnTrefferAnfahren(treffer) {
+  const karte = _bahnKarte('overview');
+  if (!karte || !treffer) return;
+  karte.setView([treffer.lat, treffer.lon], Math.max(karte.getZoom(), 16));
 }
 
-// Die Ebene wird nur noch über App-Einstellungen → Kartendarstellung geschaltet.
-// Die früheren Schalter auf den drei Karten sind entfallen; geblieben ist die
-// Suche, die zur Ebene gehört — ohne geladene Daten hat sie nichts anzubieten.
-function _bahnKnopfAktualisieren(welche) {
-  if (welche !== 'overview') return;
-  const suche = document.getElementById('bahn-suche-wrap');
-  if (!suche) return;
-  const aktiv = bahnEbeneAktiv('overview');
-  suche.style.display = aktiv ? 'flex' : 'none';
-  const liste = document.getElementById('bahn-such-liste');
-  if (liste && !aktiv) liste.style.display = 'none';
-}
+// Die Ebene wird nur über App-Einstellungen → Kartendarstellung geschaltet;
+// eigene Schalter auf den Karten gibt es nicht mehr.
+function _bahnKnopfAktualisieren() { /* nichts mehr anzuzeigen */ }
 
 // Kein Zuruecksetzen beim Projektwechsel noetig: der laeuft ueber appReload(),
 // also einen vollstaendigen Neuaufbau der Seite. Der Zwischenspeicher haengt

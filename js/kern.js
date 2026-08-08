@@ -375,6 +375,36 @@ _migrateObjType();
 
 // Einmalige Migration: ftProfilId + ftZuweisungen aus fundtyp-Text reparieren
 // Tritt auf wenn Daten via Import gespeichert wurden ohne assignFundtyp() zu rufen
+// Typnamen vergleichen: «DP1a / 1.80» am Standort und «DP1a / 1.8» in der
+// Bibliothek meinen dasselbe. Deshalb wird die Tiefe als Zahl verglichen,
+// nicht als Text — ein zeichengleicher Vergleich fand bei eingelesenen
+// Bestaenden nichts, und damit blieb die ftProfilId leer.
+function ftNameZerlegen(name) {
+  const teile   = String(name || '').split('/');
+  const familie = teile[0].trim().toLowerCase();
+  const tiefe   = teile.length > 1 ? parseFloat(teile[1].replace(',', '.')) : NaN;
+  return { familie, tiefe };
+}
+
+// Bibliothekseintrag zu einem Standort: erst ueber die stabile Kennung,
+// sonst ueber den Namen (zeichengleich, dann ueber Familie und Tiefe).
+function ftTypZuStandort(ftProfile, bpDaten) {
+  if (!bpDaten) return null;
+  if (bpDaten.ftProfilId) {
+    const nachId = ftProfile.find(t => t.id === bpDaten.ftProfilId);
+    if (nachId) return nachId;
+  }
+  if (!bpDaten.fundtyp) return null;
+  const genau = ftProfile.find(t => t.name === bpDaten.fundtyp);
+  if (genau) return genau;
+  const gesucht = ftNameZerlegen(bpDaten.fundtyp);
+  if (!gesucht.familie || Number.isNaN(gesucht.tiefe)) return null;
+  return ftProfile.find(t => {
+    const k = ftNameZerlegen(t.name);
+    return k.familie === gesucht.familie && Math.abs(k.tiefe - gesucht.tiefe) < 0.005;
+  }) || null;
+}
+
 function _migrateFtProfilId() {
   const ftProfiles  = loadFtProfile();
   const allBp       = loadAllBauprojekt();
@@ -385,8 +415,14 @@ function _migrateFtProfilId() {
     if (!bpd) return;
     // ftProfilId aus fundtyp-Text ableiten falls leer
     if (!bpd.ftProfilId && bpd.fundtyp) {
-      const match = ftProfiles.find(x => x.name === bpd.fundtyp);
-      if (match) { bpd.ftProfilId = match.id; bpChanged = true; }
+      const match = ftTypZuStandort(ftProfiles, bpd);
+      if (match) {
+        bpd.ftProfilId = match.id;
+        // Der Name wird auf die Schreibweise der Bibliothek gezogen, sonst
+        // laufen Standort und Bibliothek weiter auseinander.
+        if (bpd.fundtyp !== match.name) bpd.fundtyp = match.name;
+        bpChanged = true;
+      }
     }
     // ftZuweisungen mit bpData.ftProfilId synchronisieren
     if (bpd.ftProfilId && !ftZuw[p.id]) {

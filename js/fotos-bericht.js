@@ -21,14 +21,53 @@ function kopfSuchTreffer(q) {
     .slice(0, 12);
 }
 
+// Auf der Uebersichtskarte kommen Bahntreffer dazu: Station, Liniennummer und
+// Kilometer. Sie hatten frueher ein eigenes Feld am unteren Kartenrand — zwei
+// Suchfelder nebeneinander, die verschiedene Dinge fanden.
+function _kopfSuchBahn(val) {
+  if (currentOverviewView !== 'karte') return [];
+  if (document.getElementById('overview-view')?.style.display === 'none') return [];
+  if (typeof bahnSuche !== 'function' || !bahnEbeneAktiv('overview')) return [];
+  return bahnSuche(val).slice(0, 5);
+}
+
+// Notizen als eigene Trefferart. Sie zaehlten schon bisher mit, aber nur
+// stillschweigend: der Standort erschien, ohne dass zu sehen war, warum.
+// Hier steht die Fundstelle selbst — mit dem Wortlaut, an dem es lag.
+function _kopfSuchNotizen(val) {
+  const q = String(val || '').trim().toLowerCase();
+  if (q.length < 2 || SUCHE_ZAHL.test(q)) return [];
+  const alle = loadAllNotizen();
+  const bekannt = new Set(getPhasePairs().map(p => p.id));
+  const treffer = [];
+  Object.entries(alle).forEach(([pairId, notizen]) => {
+    const id = Number(pairId);
+    if (!bekannt.has(id)) return;
+    (notizen || []).forEach(n => {
+      if (!n?.text || !n.text.toLowerCase().includes(q)) return;
+      treffer.push({ pairId: id, text: n.text });
+    });
+  });
+  return treffer.slice(0, 6);
+}
+
+function _kopfSuchAuszug(text, q) {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  const von = Math.max(0, i - 12);
+  const auszug = text.slice(von, von + 48).replace(/\s+/g, ' ');
+  return (von > 0 ? '…' : '') + auszug + (von + 48 < text.length ? '…' : '');
+}
+
 function kopfSuchListe(val) {
   const panel = document.getElementById('kopf-such-panel');
   const liste = document.getElementById('kopf-such-liste');
   if (!panel || !liste) return;
   const treffer = kopfSuchTreffer(val);
+  const bahn    = _kopfSuchBahn(val);
+  const notizen = _kopfSuchNotizen(val);
   _kopfSuchMarkiert = 0;
-  if (!treffer.length) { panel.classList.remove('offen'); return; }
-  liste.innerHTML = treffer.map((p, i) => {
+  if (!treffer.length && !bahn.length && !notizen.length) { panel.classList.remove('offen'); return; }
+  const standortHtml = treffer.map((p, i) => {
     const km   = p.km_rs || p.km_rks;
     const name = p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id);
     return '<button class="pair-jump-eintrag' + (i === 0 ? ' markiert' : '')
@@ -37,8 +76,30 @@ function kopfSuchListe(val) {
       + (km ? '<span class="pj-neben">' + escHtml(parseFloat(km).toFixed(3)) + '</span>' : '')
       + '</button>';
   }).join('');
+  const bahnHtml = bahn.map((t, i) =>
+    '<button class="pair-jump-eintrag' + (!treffer.length && i === 0 ? ' markiert' : '')
+    + '" data-kopf-bahn="' + i + '">'
+    + '<span>' + escHtml(t.titel) + '</span>'
+    + '<span class="pj-neben">' + escHtml(t.neben || t.art) + '</span></button>').join('');
+  const notizHtml = notizen.map((n, i) => {
+    const pair = PAIRS.find(p => p.id === n.pairId);
+    const name = pair?.mast ? 'Mast ' + pair.mast : 'Standort ' + n.pairId;
+    return '<button class="pair-jump-eintrag" data-kopf-notiz="' + i + '"'
+      + ' title="' + escHtml(n.text) + '" style="align-items:flex-start;">'
+      + '<span style="white-space:normal;line-height:1.35;">' + escHtml(_kopfSuchAuszug(n.text, val)) + '</span>'
+      + '<span class="pj-neben">' + escHtml(name) + '</span></button>';
+  }).join('');
+  liste.innerHTML = standortHtml
+    + (notizen.length ? '<div class="pair-jump-leer">Notizen</div>' + notizHtml : '')
+    + (bahn.length ? '<div class="pair-jump-leer">Bahn</div>' + bahnHtml : '');
   liste.querySelectorAll('[data-kopf-pair]').forEach(btn => {
     btn.onclick = () => kopfSuchWaehlen(Number(btn.dataset.kopfPair));
+  });
+  liste.querySelectorAll('[data-kopf-notiz]').forEach(btn => {
+    btn.onclick = () => kopfSuchWaehlen(notizen[+btn.dataset.kopfNotiz].pairId);
+  });
+  liste.querySelectorAll('[data-kopf-bahn]').forEach(btn => {
+    btn.onclick = () => { kopfSuchSchliessen(); bahnTrefferAnfahren(bahn[+btn.dataset.kopfBahn]); };
   });
   panel.classList.add('offen');
 }
