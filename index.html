@@ -2219,16 +2219,10 @@
       <div style="font-size:11px;color:#9ca3af;">Massenauszug aus den Standorten · Leistungsverzeichnis · Kostenschätzung</div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-      <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Katalog einlesen
-        <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="lkKatalogImport(this)">
-      </label>
-      <button onclick="lkKatalogExport()" class="btn btn-secondary btn-sm">Katalog ausgeben</button>
-      <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-        Positionen einlesen
-        <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="lvVorlageImport(this)">
-      </label>
+      <button onclick="mkModalOeffnen('parameter')" title="Einstellungen Massen &amp; Kosten" class="btn btn-secondary btn-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button onclick="mkModalOeffnen('positionen')" class="btn btn-secondary btn-sm">Datenbank</button>
       <div style="position:relative;">
         <button id="mk-vorlage-btn" onclick="lvVorlagePanelUmschalten(event)" class="btn btn-secondary btn-sm">+ aus Vorlage</button>
         <!-- fest positioniert und beim Oeffnen eingepasst: das Feld ist breiter
@@ -2281,13 +2275,8 @@
     <div id="mk-lv-tabelle" style="overflow-x:auto;"></div>
     <!-- Baukosten, aus denen sich die Baustelleninstallation bemisst -->
     <div id="mk-instbasis" style="border-top:1px solid #f0f2f5;"></div>
-    <div style="display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:10px 14px;border-top:1px solid #f0f2f5;flex-wrap:wrap;">
-      <label style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;">Unvorhergesehenes
-        <input id="mk-zuschlag" type="number" step="1" min="0" onchange="mkEinstellungSpeichern()"
-               style="width:64px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;font-family:inherit;"> %</label>
-      <label style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;">MWST
-        <input id="mk-mwst" type="number" step="0.1" min="0" onchange="mkEinstellungSpeichern()"
-               style="width:64px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;font-family:inherit;"> %</label>
+    <!-- Zuschlag und MWST stehen im Einstellungsfenster, hier nur das Ergebnis -->
+    <div style="display:flex;align-items:center;justify-content:flex-end;padding:10px 14px;border-top:1px solid #f0f2f5;">
       <div id="mk-summen" style="font-size:12px;color:#1a3a5c;font-weight:700;text-align:right;min-width:220px;"></div>
     </div>
   </div>
@@ -7776,6 +7765,30 @@ function _ladeScript(pfad) {
 </div>
 
 <!-- MODAL: Bauprogramm Projekt-Einstellungen (4 Tabs) -->
+<!-- ══ EINSTELLUNGEN UND DATENBANK «MASSEN & KOSTEN» ══
+     Parameter der Kostenschaetzung, Mengenansaetze je Fundamenttyp und die
+     Positionsdatenbank mit den Einheitspreisen. -->
+<div id="mk-einst-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:14px;width:min(880px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <div style="padding:20px 24px 0;flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="font-size:15px;font-weight:800;color:#1a3a5c;margin:0;">Massen &amp; Kosten</h3>
+        <button onclick="mkModalSchliessen()" class="modal-close">&#215;</button>
+      </div>
+      <div class="tabs-folder">
+        <button id="mk-tab-btn-parameter" onclick="mkTabWechseln('parameter')" class="tab-folder">Parameter</button>
+        <button id="mk-tab-btn-ansaetze" onclick="mkTabWechseln('ansaetze')" class="tab-folder">Mengenansätze</button>
+        <button id="mk-tab-btn-positionen" onclick="mkTabWechseln('positionen')" class="tab-folder">Positionen</button>
+      </div>
+    </div>
+    <div style="padding:18px 24px 22px;overflow-y:auto;">
+      <div id="mk-tab-parameter"></div>
+      <div id="mk-tab-ansaetze" style="display:none;"></div>
+      <div id="mk-tab-positionen" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
 <div id="proj-einst-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
   <div style="background:white;border-radius:14px;width:min(600px,95vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
 

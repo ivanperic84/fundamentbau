@@ -57,6 +57,9 @@ function lkIntervall() {
 function lkIntervallSetzen(wert) {
   store.setItem(LK_INTERVALL_KEY(), String(wert));
   renderMassenView();
+  // Die Dauer steht an zwei Stellen — im Kopf der Tabelle und im
+  // Einstellungsfenster; die zweite muss nachziehen.
+  if (document.getElementById('mk-einst-modal')?.style.display === 'flex') _mkParameterTab();
 }
 
 // Groessen, die der Massenauszug kennt. Die Einheit steht hier, damit sie in
@@ -99,16 +102,6 @@ function saveMkEinstellungen(e) {
   store.setItem(LV_EINST_KEY(), JSON.stringify(e));
 }
 
-function mkEinstellungSpeichern() {
-  const zu = parseFloat(document.getElementById('mk-zuschlag')?.value);
-  const mw = parseFloat(document.getElementById('mk-mwst')?.value);
-  saveMkEinstellungen({
-    zuschlag: Number.isFinite(zu) ? zu : 0,
-    mwst:     Number.isFinite(mw) ? mw : 0,
-  });
-  renderMassenView();
-}
-
 // ── Massenauszug ─────────────────────────────────────────────
 // Die Kubatur steht nicht als Zahl am Fundamenttyp — das Feld «beton» traegt
 // die Betonsorte (NPK F, C30/37 …), nicht ein Volumen. Gerechnet wird deshalb
@@ -145,6 +138,37 @@ function _mkZahlFeld(w) {
   return Number.isFinite(n) ? n : null;
 }
 
+// ── Mengenansaetze je Typ ────────────────────────────────────
+// Die Geometrie traegt nur der Standardtyp. Ein Spezialtyp beschreibt eine
+// LAGE («Felsiger Baugrund», «Mast an Mauer»), keine Abmessung — und ein
+// Standort mit frei geschriebenem Fundamenttyp trifft ueberhaupt keinen
+// Bibliothekseintrag. Beide sind damit nicht rechenbar. Statt zu schaetzen
+// bekommen sie hier eine Stelle, an der die Menge JE FUNDAMENT hinterlegt
+// wird; der Auszug multipliziert sie mit der Anzahl.
+const MK_ANSATZ_KEY = 'sp_mk_ansaetze';
+
+function loadMkAnsaetze() {
+  try { return jsonParse(store.getItem(MK_ANSATZ_KEY)) || {}; } catch { return {}; }
+}
+function saveMkAnsaetze(a) { store.setItem(MK_ANSATZ_KEY, JSON.stringify(a)); }
+
+// Bibliothekstypen ueber ihre Id, freie Schreibweisen ueber den Namen
+function mkAnsatzSchluessel(ft, bp) {
+  return ft?.id || ('name:' + String(bp?.fundtyp || '—').trim());
+}
+
+function mkAnsatzSetzen(schluessel, feld, roh) {
+  const alle = loadMkAnsaetze();
+  if (!alle[schluessel]) alle[schluessel] = {};
+  const n = parseFloat(String(roh).replace(',', '.'));
+  if (Number.isFinite(n) && n >= 0) alle[schluessel][feld] = n;
+  else delete alle[schluessel][feld];
+  if (!Object.keys(alle[schluessel]).length) delete alle[schluessel];
+  saveMkAnsaetze(alle);
+  renderMassenView();
+  if (document.getElementById('mk-einst-modal')?.style.display === 'flex') _mkAnsatzTab();
+}
+
 function _mkTypDaten(ft) {
   if (!ft) return null;
   const schraub = _mkZahlFeld(ft.schraubenAnzahl);
@@ -178,6 +202,21 @@ function _mkTypDaten(ft) {
   };
 }
 
+// Menge je Fundament: gerechnete Geometrie, ueberschrieben vom hinterlegten
+// Ansatz. Der eigene Wert gilt vor der Rechnung — wer eine Menge einträgt,
+// weiss mehr als die Formel.
+function _mkMengeJeFundament(ft, bp) {
+  const gerechnet = _mkTypDaten(ft) || { beton: null, aushub: null, schalung: null,
+                                         bewehr: null, schraub: null, pfahlStk: null, pfahlMeter: null };
+  const ansatz = loadMkAnsaetze()[mkAnsatzSchluessel(ft, bp)];
+  if (!ansatz) return gerechnet;
+  const zusammen = { ...gerechnet };
+  MASSEN_GROESSEN.forEach(({ id }) => {
+    if (id !== 'anzahl' && ansatz[id] != null) zusammen[id] = ansatz[id];
+  });
+  return zusammen;
+}
+
 // Ein Eintrag je Gruppe, mit den Summen aller Groessen und der Zahl der
 // Standorte, bei denen eine Angabe fehlt.
 function massenauszugRechnen(gliederung) {
@@ -207,7 +246,7 @@ function massenauszugRechnen(gliederung) {
     }
     const g = gruppen.get(schluessel);
     g.anzahl++;
-    const d = _mkTypDaten(eintrag);
+    const d = _mkMengeJeFundament(eintrag, bp);
     // Fehlend heisst: zu diesem Standort laesst sich gar keine Menge rechnen.
     // Ein Pfahlfundament ohne Betonvolumen, aber mit Bohrmetern zaehlt nicht
     // dazu — es ist erfasst, nur anders bemessen.
@@ -442,13 +481,6 @@ function renderMassenView() {
   const gliederung = document.getElementById('mk-massen-gliederung')?.value || 'typ';
   const zeilen  = massenauszugRechnen(gliederung);
   const summen  = massenSummen(zeilen);
-  const einst   = loadMkEinstellungen();
-
-  const zuschlagEl = document.getElementById('mk-zuschlag');
-  const mwstEl     = document.getElementById('mk-mwst');
-  if (zuschlagEl && document.activeElement !== zuschlagEl) zuschlagEl.value = einst.zuschlag;
-  if (mwstEl     && document.activeElement !== mwstEl)     mwstEl.value     = einst.mwst;
-
   _mkKennzahlen(summen, zeilen);
   _mkMassenTabelle(zeilen, summen, gliederung);
   _mkLwTabelle();
@@ -806,8 +838,8 @@ function _mkSummenZeile(netto) {
     `<div style="display:flex;justify-content:space-between;gap:16px;${stark ? 'border-top:1px solid #e5e7eb;margin-top:4px;padding-top:4px;' : 'font-weight:400;color:#6b7280;'}">
        <span>${label}</span><span style="font-variant-numeric:tabular-nums;">${_mkZahl(wert)}</span></div>`;
   el.innerHTML = zeile('Summe LV', netto)
-    + zeile('Unvorhergesehenes', zu)
-    + zeile('MWST', mw)
+    + zeile(`Unvorhergesehenes ${_mkZahl(e.zuschlag || 0, 0)} %`, zu)
+    + zeile(`MWST ${_mkZahl(e.mwst || 0, 1)} %`, mw)
     + zeile('Total inkl. MWST', zwi + mw, true);
 }
 
@@ -1154,4 +1186,390 @@ function lvExportXlsx() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
     massenauszugRechnen(document.getElementById('mk-massen-gliederung')?.value || 'typ')), 'Massenauszug');
   XLSX.writeFile(wb, 'Massen-Kosten.xlsx');
+}
+
+// ============================================================
+// EINSTELLUNGEN UND DATENBANK
+// ============================================================
+// Drei Dinge in einem Fenster, weil sie zusammen die Kostenschaetzung
+// bestimmen: die Parameter, die Mengen je Fundamenttyp und die Positionen mit
+// ihren Einheitspreisen. Alles drei ist in der App aenderbar und faehrt ueber
+// Excel raus und wieder rein.
+let _mkTabAktiv = 'parameter';
+
+function mkModalOeffnen(tab) {
+  const m = document.getElementById('mk-einst-modal');
+  if (!m) return;
+  m.style.display = 'flex';
+  mkTabWechseln(tab || 'parameter');
+}
+
+function mkModalSchliessen() {
+  const m = document.getElementById('mk-einst-modal');
+  if (m) m.style.display = 'none';
+  renderMassenView();
+}
+
+function mkTabWechseln(tab) {
+  _mkTabAktiv = tab;
+  ['parameter', 'ansaetze', 'positionen'].forEach(t => {
+    const inhalt = document.getElementById('mk-tab-' + t);
+    const knopf  = document.getElementById('mk-tab-btn-' + t);
+    if (inhalt) inhalt.style.display = t === tab ? 'block' : 'none';
+    if (knopf)  knopf.classList.toggle('active', t === tab);
+  });
+  if (tab === 'parameter')  _mkParameterTab();
+  if (tab === 'ansaetze')   _mkAnsatzTab();
+  if (tab === 'positionen') _mkPositionenTab();
+}
+
+// ── Tab 1: Parameter ─────────────────────────────────────────
+function _mkParameterTab() {
+  const el = document.getElementById('mk-tab-parameter');
+  if (!el) return;
+  const e     = loadMkEinstellungen();
+  const bp    = schichtenBauprogramm();
+  const abzug = mkAbzugStunden();
+
+  const feld = (label, id, wert, schritt, einheit, hinweis) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
+       <span style="flex:1 1 auto;">${label}${hinweis ? `<br><span style="font-size:10px;color:#9ca3af;">${hinweis}</span>` : ''}</span>
+       <input id="${id}" type="number" step="${schritt}" min="0" value="${wert}"
+              onchange="mkParameterSpeichern()"
+              style="width:84px;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;
+                     font-size:12px;font-family:inherit;text-align:right;">
+       <span style="flex:0 0 26px;color:#9ca3af;font-size:11px;">${einheit}</span>
+     </label>`;
+
+  el.innerHTML =
+    `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Kostenschätzung</div>`
+    + feld('Unvorhergesehenes', 'mk-p-zuschlag', e.zuschlag, '1', '%', 'Zuschlag auf die Summe des Verzeichnisses')
+    + feld('MWST', 'mk-p-mwst', e.mwst, '0.1', '%', '')
+    + `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 4px;">Schichten</div>`
+    + `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
+         <span style="flex:1 1 auto;">Intervalldauer<br><span style="font-size:10px;color:#9ca3af;">Nettodauer einer Schicht für die Rechnung mit den Aufwandswerten</span></span>
+         <select onchange="lkIntervallSetzen(this.value)"
+                 style="width:84px;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;">
+           ${LK_INTERVALLE.map(h => `<option value="${h}"${h === lkIntervall() ? ' selected' : ''}>${h} h</option>`).join('')}
+         </select><span style="flex:0 0 26px;"></span>
+       </label>`
+    + `<div style="padding:9px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;
+                   font-size:11px;color:#6b7280;line-height:1.6;margin-top:8px;">`
+      + (bp != null
+          ? `Massgebend sind <b>${bp} Schichten aus dem Bauprogramm</b>. `
+          : `Noch keine Baupakete terminiert — massgebend sind <b>${schichtenAufwandGesamt()} Schichten aus den Aufwandswerten</b>. `)
+      + (abzug
+          ? `Der Abzug für Installation und Anfahrt beträgt ${_mkZahl(abzug * 60, 0)} min je Schicht und gilt als Vorschlag für die Rüstzeit.`
+          : `Im Bauprogramm ist kein Abzug für Installation und Anfahrt hinterlegt.`)
+      + `</div>`;
+}
+
+function mkParameterSpeichern() {
+  const zu = parseFloat(document.getElementById('mk-p-zuschlag')?.value);
+  const mw = parseFloat(document.getElementById('mk-p-mwst')?.value);
+  saveMkEinstellungen({
+    zuschlag: Number.isFinite(zu) ? zu : 0,
+    mwst:     Number.isFinite(mw) ? mw : 0,
+  });
+  renderMassenView();
+}
+
+// ── Tab 2: Mengenansaetze je Fundamenttyp ────────────────────
+// Jeder Typ, der im Projekt vorkommt — auch die frei geschriebenen. Grau
+// steht, was sich aus der Geometrie rechnen laesst; das Feld daneben nimmt
+// den eigenen Wert. Leer heisst «Rechnung gilt».
+function mkTypenImProjekt() {
+  const ftProfile = typeof loadFtProfile === 'function' ? loadFtProfile() : [];
+  const allBp     = typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+  const map = new Map();
+  getFundamente().forEach(p => {
+    const bp = { ...p, ...(allBp[p.id] || {}) };
+    const ft = ftTypZuStandort(ftProfile, bp);
+    const schluessel = mkAnsatzSchluessel(ft, bp);
+    if (!map.has(schluessel)) {
+      map.set(schluessel, {
+        schluessel,
+        name: ft?.name || bp.fundtyp || '— kein Typ —',
+        art: ft ? (ft.typ === 'standard' ? 'Standard' : 'Spezial') : 'frei erfasst',
+        anzahl: 0,
+        gerechnet: _mkTypDaten(ft),
+      });
+    }
+    map.get(schluessel).anzahl++;
+  });
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+// Ueber den Index statt den Schluessel: der Schluessel traegt bei frei
+// geschriebenen Typen den Namen und damit Zeichen, die in einem
+// Inline-Handler quotiert werden muessten.
+function mkAnsatzSetzenIdx(index, feld, wert) {
+  const typ = mkTypenImProjekt()[index];
+  if (typ) mkAnsatzSetzen(typ.schluessel, feld, wert);
+}
+
+function _mkAnsatzTab() {
+  const el = document.getElementById('mk-tab-ansaetze');
+  if (!el) return;
+  const typen  = mkTypenImProjekt();
+  const alle   = loadMkAnsaetze();
+  const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
+
+  if (!typen.length) {
+    el.innerHTML = '<div style="padding:22px;text-align:center;font-size:12px;color:#9ca3af;">'
+      + 'Noch keine Fundamentstandorte in dieser Phase.</div>';
+    return;
+  }
+
+  const th = (t, rechts) =>
+    `<th style="text-align:${rechts ? 'right' : 'left'};padding:6px 8px;font-size:10px;color:#6b7280;
+         text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">${t}</th>`;
+
+  el.innerHTML =
+    `<div style="font-size:11px;color:#6b7280;line-height:1.6;margin-bottom:10px;">
+       Menge <b>je Fundament</b>. Grau steht der aus der Geometrie gerechnete Wert — Spezialtypen
+       und frei geschriebene Fundamenttypen tragen keine Abmessung und bleiben deshalb leer.
+       Ein eigener Wert gilt vor der Rechnung; ein leeres Feld heisst «Rechnung gilt».
+     </div>
+     <div style="overflow-x:auto;">
+     <table style="width:100%;border-collapse:collapse;font-size:12px;">
+       <thead><tr style="background:#f9fafb;">
+         ${th('Fundamenttyp')}${th('Anzahl', true)}
+         ${felder.map(g => th(g.label + '<br><span style="font-weight:400;text-transform:none;">' + g.einheit + '</span>', true)).join('')}
+       </tr></thead>
+       <tbody>${typen.map((t, i) => {
+         const eigen = alle[t.schluessel] || {};
+         return `<tr>
+           <td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;">
+             ${escHtml(t.name)}
+             <span style="font-size:10px;color:#9ca3af;">· ${t.art}</span></td>
+           <td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;
+               font-variant-numeric:tabular-nums;">${t.anzahl}</td>
+           ${felder.map(g => {
+             const vor = t.gerechnet?.[g.id];
+             return `<td style="padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:right;">
+               <input type="number" step="0.01" min="0" value="${eigen[g.id] ?? ''}"
+                      placeholder="${vor != null ? _mkZahl(vor, MASSEN_GANZ.has(g.id) ? 0 : 2) : ''}"
+                      onchange="mkAnsatzSetzenIdx(${i},'${g.id}',this.value)"
+                      title="${escHtml(t.name)} — ${escHtml(g.label)} je Fundament"
+                      style="width:74px;padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;
+                             font-size:12px;font-family:inherit;text-align:right;
+                             font-variant-numeric:tabular-nums;"></td>`;
+           }).join('')}
+         </tr>`;
+       }).join('')}</tbody>
+     </table></div>
+     <div style="display:flex;gap:6px;margin-top:12px;">
+       <button onclick="mkAnsatzExport()" class="btn btn-secondary btn-sm">Ansätze ausgeben</button>
+       <label class="btn btn-secondary btn-sm" style="cursor:pointer;">Ansätze einlesen
+         <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="mkAnsatzImport(this)"></label>
+     </div>`;
+}
+
+function _mkAnsatzSpalte(g)    { return g.label + ' [' + g.einheit + ']'; }
+function _mkAnsatzSpalteRef(g) { return g.label + ' gerechnet'; }
+
+// Ausgegeben werden zwei Spalten je Groesse: der EIGENE Wert, der beim
+// Einlesen zurueckkommt, und daneben der gerechnete zur Ansicht. Stuende in
+// der Eingabespalte der gerechnete Wert, machte ihn ein Rundlauf durch Excel
+// stillschweigend zum eigenen — spaetere Aenderungen an der Geometrie kaemen
+// dann nicht mehr an.
+function mkAnsatzExport() {
+  const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
+  const alle   = loadMkAnsaetze();
+  const zeilen = mkTypenImProjekt().map(t => {
+    const eigen = alle[t.schluessel] || {};
+    const z = { 'Schlüssel': t.schluessel, 'Fundamenttyp': t.name, 'Art': t.art, 'Anzahl': t.anzahl };
+    felder.forEach(g => {
+      z[_mkAnsatzSpalte(g)]    = eigen[g.id] ?? '';
+      z[_mkAnsatzSpalteRef(g)] = t.gerechnet?.[g.id] ?? '';
+    });
+    return z;
+  });
+  if (!zeilen.length) { ui.toast('Keine Fundamenttypen im Projekt.', 'fehler'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(zeilen), 'Mengenansaetze');
+  XLSX.writeFile(wb, 'Mengenansaetze.xlsx');
+}
+
+// Eingelesen wird ueber die Spalte «Schluessel» — der Name allein waere nicht
+// eindeutig, sobald zwei Bibliothekstypen gleich heissen.
+function mkAnsatzImport(input) {
+  const datei = input.files?.[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onload = ev => {
+    try {
+      const wb     = XLSX.read(ev.target.result, { type: 'array' });
+      const roh    = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      const felder = MASSEN_GROESSEN.filter(g => g.id !== 'anzahl');
+      const alle = loadMkAnsaetze();
+      let gesehen = 0, mitWert = 0;
+      roh.forEach(z => {
+        const schluessel = String(z['Schlüssel'] || z['Schluessel'] || '').trim();
+        if (!schluessel) return;
+        gesehen++;
+        const eintrag = {};
+        felder.forEach(g => {
+          const wert = parseFloat(String(z[_mkAnsatzSpalte(g)] ?? '').replace(',', '.'));
+          if (Number.isFinite(wert) && wert >= 0) eintrag[g.id] = wert;
+        });
+        // Eine leere Zeile loescht den Ansatz — dann gilt wieder die Rechnung
+        if (Object.keys(eintrag).length) { alle[schluessel] = eintrag; mitWert++; }
+        else delete alle[schluessel];
+      });
+      if (!gesehen) throw new Error('Keine Zeile mit Spalte «Schlüssel» erkannt.');
+      saveMkAnsaetze(alle);
+      _mkAnsatzTab();
+      renderMassenView();
+      ui.toast(`${gesehen} Typen gelesen, ${mitWert} mit eigenem Ansatz`, 'erfolg');
+    } catch (err) { ui.toast(err.message, 'fehler'); }
+    input.value = '';
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+// ── Tab 3: Positionsdatenbank ────────────────────────────────
+// Dieselbe Liste, aus der «+ aus Vorlage» schoepft — hier aber aenderbar.
+function saveLvVorlage(liste) { store.setItem(LV_VORLAGE_KEY, JSON.stringify(liste)); }
+
+function dbPosSetzen(index, feld, wert) {
+  const liste = loadLvVorlage();
+  if (!liste[index]) return;
+  liste[index][feld] = feld === 'preis'
+    ? (parseFloat(String(wert).replace(',', '.')) || null)
+    : String(wert).trim();
+  saveLvVorlage(liste);
+}
+
+function dbPosNeu() {
+  const liste = loadLvVorlage();
+  liste.push({ pos: '', text: '', einheit: '', preis: null });
+  saveLvVorlage(liste);
+  _mkPositionenTab();
+}
+
+async function dbPosLoeschen(index) {
+  if (!await ui.confirm('Position aus der Datenbank löschen?')) return;
+  const liste = loadLvVorlage();
+  liste.splice(index, 1);
+  saveLvVorlage(liste);
+  _mkPositionenTab();
+}
+
+// Startwerte aus dem Verzeichnis: was im Projekt schon verwendet wird, ist
+// die beste Vorlage fuer das naechste.
+function dbAusLv() {
+  const liste = loadLvVorlage();
+  const drin  = new Set(liste.map(v => v.pos));
+  let n = 0;
+  loadLvPositionen().forEach(z => {
+    if (!z.pos || drin.has(z.pos)) return;
+    liste.push({ pos: z.pos, text: z.text, einheit: z.einheit, preis: z.preis || null });
+    drin.add(z.pos);
+    n++;
+  });
+  if (!n) { ui.toast('Nichts zu übernehmen — die Positionen stehen schon in der Datenbank.', 'fehler'); return; }
+  saveLvVorlage(liste);
+  _mkPositionenTab();
+  ui.toast(n + ' Positionen übernommen', 'erfolg');
+}
+
+function dbExport() {
+  const liste = loadLvVorlage();
+  if (!liste.length) { ui.toast('Die Datenbank ist leer.', 'fehler'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(liste.map(v =>
+    ({ 'Pos.': v.pos, 'Bezeichnung': v.text, 'Einheit': v.einheit, 'Einheitspreis': v.preis ?? '' }))),
+    'Positionen');
+  XLSX.writeFile(wb, 'Kostendatenbank.xlsx');
+}
+
+function dbImport(input) {
+  const datei = input.files?.[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onload = ev => {
+    try {
+      const wb  = XLSX.read(ev.target.result, { type: 'array' });
+      const roh = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      const liste = [];
+      roh.forEach(z => {
+        const pos  = String(z['Pos.'] ?? z['Pos'] ?? z['Position'] ?? '').trim();
+        const text = String(z['Bezeichnung'] ?? z['Text'] ?? '').trim();
+        if (!pos && !text) return;
+        const preis = parseFloat(String(z['Einheitspreis'] ?? z['Preis'] ?? '').replace(',', '.'));
+        liste.push({ pos, text, einheit: String(z['Einheit'] ?? z['LE'] ?? '').trim(),
+                     preis: Number.isFinite(preis) ? preis : null });
+      });
+      if (!liste.length) throw new Error('Keine Positionen erkannt. Erwartet: Pos., Bezeichnung, Einheit, Einheitspreis.');
+      saveLvVorlage(liste);
+      _mkPositionenTab();
+      ui.toast(liste.length + ' Positionen eingelesen', 'erfolg');
+    } catch (err) { ui.toast(err.message, 'fehler'); }
+    input.value = '';
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+function _mkPositionenTab() {
+  const el = document.getElementById('mk-tab-positionen');
+  if (!el) return;
+  const liste   = loadLvVorlage();
+  const katalog = loadLkKatalog();
+
+  const knoepfe =
+    `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
+       <button onclick="dbPosNeu()" class="btn btn-secondary btn-sm">+ Position</button>
+       <button onclick="dbAusLv()" class="btn btn-secondary btn-sm"
+               title="Positionen aus dem Leistungsverzeichnis dieses Projekts übernehmen">Aus LV übernehmen</button>
+       <label class="btn btn-secondary btn-sm" style="cursor:pointer;">Einlesen
+         <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="dbImport(this)"></label>
+       <button onclick="dbExport()" class="btn btn-secondary btn-sm">Ausgeben</button>
+       <label class="btn btn-secondary btn-sm" style="cursor:pointer;"
+              title="Tabelle mit Positionsnummer, Einheitspreis und den Schichtleistungen">Katalog einlesen
+         <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="lkKatalogImport(this)"></label>
+       <label class="btn btn-secondary btn-sm" style="cursor:pointer;">Aus Zusammenstellung
+         <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="lvVorlageImport(this)"></label>
+     </div>
+     <div style="font-size:10px;color:#9ca3af;margin-top:7px;">
+       ${katalog
+         ? katalog.positionen.length + ' Katalogpositionen hinterlegt — sie liefern die Einheitspreise beim Einlesen aus der Zusammenstellung.'
+         : 'Kein Katalog hinterlegt — Einheitspreise werden dann von Hand gesetzt.'}
+     </div>`;
+
+  if (!liste.length) {
+    el.innerHTML = '<div style="padding:22px;text-align:center;font-size:12px;color:#9ca3af;line-height:1.6;">'
+      + 'Noch keine Positionen hinterlegt<br>'
+      + '<span style="font-size:11px;">Aus dem Leistungsverzeichnis übernehmen, aus Excel einlesen oder von Hand anlegen.</span></div>'
+      + knoepfe;
+    return;
+  }
+
+  const eingabe = (i, feld, wert, breite, zahl) =>
+    `<input value="${escHtml(String(wert ?? ''))}" ${zahl ? 'type="number" step="0.01"' : 'type="text"'}
+            onchange="dbPosSetzen(${i},'${feld}',this.value)"
+            style="width:${breite};padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;
+                   font-size:12px;font-family:inherit;${zahl ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}">`;
+  const th = (t, rechts) =>
+    `<th style="text-align:${rechts ? 'right' : 'left'};padding:6px 8px;font-size:10px;color:#6b7280;
+         text-transform:uppercase;letter-spacing:.05em;">${t}</th>`;
+
+  el.innerHTML =
+    `<div style="max-height:52vh;overflow-y:auto;">
+     <table style="width:100%;border-collapse:collapse;font-size:12px;">
+       <thead><tr style="background:#f9fafb;">${th('Pos.')}${th('Bezeichnung')}${th('Einheit')}${th('Einheitspreis', true)}${th('')}</tr></thead>
+       <tbody>${liste.map((v, i) => `<tr>
+         <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'pos', v.pos, '92px')}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'text', v.text, '100%')}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'einheit', v.einheit, '64px')}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;text-align:right;">${eingabe(i, 'preis', v.preis, '92px', true)}</td>
+         <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+           <button onclick="dbPosLoeschen(${i})" title="Position löschen"
+             style="border:none;background:none;cursor:pointer;color:#9ca3af;padding:2px;display:flex;align-items:center;">
+             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+           </button></td>
+       </tr>`).join('')}</tbody>
+     </table></div>`
+    + knoepfe;
 }
