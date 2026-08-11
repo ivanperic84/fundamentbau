@@ -1673,6 +1673,13 @@
       <select id="bulk-fundtyp-select" style="padding:4px 8px;border-radius:5px;border:none;font-size:12px;max-width:200px;"></select>
       <button onclick="bulkFundtypZuweisen()" style="padding:4px 12px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#e0f2fe;color:#0369a1;">Zuweisen</button>
     </span>
+    <!-- Sammelzuweisung Baupaket — nur in der Ausfuehrung, wo Pakete stehen -->
+    <span id="bulk-paket-wrap" style="display:none;align-items:center;gap:8px;">
+      <span style="opacity:0.4;">|</span>
+      <span style="font-size:12px; opacity:0.8;">Baupaket:</span>
+      <select id="bulk-paket-select" style="padding:4px 8px;border-radius:5px;border:none;font-size:12px;max-width:200px;"></select>
+      <button onclick="bulkPaketZuweisen()" style="padding:4px 12px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#e0f2fe;color:#0369a1;">Zuweisen</button>
+    </span>
     <span style="opacity:0.4;">|</span>
     <button onclick="bulkDelete()" style="padding:4px 12px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#fee2e2;color:#b91c1c;">✕ Löschen</button>
     <button onclick="bulkClear()" style="margin-left:auto;padding:4px 10px;border-radius:5px;border:1px solid rgba(255,255,255,0.3);cursor:pointer;font-size:12px;background:transparent;color:white;">Auswahl aufheben</button>
@@ -2408,6 +2415,8 @@
       </div>
       <div style="display:flex;gap:5px;align-items:center;">
         <span id="bp-fund-auswahl" style="display:none;align-items:center;margin-right:6px;padding:2px 4px 2px 8px;border-radius:4px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;font-size:10px;"></span>
+        <button onclick="bpZuweisenOeffnen()" class="btn btn-secondary btn-sm"
+                title="Mehrere Fundamente nach Typ, Massnahme oder Ort einem Baupaket zuweisen">Zuweisen</button>
         <span class="toolbar-label">Sortierung</span>
         <span class="seg">
           <button id="bp-fsort-km"        onclick="setBpFundSort('km')">KM</button>
@@ -7766,6 +7775,25 @@ function _ladeScript(pfad) {
 </div>
 
 <!-- MODAL: Bauprogramm Projekt-Einstellungen (4 Tabs) -->
+<!-- ══ FUNDAMENTE EINEM BAUPAKET ZUWEISEN ══
+     Zwischen «alles automatisch» und «eines von Hand ziehen» fehlte der Weg
+     fuer eine Handvoll. Ausgewaehlt wird nach Typ, Massnahme und Ort — der
+     Ortsbezug ueber Koordinaten, weil die Kilometrierung innerhalb eines
+     Abschnitts auf verschiedene Referenzen laufen kann. -->
+<div id="bp-zuweisen-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:14px;width:min(620px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 12px;flex-shrink:0;">
+      <h3 style="font-size:15px;font-weight:800;color:#1a3a5c;margin:0;">Fundamente zuweisen</h3>
+      <button onclick="bpZuweisenSchliessen()" class="modal-close">&#215;</button>
+    </div>
+    <div style="padding:0 24px 22px;overflow-y:auto;">
+      <div id="bp-zuw-filter"></div>
+      <div id="bp-zuw-treffer" style="margin-top:12px;"></div>
+      <div id="bp-zuw-ziel" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ EINSTELLUNGEN UND DATENBANK «MASSEN & KOSTEN» ══
      Parameter der Kostenschaetzung, Mengenansaetze je Fundamenttyp und die
      Positionsdatenbank mit den Einheitspreisen. -->

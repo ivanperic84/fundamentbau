@@ -6359,3 +6359,274 @@ function hexToRgb(hex) {
 // ── Wird durch _patchAusfPlanungFunctions() beim App-Start einmalig eingehängt
 
 // ============================================================
+
+// ============================================================
+// FUNDAMENTE EINEM BAUPAKET ZUWEISEN
+// ============================================================
+// Bisher gab es zwei Wege: den automatischen Zuweisungslauf ueber alles, und
+// das Ziehen eines einzelnen Balkens im Gantt. Dazwischen — «diese zwoelf
+// Fundamente in Paket 3» — fehlte alles.
+//
+// Ausgewaehlt wird nach Typ, Massnahme, Zuweisungsstand und ORT. Der Ortsbezug
+// laeuft ueber die Koordinaten und nicht ueber die Kilometrierung: innerhalb
+// eines Abschnitts koennen mehrere km-Referenzen nebeneinander liegen, und
+// dann heisst «km 12.4» an zwei Masten nicht dieselbe Stelle. Koordinaten
+// sind eindeutig.
+
+let _bpZuwFilter = { typ: '', massnahme: '', stand: 'offen',
+                     ort: 'alle', zentrum: '', radius: 200, von: '', bis: '' };
+let _bpZuwAuswahl = null;   // gesetzt, wenn aus der Gantt-Auswahl geoeffnet
+
+// ── Ort ──────────────────────────────────────────────────────
+// Gerechnet wird in LV95-Metern. Der Umweg ueber WGS84 waere hier nur
+// Verzerrung: die Landeskoordinaten sind bereits ein Meterraster.
+function _bpZuwPunkt(p) {
+  const rs   = p.rs?.e   ? p.rs   : null;
+  const rks  = p.rks?.e  ? p.rks  : null;
+  const fund = p.fund?.e ? p.fund : null;
+  if (rs && rks) return { e: (rs.e + rks.e) / 2, n: (rs.n + rks.n) / 2 };
+  const q = rs || rks || fund;
+  return q ? { e: q.e, n: q.n } : null;
+}
+
+const _bpZuwAbstand = (a, b) => Math.hypot(a.e - b.e, a.n - b.n);
+
+// Lage entlang der Baustellenachse. Die Achse ist die Verbindung der beiden
+// am weitesten auseinanderliegenden Standorte; jeder Punkt wird darauf
+// projiziert. Damit gibt es ein «von … bis …» ohne Kilometrierung — und ohne
+// die Annahme, die Linie verliefe nord-sued oder ost-west.
+function bpZuwAchsenLage(pairs) {
+  const punkte = pairs.map(p => ({ id: String(p.id), pt: _bpZuwPunkt(p) })).filter(x => x.pt);
+  if (punkte.length < 2) return new Map(punkte.map(x => [x.id, 0]));
+
+  let a = punkte[0], b = punkte[1], max = -1;
+  for (let i = 0; i < punkte.length; i++) {
+    for (let j = i + 1; j < punkte.length; j++) {
+      const d = _bpZuwAbstand(punkte[i].pt, punkte[j].pt);
+      if (d > max) { max = d; a = punkte[i]; b = punkte[j]; }
+    }
+  }
+  const ve = b.pt.e - a.pt.e, vn = b.pt.n - a.pt.n;
+  const len2 = ve * ve + vn * vn || 1;
+  return new Map(punkte.map(x =>
+    [x.id, ((x.pt.e - a.pt.e) * ve + (x.pt.n - a.pt.n) * vn) / len2 * Math.sqrt(len2)]));
+}
+
+// ── Auswahl ──────────────────────────────────────────────────
+function bpZuwTreffer() {
+  const f     = _bpZuwFilter;
+  const prof  = loadFtProfile();
+  const allBp = loadAllBauprojekt();
+  const zuw   = loadSchichtZuw();
+  const alle  = getFundamente();
+
+  if (_bpZuwAuswahl) return alle.filter(p => _bpZuwAuswahl.has(String(p.id)));
+
+  const lage = f.ort === 'abschnitt' ? bpZuwAchsenLage(alle) : null;
+  let vonL = null, bisL = null;
+  if (lage && f.von && f.bis) {
+    const a = lage.get(String(f.von)), b = lage.get(String(f.bis));
+    if (a != null && b != null) { vonL = Math.min(a, b); bisL = Math.max(a, b); }
+  }
+  const zentrum = f.ort === 'umkreis' && f.zentrum
+    ? _bpZuwPunkt(alle.find(p => String(p.id) === String(f.zentrum)) || {}) : null;
+
+  return alle.filter(p => {
+    const bp = { ...p, ...(allBp[p.id] || {}) };
+    if (f.typ) {
+      const ft = ftTypZuStandort(prof, bp);
+      if ((ft?.id || '') !== f.typ) return false;
+    }
+    if (f.massnahme && getPairBpTyp(p.id, allBp) !== f.massnahme) return false;
+    if (f.stand === 'offen'    &&  zuw[p.id]?.paketId) return false;
+    if (f.stand === 'zugewiesen' && !zuw[p.id]?.paketId) return false;
+
+    if (f.ort === 'umkreis') {
+      if (!zentrum) return false;
+      const pt = _bpZuwPunkt(p);
+      if (!pt || _bpZuwAbstand(pt, zentrum) > (f.radius || 0)) return false;
+    } else if (f.ort === 'abschnitt') {
+      if (vonL == null) return false;
+      const l = lage.get(String(p.id));
+      if (l == null || l < vonL - 0.5 || l > bisL + 0.5) return false;
+    }
+    return true;
+  });
+}
+
+function bpZuwFilterSetzen(feld, wert) {
+  _bpZuwFilter[feld] = feld === 'radius' ? (parseFloat(wert) || 0) : wert;
+  _bpZuwAuswahl = null;          // eigener Filter loest die uebernommene Auswahl ab
+  _bpZuwZeichnen();
+}
+
+function bpZuwAuswahlUebernehmen() {
+  _bpZuwAuswahl = new Set([..._bpFundSelection].map(String));
+  if (!_bpZuwAuswahl.size) { _bpZuwAuswahl = null; ui.toast('Keine Auswahl im Gantt.', 'fehler'); }
+  _bpZuwZeichnen();
+}
+
+// ── Fenster ──────────────────────────────────────────────────
+function bpZuweisenOeffnen() {
+  const m = document.getElementById('bp-zuweisen-modal');
+  if (!m) return;
+  if (!loadBaupakete().length) { ui.toast('Zuerst ein Baupaket anlegen.', 'fehler'); return; }
+  _bpZuwAuswahl = _bpFundSelection.size ? new Set([..._bpFundSelection].map(String)) : null;
+  m.style.display = 'flex';
+  _bpZuwZeichnen();
+}
+
+function bpZuweisenSchliessen() {
+  const m = document.getElementById('bp-zuweisen-modal');
+  if (m) m.style.display = 'none';
+  _bpZuwAuswahl = null;
+}
+
+function _bpZuwStandortName(p) {
+  return 'Mast ' + (p.mast || p.id) + (p.km ? ' · km ' + p.km : '');
+}
+
+function _bpZuwZeichnen() {
+  const f      = _bpZuwFilter;
+  const alle   = getFundamente();
+  const prof   = loadFtProfile();
+  const allBp  = loadAllBauprojekt();
+  const typen  = new Map();
+  alle.forEach(p => {
+    const ft = ftTypZuStandort(prof, { ...p, ...(allBp[p.id] || {}) });
+    if (ft) typen.set(ft.id, ft.name);
+  });
+
+  const feld = (label, inhalt, hinweis) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12px;color:#374151;">
+       <span style="flex:0 0 128px;">${label}${hinweis ? `<br><span style="font-size:10px;color:#9ca3af;">${hinweis}</span>` : ''}</span>
+       <span style="flex:1 1 auto;">${inhalt}</span></label>`;
+  const stil = 'width:100%;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;';
+  const opt  = (w, t, akt) => `<option value="${w}"${akt === w ? ' selected' : ''}>${t}</option>`;
+
+  document.getElementById('bp-zuw-filter').innerHTML =
+    (_bpZuwAuswahl
+      ? `<div style="padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
+                     font-size:11px;color:#1e40af;margin-bottom:8px;">
+           ${_bpZuwAuswahl.size} Fundamente aus der Auswahl im Gantt übernommen.
+           <a onclick="bpZuwFilterSetzen('ort','${f.ort}')" style="cursor:pointer;text-decoration:underline;">stattdessen filtern</a>
+         </div>`
+      : (_bpFundSelection.size
+          ? `<div style="font-size:11px;color:#6b7280;margin-bottom:8px;">
+               <a onclick="bpZuwAuswahlUebernehmen()" style="color:#1a3a5c;cursor:pointer;text-decoration:underline;">
+               ${_bpFundSelection.size} im Gantt ausgewählte Fundamente übernehmen</a></div>` : ''))
+    + feld('Fundamenttyp',
+        `<select onchange="bpZuwFilterSetzen('typ',this.value)" style="${stil}">
+           ${opt('', 'alle Typen', f.typ)}
+           ${[...typen].map(([id, name]) => opt(id, escHtml(name), f.typ)).join('')}
+         </select>`)
+    + feld('Massnahme',
+        `<select onchange="bpZuwFilterSetzen('massnahme',this.value)" style="${stil}">
+           ${opt('', 'alle Massnahmen', f.massnahme)}
+           ${opt('neubau', 'Neubau', f.massnahme)}
+           ${opt('abbruch-neubau', 'Abbruch + Neubau', f.massnahme)}
+           ${opt('abbruch', 'Abbruch', f.massnahme)}
+           ${opt('sicherung', 'Sicherung', f.massnahme)}
+           ${opt('provisorium', 'Provisorium', f.massnahme)}
+         </select>`)
+    + feld('Zuweisung',
+        `<select onchange="bpZuwFilterSetzen('stand',this.value)" style="${stil}">
+           ${opt('offen', 'nur noch nicht zugewiesene', f.stand)}
+           ${opt('zugewiesen', 'nur bereits zugewiesene', f.stand)}
+           ${opt('alle', 'alle', f.stand)}
+         </select>`)
+    + feld('Ort', `<select onchange="bpZuwFilterSetzen('ort',this.value)" style="${stil}">
+           ${opt('alle', 'ganzes Projekt', f.ort)}
+           ${opt('umkreis', 'Umkreis um einen Standort', f.ort)}
+           ${opt('abschnitt', 'Abschnitt von … bis …', f.ort)}
+         </select>`, 'über Koordinaten, nicht über km')
+    + (f.ort === 'umkreis'
+        ? feld('Zentrum',
+            `<select onchange="bpZuwFilterSetzen('zentrum',this.value)" style="${stil}">
+               ${opt('', '— Standort wählen —', f.zentrum)}
+               ${alle.map(p => opt(p.id, escHtml(_bpZuwStandortName(p)), f.zentrum)).join('')}
+             </select>`)
+          + feld('Radius',
+            `<input type="number" min="10" step="10" value="${f.radius}"
+                    onchange="bpZuwFilterSetzen('radius',this.value)" style="${stil}"> `)
+        : '')
+    + (f.ort === 'abschnitt'
+        ? feld('von',
+            `<select onchange="bpZuwFilterSetzen('von',this.value)" style="${stil}">
+               ${opt('', '— Standort wählen —', f.von)}
+               ${alle.map(p => opt(p.id, escHtml(_bpZuwStandortName(p)), f.von)).join('')}
+             </select>`)
+          + feld('bis',
+            `<select onchange="bpZuwFilterSetzen('bis',this.value)" style="${stil}">
+               ${opt('', '— Standort wählen —', f.bis)}
+               ${alle.map(p => opt(p.id, escHtml(_bpZuwStandortName(p)), f.bis)).join('')}
+             </select>`)
+        : '');
+
+  // Treffer
+  const treffer = bpZuwTreffer();
+  const zuw     = loadSchichtZuw();
+  const pakete  = loadBaupakete();
+  document.getElementById('bp-zuw-treffer').innerHTML =
+    `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">
+       ${treffer.length} Fundament${treffer.length === 1 ? '' : 'e'}</div>`
+    + (treffer.length
+        ? `<div style="max-height:150px;overflow-y:auto;border:1px solid #f0f2f5;border-radius:8px;padding:6px 8px;">`
+          + treffer.map(p => {
+              const pk = pakete.find(x => x.id === zuw[p.id]?.paketId);
+              return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;
+                           color:#374151;padding:1px 0;">
+                  <span>${escHtml(_bpZuwStandortName(p))}</span>
+                  <span style="color:${pk ? '#6b7280' : '#b45309'};">${pk ? escHtml(pk.name) : 'nicht zugewiesen'}</span>
+                </div>`;
+            }).join('')
+          + '</div>'
+        : `<div style="padding:12px;text-align:center;font-size:11px;color:#9ca3af;">Kein Fundament passt auf diese Auswahl.</div>`);
+
+  // Ziel
+  const pakSel = document.getElementById('bp-zuw-pak')?.value || pakete[0]?.id || '';
+  const pak    = pakete.find(p => p.id === pakSel);
+  const schichten = pak ? bpGetSchichten(pak) : [];
+  document.getElementById('bp-zuw-ziel').innerHTML =
+    feld('Baupaket',
+      `<select id="bp-zuw-pak" onchange="_bpZuwZeichnen()" style="${stil}">
+         ${pakete.map(p => opt(p.id, escHtml(p.name), pakSel)).join('')}
+       </select>`)
+    + feld('Schicht',
+      `<select id="bp-zuw-sch" style="${stil}">
+         ${schichten.length
+            ? schichten.map(s => `<option value="${s.schichtNr}">${s.schichtNr}. Schicht (${bpFmtDisplay(s.datum)})</option>`).join('')
+            : '<option value="1">1. Schicht</option>'}
+       </select>`)
+    + `<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:12px;">
+         <button onclick="bpZuweisenSchliessen()" class="btn btn-secondary btn-sm">Abbrechen</button>
+         <button onclick="bpZuwAusfuehren()" class="btn btn-primary btn-sm"${treffer.length ? '' : ' disabled'}>
+           ${treffer.length} zuweisen</button>
+       </div>`;
+}
+
+function bpZuwAusfuehren() {
+  const treffer = bpZuwTreffer();
+  if (!treffer.length) return;
+  const pakId = document.getElementById('bp-zuw-pak')?.value;
+  const schNr = parseInt(document.getElementById('bp-zuw-sch')?.value) || 1;
+  if (!pakId) { ui.toast('Kein Baupaket gewählt.', 'fehler'); return; }
+
+  const zuw = loadSchichtZuw();
+  treffer.forEach(p => {
+    if (!zuw[p.id]) zuw[p.id] = {};
+    zuw[p.id].paketId   = pakId;
+    zuw[p.id].schichtNr = schNr;
+    // Bohrschichten sind an das alte Paket gebunden und gelten hier nicht mehr
+    delete zuw[p.id].bohrSchichten;
+    delete zuw[p.id].betonSchichtNr;
+  });
+  saveSchichtZuw(zuw);
+  bpZuweisenSchliessen();
+  bpFundAuswahlLeeren(false);
+  _recalcBaugruppenDates();
+  renderBpFundamenteGantt();
+  updateBpInfoBar();
+  ui.toast(treffer.length + ' Fundamente zugewiesen', 'erfolg', null,
+           { text: 'Rückgängig', aufRuf: bpUndo });
+}

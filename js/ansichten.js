@@ -1984,6 +1984,46 @@ function updateBulkBar() {
       ftSel.value = vorher;
     }
   }
+  // Sammelzuweisung Baupaket: nur in der Ausfuehrung, und nur wenn Pakete da sind
+  const pakWrap = document.getElementById('bulk-paket-wrap');
+  if (pakWrap) {
+    const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
+    const zeigen = _activePhase === 'ausfuehrung' && pakete.length > 0;
+    pakWrap.style.display = zeigen ? 'flex' : 'none';
+    const pakSel = document.getElementById('bulk-paket-select');
+    if (zeigen && pakSel) {
+      const vorher = pakSel.value;
+      pakSel.innerHTML = '<option value="">– Paket wählen –</option>'
+        + pakete.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+      pakSel.value = vorher;
+    }
+  }
+}
+
+// Sammelzuweisung Baupaket. In der Liste laesst sich nach Mast, km oder Typ
+// filtern — genau die Vorauswahl, die man zum Verteilen auf Pakete braucht.
+// Die Schicht bleibt die erste; feiner wird es im Zuweisen-Fenster.
+function bulkPaketZuweisen() {
+  const pakId = document.getElementById('bulk-paket-select')?.value;
+  if (!pakId) { ui.toast('Bitte zuerst ein Baupaket wählen.', 'fehler'); return; }
+  if (!selectedIds.size) return;
+  const fundamente = new Set(getFundamente().map(p => String(p.id)));
+  const ziele = [...selectedIds].filter(id => fundamente.has(String(id)));
+  if (!ziele.length) { ui.toast('Kein Fundament in der Auswahl.', 'fehler'); return; }
+
+  const zuw = loadSchichtZuw();
+  ziele.forEach(id => {
+    if (!zuw[id]) zuw[id] = {};
+    zuw[id].paketId   = pakId;
+    zuw[id].schichtNr = zuw[id].schichtNr || 1;
+    delete zuw[id].bohrSchichten;
+    delete zuw[id].betonSchichtNr;
+  });
+  saveSchichtZuw(zuw);
+  if (typeof _recalcBaugruppenDates === 'function') _recalcBaugruppenDates();
+  ui.toast(ziele.length + ' Fundamente zugewiesen', 'erfolg', null,
+           { text: 'Rückgängig', aufRuf: bpUndo });
+  renderList();
 }
 
 // Sammelzuweisung aus der allgemeinen Liste heraus
