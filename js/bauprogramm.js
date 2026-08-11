@@ -1484,13 +1484,61 @@ function _updateBpToolbar() {
 }
 
 function setBpFundSort(sort) {
+  const vorher = _bpFundSort;
   _bpFundSort = sort;
   bpFundAuswahlLeeren(false);
   // Aktiven Zustand über die Klasse .aktiv (siehe .seg im Stylesheet)
-  ['km','datum','baugruppe'].forEach(s => {
+  ['km','datum','paket','baugruppe'].forEach(s => {
     document.getElementById('bp-fsort-' + s)?.classList.toggle('aktiv', s === sort);
   });
+  // In der Paketansicht beginnt jedes Paket zugeklappt: bei zwanzig Standorten
+  // ist die Uebersicht sonst genauso lang wie vorher.
+  if (sort === 'paket' && vorher !== 'paket') {
+    loadBaupakete().forEach(p => _bpCollapsed.add(p.id));
+    _bpCollapsed.add('__ohne_paket__');
+  }
   renderBpFundamenteGantt();
+}
+
+// Paketzeile auf- und zuklappen. Das Diagramm ist EIN SVG mit ausgerechneten
+// y-Positionen — Zeilen lassen sich darin nicht wie DOM-Elemente in der Hoehe
+// animieren. Bewegt wird deshalb der Rahmen: seine Hoehe faehrt von der alten
+// auf die neue, waehrend das neu gezeichnete SVG darin schon steht. Die
+// hinzugekommenen Zeilen blenden sich zusaetzlich kurz ein (CSS-Klasse
+// .bp-fund-auf). Wer Bewegung abgestellt hat, bekommt den Sprung.
+function bpPaketZeileUmschalten(pid) {
+  const wrap = document.getElementById('bp-fund-gantt-wrap');
+  const wenigerBewegung = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const alt = wrap ? wrap.getBoundingClientRect().height : 0;
+
+  if (_bpCollapsed.has(pid)) _bpCollapsed.delete(pid); else _bpCollapsed.add(pid);
+  renderBpFundamenteGantt();
+
+  if (!wrap || wenigerBewegung) return;
+  // Beide Hoehen auf dieselbe Weise messen: scrollHeight laesst den waagrechten
+  // Scrollbalken weg, getBoundingClientRect rechnet ihn mit. Gemischt ergaebe
+  // das ein Ziel, das um die Balkenhoehe danebenliegt.
+  const neu = wrap.getBoundingClientRect().height;
+  if (Math.abs(neu - alt) < 2) return;
+
+  wrap.style.overflowY  = 'hidden';
+  wrap.style.height     = alt + 'px';
+  void wrap.offsetHeight;   // Reflow erzwingen, sonst faellt der Uebergang aus
+  wrap.style.transition = 'height .18s ease-out';
+  const svgEl = wrap.querySelector('svg');
+  if (svgEl) svgEl.classList.add('bp-fund-auf');
+  requestAnimationFrame(() => { wrap.style.height = neu + 'px'; });
+
+  const fertig = () => {
+    wrap.style.transition = '';
+    wrap.style.height     = '';
+    wrap.style.overflowY  = '';
+    svgEl?.classList.remove('bp-fund-auf');
+    wrap.removeEventListener('transitionend', fertig);
+  };
+  wrap.addEventListener('transitionend', fertig);
+  // Rueckfall, falls transitionend ausbleibt (z.B. Hoehe gleich gerundet)
+  setTimeout(fertig, 400);
 }
 
 // Auswahl leeren — beim Wechsel von Sortierung, Zoom oder Ansicht, damit keine
@@ -1535,7 +1583,7 @@ function _bpFundHintergrundSvg(g) {
   let svg = '';
   let y = g.HEADER_H;
   g.rowDefs.forEach((r, ri) => {
-    const h = ['gruppe','abbruch-header'].includes(r.type) ? g.GROUP_H : g.ROW_H;
+    const h = ['gruppe','abbruch-header','paket'].includes(r.type) ? g.GROUP_H : g.ROW_H;
     svg += `<rect x="0" y="${y}" width="${g.totalW}" height="${h}" fill="${r.type==='vorarbeit'?'#fffbeb':ri%2===0?'#fff':'#f9fafb'}"/>`;
     y += h;
   });
@@ -1702,7 +1750,33 @@ function _bpFundZeilenstruktur(g) {
 const rowDefs = [];
 const sorted  = sortPairs(neubauPairs);
 
-if (_bpFundSort === 'baugruppe') {
+if (_bpFundSort === 'paket') {
+  // Fundamente unter ihrem Baupaket. Die Reihenfolge folgt dem Starttermin,
+  // Unzugewiesenes kommt zuletzt — es ist das, was noch Arbeit macht, und
+  // soll nicht zwischen den terminierten Paketen untergehen.
+  const nachPaket = new Map();
+  sorted.forEach(p => {
+    const pid = zuw[p.id]?.paketId || '__ohne_paket__';
+    if (!nachPaket.has(pid)) nachPaket.set(pid, []);
+    nachPaket.get(pid).push(p);
+  });
+  const reihenfolge = [...pakete]
+    .sort((a, b) => (a.startDatum || '9999').localeCompare(b.startDatum || '9999'))
+    .map(p => p.id)
+    .filter(id => nachPaket.has(id));
+  // Leere Pakete gehoeren trotzdem in die Liste: sonst sieht man nicht, dass
+  // sie noch nichts zu tun haben.
+  [...pakete].sort((a, b) => (a.startDatum || '9999').localeCompare(b.startDatum || '9999'))
+    .forEach(p => { if (!reihenfolge.includes(p.id)) reihenfolge.push(p.id); });
+  if (nachPaket.has('__ohne_paket__')) reihenfolge.push('__ohne_paket__');
+
+  reihenfolge.forEach(pid => {
+    const pak    = pakete.find(p => p.id === pid) || null;
+    const gPairs = nachPaket.get(pid) || [];
+    rowDefs.push({ type: 'paket', pak, pid, pairs: gPairs });
+    if (!_bpCollapsed.has(pid)) gPairs.forEach(p => rowDefs.push({ type: 'fund', pair: p, indent: true, imPaket: pid }));
+  });
+} else if (_bpFundSort === 'baugruppe') {
   const grouped = {};
   sorted.forEach(p => { const gid = zuw[p.id]?.bauGruppeId||'__none__'; (grouped[gid]=grouped[gid]||[]).push(p); });
   Object.entries(grouped).forEach(([gid, gPairs]) => {
@@ -1783,6 +1857,10 @@ function renderBpFundamenteGantt() {
 
   // Sortierung
   const sortPairs = list => {
+    // Innerhalb eines Pakets zaehlt die Schicht, dann die Lage entlang der Strecke
+    if (_bpFundSort === 'paket') return [...list].sort((a,b) =>
+      (zuw[a.id]?.schichtNr || 99) - (zuw[b.id]?.schichtNr || 99)
+      || parseFloat(a.km_rs||0) - parseFloat(b.km_rs||0));
     if (_bpFundSort === 'datum') return [...list].sort((a,b) => (getStartDate(a)||'9999').localeCompare(getStartDate(b)||'9999'));
     if (_bpFundSort === 'baugruppe') return [...list].sort((a,b) => (zuw[a.id]?.bauGruppeId||'zzz_'+a.id).localeCompare(zuw[b.id]?.bauGruppeId||'zzz_'+b.id));
     return [...list].sort((a,b) => parseFloat(a.km_rs||0) - parseFloat(b.km_rs||0));
@@ -1825,7 +1903,7 @@ function renderBpFundamenteGantt() {
     else cur.setMonth(cur.getMonth()+1);
   }
   const totalW = LEFT_W + cols.length * COL_W;
-  const totalH = HEADER_H + rowDefs.reduce((h,r) => h + (['gruppe','abbruch-header'].includes(r.type) ? GROUP_H : ROW_H), 0) + 8;
+  const totalH = HEADER_H + rowDefs.reduce((h,r) => h + (['gruppe','abbruch-header','paket'].includes(r.type) ? GROUP_H : ROW_H), 0) + 8;
 
   const xFor = dateStr => {
     if (!dateStr) return LEFT_W;
@@ -1853,14 +1931,38 @@ function renderBpFundamenteGantt() {
   // Zeilen rendern
   let rowY = HEADER_H;
   rowDefs.forEach(r => {
-    const h   = ['gruppe','abbruch-header'].includes(r.type) ? GROUP_H : ROW_H;
+    const h   = ['gruppe','abbruch-header','paket'].includes(r.type) ? GROUP_H : ROW_H;
     const midY = rowY + h/2 + 4;
 
     // Linke Spalte
-    beide(`<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="${r.type==='gruppe'?'#f8fafc':r.type==='abbruch-header'?'#fff7ed':r.type==='vorarbeit'?'#fffbeb':'white'}"/>`);
+    beide(`<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="${r.type==='gruppe'||r.type==='paket'?'#f8fafc':r.type==='abbruch-header'?'#fff7ed':r.type==='vorarbeit'?'#fffbeb':'white'}"/>`);
     beide(`<line x1="${LEFT_W}" y1="${rowY}" x2="${LEFT_W}" y2="${rowY+h}" stroke="#e5e7eb" stroke-width="1"/>`);
 
-    if (r.type === 'gruppe') {
+    if (r.type === 'paket') {
+      // Kopfzeile eines Baupakets: derselbe Balken wie im Paketdiagramm, nur
+      // hier mit seinen Fundamenten darunter. Zugeklappt zeigt er die Huelle,
+      // aufgeklappt steht er ueber den einzelnen Zeilen.
+      const zu   = _bpCollapsed.has(r.pid);
+      const col  = r.pak?.farbe || '#9ca3af';
+      const name = (r.pak?.name || 'ohne Paket').slice(0, 13);
+      beide(`<text x="8" y="${midY}" font-size="11" fill="${r.pak ? '#1a3a5c' : '#b45309'}" font-weight="700" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(name)}</text>`);
+      beide(`<text x="${LEFT_W - 8}" y="${midY}" font-size="9" fill="#9ca3af" text-anchor="end" font-family="system-ui">${r.pairs.length}</text>`);
+      svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-pak="${r.pid}"/>`;
+
+      if (r.pak?.startDatum) {
+        const bx = xFor(r.pak.startDatum);
+        const bw = Math.max(COL_W, xFor(bpPaketEnd(r.pak) || r.pak.startDatum) + COL_W - bx);
+        svg += `<rect x="${bx}" y="${rowY+5}" width="${bw}" height="${h-10}" rx="4" fill="${col}"`
+             + ` opacity="${zu ? 0.85 : 0.28}" style="cursor:pointer;"`
+             + ` data-bp-modal="${r.pak.id}" data-bp-move="${r.pak.id}" data-bp-start="${r.pak.startDatum}" data-bp-ctx="${r.pak.id}"/>`;
+        if (zu) {
+          svg += `<text x="${bx+7}" y="${midY-1}" font-size="9" fill="white" font-weight="700"`
+               + ` font-family="system-ui" style="pointer-events:none;">${r.pairs.length} Fundamente</text>`;
+        }
+      } else if (r.pak) {
+        beide(`<text x="${LEFT_W + 8}" y="${midY}" font-size="9" fill="#b45309" font-family="system-ui">ohne Startdatum</text>`);
+      }
+    } else if (r.type === 'gruppe') {
       const collapsed = _bpCollapsed.has(r.gid);
       beide(`<text x="8" y="${midY}" font-size="11" fill="#1a3a5c" font-weight="700" font-family="system-ui">${collapsed?'▶':'▼'} ${(r.grp?.name||'Gruppe').slice(0,12)}</text>`);
       // Klickbare Fläche für Toggle
@@ -2044,6 +2146,16 @@ function renderBpFundamenteGantt() {
       renderBpFundamenteGantt();
     });
   });
+  wrap.querySelectorAll('[data-toggle-pak]').forEach(el => {
+    el.addEventListener('click', () => bpPaketZeileUmschalten(el.getAttribute('data-toggle-pak')));
+  });
+  // Paketbalken im Kopf: Klick klappt auf, statt den Paketdialog zu oeffnen —
+  // im Fundamentdiagramm ist das Aufklappen die naheliegende Handlung.
+  if (_bpFundSort === 'paket') {
+    wrap.querySelectorAll('[data-bp-modal]').forEach(el => {
+      el.onclick = () => bpPaketZeileUmschalten(el.getAttribute('data-bp-modal'));
+    });
+  }
   wrap.querySelectorAll('[data-ms-id]').forEach(el => {
     const id = el.getAttribute('data-ms-id');
     el.onclick = () => openMeilensteinModal(id);

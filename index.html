@@ -396,8 +396,14 @@
     to   { opacity: 1; transform: none; }
   }
   .ansicht-rein { animation: ansicht-rein 0.22s ease-out; }
+  /* Auf- und Zuklappen einer Paketzeile im Fundamente-Gantt: das SVG wird neu
+     gezeichnet, waehrend der Rahmen seine Hoehe faehrt (bpPaketZeileUmschalten).
+     Das kurze Einblenden nimmt dem Neuaufbau die Haerte. */
+  @keyframes bp-fund-auf { from { opacity: .35; } to { opacity: 1; } }
+  .bp-fund-auf { animation: bp-fund-auf .18s ease-out; }
   @media (prefers-reduced-motion: reduce) {
     .ansicht-rein { animation: none; }
+    .bp-fund-auf  { animation: none; }
   }
   .filters { display: flex; gap: 6px; }
   .filter-btn {
@@ -2421,6 +2427,7 @@
         <span class="seg">
           <button id="bp-fsort-km"        onclick="setBpFundSort('km')">KM</button>
           <button id="bp-fsort-datum"     onclick="setBpFundSort('datum')" class="aktiv">Datum</button>
+          <button id="bp-fsort-paket"     onclick="setBpFundSort('paket')">Paket</button>
           <button id="bp-fsort-baugruppe" onclick="setBpFundSort('baugruppe')">Baugruppe</button>
         </span>
       </div>
