@@ -473,12 +473,12 @@ function bpMsMoveMove(e) {
     tip.style.top  = (e.clientY - 32) + 'px';
   }
   if (_bpZoomColW > 0) {
-    const wrap = document.getElementById('bp-gantt-wrap');
+    const wrap = document.getElementById(bpGanttZielId());
     if (wrap) {
       const rect   = wrap.getBoundingClientRect();
       const svgX   = e.clientX - rect.left + wrap.scrollLeft;
       const dayOff = Math.round((svgX - 112) / _bpZoomColW);
-      _bpShowSnapHighlight('bp-gantt-wrap', 112 + dayOff * _bpZoomColW, _bpZoomColW);
+      _bpShowSnapHighlight(bpGanttZielId(), 112 + dayOff * _bpZoomColW, _bpZoomColW);
     }
   }
 }
@@ -947,6 +947,12 @@ async function executeBpReset() {
   renderBauprogrammTab();
 }
 
+// Wohin die Zieh-Rueckmeldung gezeichnet wird. Das eigene Paketdiagramm gibt
+// es in der Ausfuehrungsansicht nicht mehr; in der Kartenansicht schon.
+function bpGanttZielId() {
+  return document.getElementById('bp-gantt-wrap') ? 'bp-gantt-wrap' : 'bp-fund-gantt-wrap';
+}
+
 function bpResizeMove(e) {
   if (!_bpResizeDrag) return;
   const delta      = e.clientX - _bpResizeDrag.startX;
@@ -981,14 +987,14 @@ function bpResizeMove(e) {
   }
   // Snap-Highlight: Spaltenstreifen am aktuellen Maus-X
   if (_bpZoomColW > 0) {
-    const wrap = document.getElementById('bp-gantt-wrap');
+    const wrap = document.getElementById(bpGanttZielId());
     if (wrap) {
       const rect   = wrap.getBoundingClientRect();
       const svgX   = e.clientX - rect.left + wrap.scrollLeft;
       const LEFT_W = 120;
       const dayOff = Math.round((svgX - LEFT_W) / _bpZoomColW);
       const colX   = LEFT_W + dayOff * _bpZoomColW;
-      _bpShowSnapHighlight('bp-gantt-wrap', colX, _bpZoomColW);
+      _bpShowSnapHighlight(bpGanttZielId(), colX, _bpZoomColW);
     }
   }
 }
@@ -1058,14 +1064,14 @@ function bpMoveMove(e) {
   }
   // Snap-Highlight: Spaltenstreifen am aktuellen Maus-X
   if (_bpZoomColW > 0) {
-    const wrap = document.getElementById('bp-gantt-wrap');
+    const wrap = document.getElementById(bpGanttZielId());
     if (wrap) {
       const rect   = wrap.getBoundingClientRect();
       const svgX   = e.clientX - rect.left + wrap.scrollLeft;
       const LEFT_W = 120;
       const dayOff = Math.round((svgX - LEFT_W) / _bpZoomColW);
       const colX   = LEFT_W + dayOff * _bpZoomColW;
-      _bpShowSnapHighlight('bp-gantt-wrap', colX, _bpZoomColW);
+      _bpShowSnapHighlight(bpGanttZielId(), colX, _bpZoomColW);
     }
   }
 }
@@ -1350,7 +1356,7 @@ function renderBauprogrammTab() {
   bpSeedStartwerte();   // einmalig je Projekt: ein Sperrmuster, ein Los
   try { renderBpGantt(); } catch(e) {
     console.error('renderBpGantt:', e);
-    const w = document.getElementById('bp-gantt-wrap');
+    const w = document.getElementById(bpGanttZielId());
     if (w) w.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">Fehler beim Rendern der Baupakete (siehe Konsole).<br><small>' + String(e).replace(/</g,'&lt;') + '</small></div>';
   }
   try { renderBpLegende(); } catch(e) { console.error('renderBpLegende:', e); }
@@ -1583,7 +1589,7 @@ function _bpFundHintergrundSvg(g) {
   let svg = '';
   let y = g.HEADER_H;
   g.rowDefs.forEach((r, ri) => {
-    const h = ['gruppe','abbruch-header','paket'].includes(r.type) ? g.GROUP_H : g.ROW_H;
+    const h = ['gruppe','abbruch-header','paket','team'].includes(r.type) ? g.GROUP_H : g.ROW_H;
     svg += `<rect x="0" y="${y}" width="${g.totalW}" height="${h}" fill="${r.type==='vorarbeit'?'#fffbeb':ri%2===0?'#fff':'#f9fafb'}"/>`;
     y += h;
   });
@@ -1751,31 +1757,44 @@ const rowDefs = [];
 const sorted  = sortPairs(neubauPairs);
 
 if (_bpFundSort === 'paket') {
-  // Fundamente unter ihrem Baupaket. Die Reihenfolge folgt dem Starttermin,
-  // Unzugewiesenes kommt zuletzt — es ist das, was noch Arbeit macht, und
-  // soll nicht zwischen den terminierten Paketen untergehen.
+  // Drei Ebenen: Team → Baupaket → Fundament.
+  //
+  // Die Teamzeile zeichnet ALLE Pakete des Teams nebeneinander in EINE Zeile.
+  // Das ist die Aussage, die frueher nur das eigene Paketdiagramm machte: ob
+  // ein Team doppelt belegt ist, sieht man daran, dass sich in seiner Zeile
+  // zwei Balken ueberlappen. Ohne diese Zeile waere sie beim Zusammenlegen
+  // verloren gegangen.
   const nachPaket = new Map();
   sorted.forEach(p => {
     const pid = zuw[p.id]?.paketId || '__ohne_paket__';
     if (!nachPaket.has(pid)) nachPaket.set(pid, []);
     nachPaket.get(pid).push(p);
   });
-  const reihenfolge = [...pakete]
-    .sort((a, b) => (a.startDatum || '9999').localeCompare(b.startDatum || '9999'))
-    .map(p => p.id)
-    .filter(id => nachPaket.has(id));
-  // Leere Pakete gehoeren trotzdem in die Liste: sonst sieht man nicht, dass
-  // sie noch nichts zu tun haben.
-  [...pakete].sort((a, b) => (a.startDatum || '9999').localeCompare(b.startDatum || '9999'))
-    .forEach(p => { if (!reihenfolge.includes(p.id)) reihenfolge.push(p.id); });
-  if (nachPaket.has('__ohne_paket__')) reihenfolge.push('__ohne_paket__');
 
-  reihenfolge.forEach(pid => {
-    const pak    = pakete.find(p => p.id === pid) || null;
-    const gPairs = nachPaket.get(pid) || [];
-    rowDefs.push({ type: 'paket', pak, pid, pairs: gPairs });
-    if (!_bpCollapsed.has(pid)) gPairs.forEach(p => rowDefs.push({ type: 'fund', pair: p, indent: true, imPaket: pid }));
+  const nachStart = (a, b) => (a.startDatum || '9999').localeCompare(b.startDatum || '9999');
+  const teams     = (loadProjEinst().teams || []);
+  const teamOrdnung = [...teams.map(t => t.id), '__ohne_team__'];
+
+  teamOrdnung.forEach(tid => {
+    const teamPakete = [...pakete].filter(p => (p.teamId || '__ohne_team__') === tid).sort(nachStart);
+    if (!teamPakete.length) return;
+    const team = teams.find(t => t.id === tid);
+    rowDefs.push({ type: 'team', tid, name: team?.name || 'Ohne Los', pakete: teamPakete });
+    if (_bpCollapsed.has('team_' + tid)) return;
+    teamPakete.forEach(pak => {
+      const gPairs = nachPaket.get(pak.id) || [];
+      rowDefs.push({ type: 'paket', pak, pid: pak.id, pairs: gPairs, indent: true });
+      if (!_bpCollapsed.has(pak.id)) gPairs.forEach(p => rowDefs.push({ type: 'fund', pair: p, indent: true, imPaket: pak.id }));
+    });
   });
+
+  // Nicht zugewiesene Fundamente zuletzt — sie sind das, was noch Arbeit
+  // macht, und sollen nicht zwischen den terminierten Paketen untergehen.
+  if (nachPaket.has('__ohne_paket__')) {
+    const ohne = nachPaket.get('__ohne_paket__');
+    rowDefs.push({ type: 'paket', pak: null, pid: '__ohne_paket__', pairs: ohne });
+    if (!_bpCollapsed.has('__ohne_paket__')) ohne.forEach(p => rowDefs.push({ type: 'fund', pair: p, indent: true, imPaket: '__ohne_paket__' }));
+  }
 } else if (_bpFundSort === 'baugruppe') {
   const grouped = {};
   sorted.forEach(p => { const gid = zuw[p.id]?.bauGruppeId||'__none__'; (grouped[gid]=grouped[gid]||[]).push(p); });
@@ -1903,7 +1922,7 @@ function renderBpFundamenteGantt() {
     else cur.setMonth(cur.getMonth()+1);
   }
   const totalW = LEFT_W + cols.length * COL_W;
-  const totalH = HEADER_H + rowDefs.reduce((h,r) => h + (['gruppe','abbruch-header','paket'].includes(r.type) ? GROUP_H : ROW_H), 0) + 8;
+  const totalH = HEADER_H + rowDefs.reduce((h,r) => h + (['gruppe','abbruch-header','paket','team'].includes(r.type) ? GROUP_H : ROW_H), 0) + 8;
 
   const xFor = dateStr => {
     if (!dateStr) return LEFT_W;
@@ -1931,21 +1950,47 @@ function renderBpFundamenteGantt() {
   // Zeilen rendern
   let rowY = HEADER_H;
   rowDefs.forEach(r => {
-    const h   = ['gruppe','abbruch-header','paket'].includes(r.type) ? GROUP_H : ROW_H;
+    const h   = ['gruppe','abbruch-header','paket','team'].includes(r.type) ? GROUP_H : ROW_H;
     const midY = rowY + h/2 + 4;
 
     // Linke Spalte
-    beide(`<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="${r.type==='gruppe'||r.type==='paket'?'#f8fafc':r.type==='abbruch-header'?'#fff7ed':r.type==='vorarbeit'?'#fffbeb':'white'}"/>`);
+    beide(`<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="${r.type==='team'?'#eef2f7':r.type==='gruppe'||r.type==='paket'?'#f8fafc':r.type==='abbruch-header'?'#fff7ed':r.type==='vorarbeit'?'#fffbeb':'white'}"/>`);
     beide(`<line x1="${LEFT_W}" y1="${rowY}" x2="${LEFT_W}" y2="${rowY+h}" stroke="#e5e7eb" stroke-width="1"/>`);
 
-    if (r.type === 'paket') {
+    if (r.type === 'team') {
+      // Alle Pakete des Teams in EINER Zeile: ueberlappende Balken zeigen,
+      // dass das Team doppelt belegt ist. Diese Aussage machte frueher das
+      // eigene Paketdiagramm.
+      const zu = _bpCollapsed.has('team_' + r.tid);
+      beide(`<text x="8" y="${midY}" font-size="11" fill="#0f172a" font-weight="800" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(r.name.slice(0, 12))}</text>`);
+      beide(`<text x="${LEFT_W - 8}" y="${midY}" font-size="9" fill="#9ca3af" text-anchor="end" font-family="system-ui">${r.pakete.length}</text>`);
+      svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-team="${r.tid}"/>`;
+
+      const spannen = [];
+      r.pakete.forEach(pak => {
+        if (!pak.startDatum) return;
+        const bx = xFor(pak.startDatum);
+        const bw = Math.max(COL_W, xFor(bpPaketEnd(pak) || pak.startDatum) + COL_W - bx);
+        spannen.push([bx, bx + bw]);
+        svg += `<rect x="${bx}" y="${rowY+7}" width="${bw}" height="${h-14}" rx="3" fill="${pak.farbe || '#1a3a5c'}" opacity="0.55" style="pointer-events:none;"/>`;
+      });
+      // Ueberschneidungen ausdruecklich markieren — zwei Balken uebereinander
+      // sind schnell uebersehen, wenn sie dieselbe Farbe haben.
+      spannen.sort((a, b) => a[0] - b[0]).forEach((s, i) => {
+        const v = spannen[i - 1];
+        if (!v || s[0] >= v[1]) return;
+        svg += `<rect x="${s[0]}" y="${rowY+4}" width="${Math.min(v[1], s[1]) - s[0]}" height="${h-8}" rx="3"`
+             + ` fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="3,2" style="pointer-events:none;"/>`;
+      });
+    } else if (r.type === 'paket') {
       // Kopfzeile eines Baupakets: derselbe Balken wie im Paketdiagramm, nur
       // hier mit seinen Fundamenten darunter. Zugeklappt zeigt er die Huelle,
       // aufgeklappt steht er ueber den einzelnen Zeilen.
       const zu   = _bpCollapsed.has(r.pid);
       const col  = r.pak?.farbe || '#9ca3af';
-      const name = (r.pak?.name || 'ohne Paket').slice(0, 13);
-      beide(`<text x="8" y="${midY}" font-size="11" fill="${r.pak ? '#1a3a5c' : '#b45309'}" font-weight="700" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(name)}</text>`);
+      const name = (r.pak?.name || 'ohne Paket').slice(0, 12);
+      const ein  = r.indent ? 10 : 0;
+      beide(`<text x="${8+ein}" y="${midY}" font-size="11" fill="${r.pak ? '#1a3a5c' : '#b45309'}" font-weight="700" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(name)}</text>`);
       beide(`<text x="${LEFT_W - 8}" y="${midY}" font-size="9" fill="#9ca3af" text-anchor="end" font-family="system-ui">${r.pairs.length}</text>`);
       svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-pak="${r.pid}"/>`;
 
@@ -1953,10 +1998,16 @@ function renderBpFundamenteGantt() {
         const bx = xFor(r.pak.startDatum);
         const bw = Math.max(COL_W, xFor(bpPaketEnd(r.pak) || r.pak.startDatum) + COL_W - bx);
         svg += `<rect x="${bx}" y="${rowY+5}" width="${bw}" height="${h-10}" rx="4" fill="${col}"`
-             + ` opacity="${zu ? 0.85 : 0.28}" style="cursor:pointer;"`
+             + ` opacity="${zu ? 0.85 : 0.28}" style="cursor:grab;"`
              + ` data-bp-modal="${r.pak.id}" data-bp-move="${r.pak.id}" data-bp-start="${r.pak.startDatum}" data-bp-ctx="${r.pak.id}"/>`;
+        // Griffe zum Verlaengern — wie im frueheren Paketdiagramm
+        const griff = (gx, seite) =>
+          `<rect x="${gx}" y="${rowY+8}" width="5" height="${h-16}" rx="2" fill="rgba(255,255,255,0.65)"`
+          + ` style="cursor:ew-resize;" data-bp-resize="${r.pak.id}" data-bp-side="${seite}"`
+          + ` data-bp-start="${r.pak.startDatum}" data-bp-naechte="${r.pak.anzahlNaechte || 1}"/>`;
+        svg += griff(bx, 'left') + griff(bx + bw - 5, 'right');
         if (zu) {
-          svg += `<text x="${bx+7}" y="${midY-1}" font-size="9" fill="white" font-weight="700"`
+          svg += `<text x="${bx+9}" y="${midY-1}" font-size="9" fill="white" font-weight="700"`
                + ` font-family="system-ui" style="pointer-events:none;">${r.pairs.length} Fundamente</text>`;
         }
       } else if (r.pak) {
@@ -2149,12 +2200,54 @@ function renderBpFundamenteGantt() {
   wrap.querySelectorAll('[data-toggle-pak]').forEach(el => {
     el.addEventListener('click', () => bpPaketZeileUmschalten(el.getAttribute('data-toggle-pak')));
   });
-  // Paketbalken im Kopf: Klick klappt auf, statt den Paketdialog zu oeffnen —
-  // im Fundamentdiagramm ist das Aufklappen die naheliegende Handlung.
+  wrap.querySelectorAll('[data-toggle-team]').forEach(el => {
+    el.addEventListener('click', () => bpPaketZeileUmschalten('team_' + el.getAttribute('data-toggle-team')));
+  });
+
+  // Bedienung der Paketbalken — dieselbe wie im frueheren Paketdiagramm.
+  // Die Zeiger-Handler haengen global am document (siehe listen-bsp.js), hier
+  // wird nur der Beginn angemeldet.
   if (_bpFundSort === 'paket') {
-    wrap.querySelectorAll('[data-bp-modal]').forEach(el => {
-      el.onclick = () => bpPaketZeileUmschalten(el.getAttribute('data-bp-modal'));
+    wrap.querySelectorAll('[data-bp-resize]').forEach(el => {
+      el.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const naechte = parseInt(el.getAttribute('data-bp-naechte'));
+        const start   = el.getAttribute('data-bp-start');
+        _bpResizeDrag = {
+          pakId:          el.getAttribute('data-bp-resize'),
+          side:           el.getAttribute('data-bp-side') || 'right',
+          startX:         e.clientX,
+          startNaechte:   naechte,
+          startDatum:     start,
+          currentNaechte: naechte,
+          currentStart:   start,
+        };
+      });
     });
+    wrap.querySelectorAll('[data-bp-move]').forEach(el => {
+      el.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation();
+        _bpMoveDrag = {
+          pakId:        el.getAttribute('data-bp-move'),
+          origStart:    el.getAttribute('data-bp-start'),
+          startX:       e.clientX,
+          currentStart: el.getAttribute('data-bp-start'),
+          moved:        false,
+        };
+      });
+      // Klick ohne Zug klappt auf; der Paketdialog liegt auf dem Kontextmenue
+      el.onclick = () => { if (!_bpMoveDrag?.moved) bpPaketZeileUmschalten(el.getAttribute('data-bp-move')); };
+    });
+    if (!wrap._bpPakCtxAttached) {
+      wrap._bpPakCtxAttached = true;
+      wrap.addEventListener('contextmenu', e => {
+        const bar = e.target.closest('[data-bp-ctx]');
+        if (!bar) return;
+        e.preventDefault(); e.stopPropagation();
+        showBpPakCtxMenu(bar.getAttribute('data-bp-ctx'), e.clientX, e.clientY);
+      });
+    }
   }
   wrap.querySelectorAll('[data-ms-id]').forEach(el => {
     const id = el.getAttribute('data-ms-id');
@@ -2200,9 +2293,12 @@ function renderBpFundamenteGantt() {
   }
 }
 
-// Kompakte Paket-Legende unterhalb des Gantt
+// Kompakte Paket-Legende. Sie haengte frueher unter dem Paketdiagramm; seit
+// die Pakete Zeilen im Fundamentdiagramm sind, hat sie einen eigenen Platz.
+// Sie sagt etwas, das kein Balken sagt: Bedarf gegen verfuegbare Naechte.
 function renderBpLegende() {
-  const wrap   = document.getElementById('bp-gantt-wrap');
+  const wrap = document.getElementById('bp-legende-wrap')
+            || document.getElementById('bp-gantt-wrap');
   if (!wrap) return;
   const pakete = loadBaupakete();
   const zuw    = loadSchichtZuw();

@@ -2400,18 +2400,13 @@
     </button>
   </div>
 
-  <!-- Gantt-Container — volle Breite, mehr Höhe -->
-  <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 6px;border-bottom:1px solid #f3f4f6;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.05em;">Baupakete</span>
-        <button onclick="renderBauprogrammTab()" title="Neu berechnen" style="padding:2px 7px;border-radius:4px;border:1px solid #e5e7eb;background:white;font-size:13px;color:#6b7280;cursor:pointer;line-height:1;display:inline-flex;align-items:center;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
-      </div>
-    </div>
-    <div id="bp-gantt-wrap" style="overflow-x:auto;min-height:160px;"></div>
-  </div>
+  <!-- Paket-Legende. Das eigene Baupakete-Gantt ist entfallen: seine Balken
+       stehen jetzt als Kopfzeilen im Fundamente-Gantt (Sortierung «Paket»),
+       die Team-Aussage in dessen Teamzeile. Die Legende bleibt — sie zeigt
+       Bedarf gegen verfuegbare Naechte, was kein Balken zeigt. -->
+  <div id="bp-legende-wrap"></div>
 
-  <!-- Fundamente Detail-Gantt -->
+  <!-- Fundamente-Gantt — Teams, Pakete und Fundamente in einer Darstellung -->
   <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid #f3f4f6;flex-wrap:wrap;gap:6px;">
       <div style="display:flex;align-items:center;gap:8px;">
