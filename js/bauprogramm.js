@@ -728,6 +728,71 @@ function bpIstMehrpfahl(pairId) {
   return bpIstPfahlTyp(ftTypZuStandort(loadFtProfile(), bp));
 }
 
+// ── Gemeinsame Zeitachse beider Gantt-Darstellungen ──────────
+// Paket- und Fundamente-Gantt standen uebereinander, benutzten dieselben
+// Spaltenbreiten und dieselbe Zoomstufe — rechneten ihren Anfang aber
+// getrennt: das Paketdiagramm mit Vorlauf und +14 Tagen, das Fundamentdiagramm
+// ohne Vorlauf und mit +35. Ein Datum lag damit in beiden an einer anderen
+// Stelle, und der senkrechte Vergleich fuehrte in die Irre.
+//
+// Gesammelt wird alles, was in einer der beiden Darstellungen vorkommt, damit
+// keine der beiden abgeschnitten wird. Der Vorlauf links bleibt: er gibt Raum
+// zum Zurueckscrollen.
+const BP_ACHSE_VORLAUF = { tag: 7, woche: 28, monat: 60, jahr: 180 };
+const BP_ACHSE_NACHLAUF = 35;
+const BP_ACHSE_LEFT_W   = 112;
+
+function bpZeitachse() {
+  const pakete = loadBaupakete();
+  const zuw    = loadSchichtZuw();
+  const abbZuw = loadAbbZuw();
+  const allBp  = loadAllBauprojekt();
+  const einst  = loadProjEinst();
+  const daten  = [];
+
+  pakete.forEach(p => {
+    if (p.startDatum) daten.push(p.startDatum);
+    const ende = bpPaketEnd(p);            if (ende)   daten.push(ende);
+    const fert = bpPaketFertig(p, zuw, einst); if (fert) daten.push(fert);
+    (p.vorarbeiten || []).forEach(va => {
+      if (!p.startDatum || !va.name) return;
+      daten.push(bpFmtDate(bpAddDays(bpParseDate(p.startDatum), va.offsetTage ?? -14)));
+    });
+  });
+
+  loadMeilensteine().forEach(m => {
+    const d = msMsResolvedDatum(m);
+    if (d) daten.push(bpFmtDate(bpParseDate(d)));
+  });
+
+  getFilteredSorted().forEach(p => {
+    const z = zuw[p.id] || {};
+    if (z.ausschaltermin) daten.push(z.ausschaltermin);
+    if (z.betoniertermin) daten.push(z.betoniertermin);
+    if (z.paketId && z.schichtNr) {
+      const d = bpSchichtDatum(z.paketId, z.schichtNr, pakete);
+      if (d) daten.push(d);
+    }
+    (z.bohrSchichten || []).forEach(b => {
+      const d = bpSchichtDatum(b.paketId, b.schichtNr, pakete);
+      if (d) daten.push(d);
+    });
+    const az = (bpAbbZuwStore(p.id, allBp) === 'abb' ? abbZuw[p.id] : zuw[p.id]) || {};
+    if (az.paketId && az.schichtNr) {
+      const d = bpSchichtDatum(az.paketId, az.schichtNr, pakete);
+      if (d) daten.push(d);
+    }
+  });
+
+  const sortiert = daten.filter(Boolean).sort();
+  if (!sortiert.length) return null;
+  const vorlauf = BP_ACHSE_VORLAUF[_bpZoom] ?? 14;
+  return {
+    projStart: bpAddDays(bpParseDate(sortiert[0]), -vorlauf),
+    projEnd:   bpAddDays(bpParseDate(sortiert[sortiert.length - 1]), BP_ACHSE_NACHLAUF),
+  };
+}
+
 // Pfahltypen, die im Projekt vorkommen, aber weder am Typ noch am Profil eine
 // Bohrleistung fuehren. Ohne sie laesst sich die Bohrzeit nicht rechnen — das
 // gehoert sichtbar gemacht und nicht durch eine andere Groesse ersetzt.
@@ -1735,34 +1800,16 @@ function renderBpFundamenteGantt() {
   // Reihenfolge für Shift-Range-Selektion merken
   _bpFundRowOrder = rowDefs.filter(r => r.type === 'fund' || r.type === 'fund-abbruch').map(r => String(r.pair.id));
 
-  // Datumsbereich bestimmen
-  const allDates = [];
-  pairs.forEach(p => {
-    const d = getStartDate(p); if (d) allDates.push(d);
-    const z = _getEffZ(p);
-    if (z.ausschaltermin) allDates.push(z.ausschaltermin);
-    if (z.paketId && z.schichtNr) { const d2 = bpSchichtDatum(z.paketId, z.schichtNr, pakete); if (d2) allDates.push(d2); }
-    // Abbruch-Datum ebenfalls einbeziehen
-    const dabb = getAbbruchStartDate(p); if (dabb) allDates.push(dabb);
-  });
-  pakete.forEach(p => { if (p.startDatum) allDates.push(p.startDatum); const e=bpPaketEnd(p); if (e) allDates.push(e); });
-  pakete.forEach(pak => {
-    (pak.vorarbeiten || []).forEach(va => {
-      if (!pak.startDatum || !va.name) return;
-      allDates.push(bpFmtDate(bpAddDays(bpParseDate(pak.startDatum), va.offsetTage ?? -14)));
-    });
-  });
-
-  const sortedD = allDates.filter(Boolean).sort();
-  if (!sortedD.length) {
+  // Zeitachse gemeinsam mit dem Paket-Gantt — siehe bpZeitachse()
+  const achse = bpZeitachse();
+  if (!achse) {
     wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:12px;">Noch keine Zuweisung. Auto-Zuweisung starten.</div>';
     return;
   }
-  const projStart = bpParseDate(sortedD[0]);
-  const projEnd   = bpAddDays(bpParseDate(sortedD[sortedD.length-1]), 35);
+  const { projStart, projEnd } = achse;
 
   // Layout
-  const ROW_H   = 32, GROUP_H = 28, HEADER_H = 44, LEFT_W = 112;
+  const ROW_H   = 32, GROUP_H = 28, HEADER_H = 44, LEFT_W = BP_ACHSE_LEFT_W;
   const COL_W   = _bpZoom === 'tag' ? 28 : _bpZoom === 'woche' ? 44 : _bpZoom === 'jahr' ? 90 : 50;
   // Referenz für Drag-Reverse-Mapping speichern
   _bpFundGanttRef = { projStart, colW: COL_W, leftW: LEFT_W, zoom: _bpZoom };
@@ -2297,10 +2344,13 @@ function renderBpGantt(targetId = 'bp-gantt-wrap', karteMode = false) {
     wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:12px;">Baupaket ohne Startdatum — bitte Baupaket öffnen und Datum setzen.</div>';
     return;
   }
-  // Padding links (4 Einheiten) für freies Rückwärts-Scrollen
-  const _padLeft   = { tag: 7, woche: 28, monat: 60, jahr: 180 }[_bpZoom] ?? 14;
-  const projStart  = bpAddDays(bpParseDate(allDaten[0]), -_padLeft);
-  const projEnd    = bpAddDays(bpParseDate(allDaten[allDaten.length - 1]), 14);
+  // Zeitachse gemeinsam mit dem Fundamente-Gantt — siehe bpZeitachse().
+  // Der Rueckfall gilt nur, falls die gemeinsame Achse nichts findet, das
+  // Paketdiagramm aber Daten hat; dann bleibt es bei den eigenen.
+  const _achse    = bpZeitachse();
+  const _padLeft  = BP_ACHSE_VORLAUF[_bpZoom] ?? 14;
+  const projStart = _achse?.projStart || bpAddDays(bpParseDate(allDaten[0]), -_padLeft);
+  const projEnd   = _achse?.projEnd   || bpAddDays(bpParseDate(allDaten[allDaten.length - 1]), BP_ACHSE_NACHLAUF);
 
   // Zoom-Parameter
   const ZOOM = {
@@ -2339,7 +2389,7 @@ function renderBpGantt(targetId = 'bp-gantt-wrap', karteMode = false) {
 
   const ROW_H = 72;
   const _HEADER_DATE_H = 64;   // Höhe des Datums-Headers (KW-Zeilen)
-  const LEFT_W = 100;
+  const LEFT_W = BP_ACHSE_LEFT_W;   // gleiche Breite wie im Fundamente-Gantt
   const spList = loadSperrmuster();
   const SP_STRIP_H = 18;       // Höhe pro Sperrmuster-Streifen (dezent, 2 Zeilen à 7-8 px)
   const SP_BAND_H = spList.length > 0 ? spList.length * SP_STRIP_H + 4 : 0;
