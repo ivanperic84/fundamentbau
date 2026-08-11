@@ -2434,20 +2434,9 @@
   <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
       <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.05em;">Schichtzuweisung</div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <span id="bp-zuw-count" style="font-size:11px;color:#9ca3af;"></span>
-        <div style="position:relative;">
-          <button onclick="toggleExportPanel('szuw-export-panel','szuw-export-btn')" id="szuw-export-btn"
-            style="padding:4px 12px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div id="szuw-export-panel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:300;min-width:120px;">
-            <button onclick="exportSchichtZuwXlsx()" style="width:100%;padding:6px 0;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;cursor:pointer;">Excel</button>
-          </div>
-        </div>
-      </div>
+      <!-- Kein eigener Export-Knopf: der Export der Werkzeugleiste oben
+           schreibt dieselben Daten, jetzt samt Tabellenspalten. -->
+      <span id="bp-zuw-count" style="font-size:11px;color:#9ca3af;"></span>
     </div>
     <div style="overflow-x:auto;">
       <table id="bp-zuweisung-table" class="list-table" style="min-width:800px;width:100%;"></table>

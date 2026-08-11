@@ -1751,6 +1751,16 @@ wrap.querySelectorAll('[data-fp-abbruch-move]').forEach(el => {
 // Baut die Zeilenstruktur des Fundamente-Gantts: Fundament-Zeilen (ggf. nach
 // Baugruppen gruppiert), Abbruch-Zeilen und die Vorarbeits-Zeilen je Baupaket,
 // die oben eingefuegt werden. Rueckgabe: Array von Zeilendefinitionen.
+// Auf-/Zuklapp-Zeichen als SVG statt als Textpfeil. Die Projektregel will
+// Icons als SVG; ausserdem rendern ▶/▼ je nach Schriftfamilie unterschiedlich
+// gross und rueckten die Beschriftung daneben.
+function _bpChevron(x, y, zu) {
+  const d = zu ? 'M4.5 2.5 L7.5 6 L4.5 9.5' : 'M2.5 4.5 L6 7.5 L9.5 4.5';
+  return `<g transform="translate(${x},${y - 6})" fill="none" stroke="currentColor"`
+       + ` stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`
+       + ` style="pointer-events:none;"><path d="${d}"/></g>`;
+}
+
 function _bpFundZeilenstruktur(g) {
   const { abbruchPairs, gruppen, neubauPairs, pairs, pakete, sortPairs, zuw } = g;
 const rowDefs = [];
@@ -1962,7 +1972,8 @@ function renderBpFundamenteGantt() {
       // dass das Team doppelt belegt ist. Diese Aussage machte frueher das
       // eigene Paketdiagramm.
       const zu = _bpCollapsed.has('team_' + r.tid);
-      beide(`<text x="8" y="${midY}" font-size="11" fill="#0f172a" font-weight="800" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(r.name.slice(0, 12))}</text>`);
+      beide(`<g color="#0f172a">${_bpChevron(8, midY, zu)}</g>`);
+      beide(`<text x="22" y="${midY}" font-size="11" fill="#0f172a" font-weight="700" font-family="system-ui">${escHtml(r.name.slice(0, 12))}</text>`);
       beide(`<text x="${LEFT_W - 8}" y="${midY}" font-size="9" fill="#9ca3af" text-anchor="end" font-family="system-ui">${r.pakete.length}</text>`);
       svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-team="${r.tid}"/>`;
 
@@ -1990,7 +2001,9 @@ function renderBpFundamenteGantt() {
       const col  = r.pak?.farbe || '#9ca3af';
       const name = (r.pak?.name || 'ohne Paket').slice(0, 12);
       const ein  = r.indent ? 10 : 0;
-      beide(`<text x="${8+ein}" y="${midY}" font-size="11" fill="${r.pak ? '#1a3a5c' : '#b45309'}" font-weight="700" font-family="system-ui">${zu ? '▶' : '▼'} ${escHtml(name)}</text>`);
+      const pakFarbe = r.pak ? '#1a3a5c' : '#b45309';
+      beide(`<g color="${pakFarbe}">${_bpChevron(8 + ein, midY, zu)}</g>`);
+      beide(`<text x="${22+ein}" y="${midY}" font-size="11" fill="${pakFarbe}" font-weight="600" font-family="system-ui">${escHtml(name)}</text>`);
       beide(`<text x="${LEFT_W - 8}" y="${midY}" font-size="9" fill="#9ca3af" text-anchor="end" font-family="system-ui">${r.pairs.length}</text>`);
       svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-pak="${r.pid}"/>`;
 
@@ -2015,7 +2028,8 @@ function renderBpFundamenteGantt() {
       }
     } else if (r.type === 'gruppe') {
       const collapsed = _bpCollapsed.has(r.gid);
-      beide(`<text x="8" y="${midY}" font-size="11" fill="#1a3a5c" font-weight="700" font-family="system-ui">${collapsed?'▶':'▼'} ${(r.grp?.name||'Gruppe').slice(0,12)}</text>`);
+      beide(`<g color="#1a3a5c">${_bpChevron(8, midY, collapsed)}</g>`);
+      beide(`<text x="22" y="${midY}" font-size="11" fill="#1a3a5c" font-weight="600" font-family="system-ui">${escHtml((r.grp?.name||'Gruppe').slice(0,12))}</text>`);
       // Klickbare Fläche für Toggle
       svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-grp="${r.gid}"/>`;
       // Sammelbalken
@@ -2348,16 +2362,19 @@ function renderBpLegende() {
     </div>`;
   }).join('');
 
-  // «+ Baupaket» immer aktiv
-  const addChip = `<div onclick="openBaupaketModal(null)"
-    style="display:flex;align-items:center;gap:5px;padding:5px 12px;background:white;border:2px dashed #d1d5db;border-radius:6px;cursor:pointer;font-size:11px;color:#9ca3af;font-weight:600;transition:all 0.15s;"
-    onmouseover="this.style.borderColor='#3b82f6';this.style.color='#3b82f6';this.style.background='#f0f4ff';"
-    onmouseout="this.style.borderColor='#d1d5db';this.style.color='#9ca3af';this.style.background='white';">
-    <span style="font-size:18px;font-weight:300;line-height:1;">+</span> Baupaket
-  </div>`;
-
-  leg.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 2px;align-items:center;';
-  leg.innerHTML = items + addChip;
+  // Kein «+ Baupaket» mehr: derselbe Befehl steht in der Werkzeugleiste unter
+  // «Neu». Zwei Wege zum selben Dialog schaffen keine Uebersicht.
+  //
+  // Seit das eigene Paketdiagramm entfallen ist, stehen die Kacheln fuer sich
+  // — ohne Rahmen wirkten sie verloren. Sie bekommen deshalb dieselbe Karte
+  // mit Grossbuchstaben-Titel wie die uebrigen Abschnitte der Ansicht.
+  leg.style.cssText = pakete.length
+    ? 'display:block;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px 12px;margin-bottom:14px;'
+    : 'display:none;';
+  leg.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;'
+    + 'letter-spacing:0.05em;margin-bottom:8px;">Baupakete</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">' + items + '</div>';
 
 
   // Hinweis: Karte auf "Baupaket / Schicht" umschalten
@@ -3442,6 +3459,16 @@ function setBpZuwSort(col) {
 // showControls: Dropdowns anzeigen; zuwData: alternativer Zuweisungs-Store
 // (fuer die ABB-Zeile bei abbruch-neubau). ctx buendelt die Tabellen-
 // konstanten und geladenen Listen aus renderBpZuweisungTable().
+// Geraete des Bauprogramms. Stand dreimal im Code — in der Tabelle, im
+// Los-Editor und zuletzt im Export, wo die Bezeichnung fehlte, weil die dort
+// benutzte Karte eine lokale Konstante einer anderen Funktion war.
+const BP_GERAET = {
+  bagger:       'Bagger',
+  bohrmaschine: 'Bohrmaschine',
+  kran:         'Kran',
+  sonstige:     'Sonstige',
+};
+
 function _bpZuwZeileHtml(p, rowMode, showControls, zuwData, ctx) {
   const { allBp, baugruppen, einst, ftList, ftZuw, gerOpts, pakOpts, pakete, stLabels, stStyles, stVals, tdS, zuw } = ctx;
     if (rowMode === true)  rowMode = 'abbruch';   // backward compat
@@ -3513,14 +3540,21 @@ function _bpZuwZeileHtml(p, rowMode, showControls, zuwData, ctx) {
     const pakInputId = idPfx + '-pak-' + p.id + rowSuffix;
     const schInputId = idPfx + '-sch-' + p.id + rowSuffix;
 
+    // Die Kuerzel sind ohne Erklaerung nicht zu erraten — der Hinweistext
+    // nennt die Bedingung ausgeschrieben und wohin sie wirkt.
     const bedChips = !showControls ? '' : [
-      { key:'gleisgebunden', label:'GL', color:'#b91c1c', bg:'#fee2e2', val: bp2.ausfGleisgebunden },
-      { key:'hoehenbegr',    label:'HB', color:'#92400e', bg:'#fef3c7', val: bp2.ausfHoehenbegrenzung },
-      { key:'abschaltung',   label:'FL', color:'#166534', bg:'#dcfce7', val: bp2.ausfAbschaltung },
-      { key:'nachbargleis',  label:'NG', color:'#1d4ed8', bg:'#dbeafe', val: bp2.ausfNachbargleis },
+      { key:'gleisgebunden', label:'GL', titel:'Gleisgebunden — Arbeiten nur mit Zweiwegefahrzeug',
+        color:'#b91c1c', bg:'#fee2e2', val: bp2.ausfGleisgebunden },
+      { key:'hoehenbegr',    label:'HB', titel:'Höhenbegrenzung — eingeschränkte Aufbauhöhe',
+        color:'#92400e', bg:'#fef3c7', val: bp2.ausfHoehenbegrenzung },
+      { key:'abschaltung',   label:'FL', titel:'Fahrleitungsabschaltung erforderlich',
+        color:'#166534', bg:'#dcfce7', val: bp2.ausfAbschaltung },
+      { key:'nachbargleis',  label:'NG', titel:'Nachbargleis betroffen — zusätzliche Sicherung',
+        color:'#1d4ed8', bg:'#dbeafe', val: bp2.ausfNachbargleis },
     ].map(c => {
       const active = !!c.val;
-      return '<span onclick="toggleBpBedingung(' + p.id + ',\'' + c.key + '\')" style="cursor:pointer;padding:2px 5px;border-radius:4px;font-size:9px;font-weight:700;border:1px solid ' + (active ? c.color : '#e5e7eb') + ';background:' + (active ? c.bg : 'white') + ';color:' + (active ? c.color : '#9ca3af') + ';" title="' + c.key + '">' + c.label + '</span>';
+      const titel  = c.titel + (active ? ' · gesetzt' : ' · nicht gesetzt') + ' · erscheint in Listen und Terminen';
+      return '<span onclick="toggleBpBedingung(' + p.id + ',\'' + c.key + '\')" style="cursor:pointer;padding:2px 5px;border-radius:4px;font-size:9px;font-weight:700;border:1px solid ' + (active ? c.color : '#e5e7eb') + ';background:' + (active ? c.bg : 'white') + ';color:' + (active ? c.color : '#9ca3af') + ';" title="' + titel + '">' + c.label + '</span>';
     }).join('');
 
     const stVal = !showControls ? 'geplant' : ((getPairData(p.id).status) || 'geplant');
@@ -3655,10 +3689,8 @@ function renderBpZuweisungTable() {
     abgesagt:      ['#fee2e2','#dc2626'],
   };
 
-  const geraetVals   = ['bagger','bohrmaschine','kran','sonstige'];
-  const geraetLabels = ['Bagger','Bohrmaschine','Kran','Sonstige'];
   const gerOpts = '<option value="">—</option>' +
-    geraetVals.map((v,j) => '<option value="' + v + '">' + geraetLabels[j] + '</option>').join('');
+    Object.entries(BP_GERAET).map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
 
   // Hilfsfunktion: eine Tabellenzeile rendern
   // rowMode: 'neubau' | 'abbruch' | 'sicherung' | 'provisorium'
@@ -5680,8 +5712,6 @@ function closeProjEinstModal() {
 function renderEinstTeamsList(teams) {
   const wrap = document.getElementById('einst-teams-list');
   if (!wrap) return;
-  const GERAET_OPT = ['bagger','bohrmaschine','kran','sonstige'];
-  const GERAET_LBL = { 'bagger':'Bagger','bohrmaschine':'Bohrmaschine','kran':'Kran','sonstige':'Sonstige' };
 
   const addTile = '<div onclick="addTeamRow()" '
     + 'style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;'
@@ -5700,7 +5730,7 @@ function renderEinstTeamsList(teams) {
 
   wrap.innerHTML = teams.map((t, i) => {
     const gerOptHtml = '<option value="">— Gerät —</option>'
-      + GERAET_OPT.map(g => '<option value="' + g + '"' + (t.geraet === g ? ' selected' : '') + '>' + GERAET_LBL[g] + '</option>').join('');
+      + Object.entries(BP_GERAET).map(([g, l]) => '<option value="' + g + '"' + (t.geraet === g ? ' selected' : '') + '>' + l + '</option>').join('');
     return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.06);" id="team-row-' + i + '">'
       + '<input type="text" value="' + (t.name || '') + '" placeholder="Los 1" id="team-name-' + i + '" '
         + 'style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;font-family:inherit;font-weight:600;">'
@@ -6417,43 +6447,112 @@ function exportBauprogrammJson() {
   a.click();
 }
 
+// Der Export traegt jetzt dasselbe wie die Tabelle auf dem Bildschirm — es
+// hat keinen Wert, Angaben zu pflegen, die dann nicht mitkommen. Zwei
+// Blaetter: die Zuweisung je Fundament und eine Uebersicht je Baupaket.
 function exportBauprogrammXlsx() {
   if (!window.XLSX) { ui.toast('SheetJS nicht geladen.', 'fehler'); return; }
   const pakete = loadBaupakete();
   const zuw    = loadSchichtZuw();
   const pairs  = getFilteredSorted();
-  const ftZuw  = loadFtZuweisungen();
   const ftList = loadFtProfile();
   const spList = loadSperrmuster();
   const einst  = loadProjEinst();
+  const allBp  = loadAllBauprojekt();
+  const gruppen = loadBaugruppen();
+  const teams   = einst.teams || [];
 
-  const rows = [['Mast','KM','Gleis','Fundamenttyp','Baupaket','Schicht Nr.','Schichtdatum','Sperrmuster','Eff. Schichtzeit (min)']];
+  const BED = [
+    ['ausfGleisgebunden',    'Gleisgebunden'],
+    ['ausfHoehenbegrenzung', 'Höhenbegrenzung'],
+    ['ausfAbschaltung',      'FL-Abschaltung'],
+    ['ausfNachbargleis',     'Nachbargleis'],
+  ];
+
+  const zeilen = [[
+    'Mast', 'KM', 'Gleis', 'Massnahme', 'Fundamenttyp',
+    'Los / Team', 'Baupaket', 'Paketstart', 'Schicht Nr.', 'Schichtdatum',
+    'Sperrmuster', 'Eff. Schichtzeit (min)', 'Kapazität je Schicht',
+    'Baugruppe', 'Bohrschichten', 'Betoniertermin', 'Ausschaltermin',
+    'Gerät', 'Bedingungen', 'Status',
+  ]];
+
   pairs.forEach(p => {
     const z   = zuw[p.id] || {};
     const pak = pakete.find(pk => pk.id === z.paketId);
-    const ft  = ftList.find(t => t.id === ftZuw[p.id]);
+    const team = pak ? teams.find(t => t.id === pak.teamId) : null;
+    const ft  = ftTypZuStandort(ftList, { ...p, ...(allBp[p.id] || {}) });
     const schichten = pak ? bpGetSchichten(pak) : [];
     const sch = schichten.find(s => s.schichtNr === z.schichtNr);
-    // SP pro Fundament: p.gleis hat Vorrang vor dem im Paket hinterlegten SP
     const sp  = sch?.datum
       ? (resolveSpForGleis(p.gleis, sch.datum) || (sch.spId ? spList.find(s => s.id === sch.spId) : null))
       : (pak ? resolveSpForPak(pak, pak.startDatum) : null);
     const effMin = sp?.nettoH ? sp.nettoH * 60 - (einst.abzugMinuten || 0) : '';
-    rows.push([
+    const kap    = (ft && sp?.nettoH) ? getFtLeistung(ft, sp.nettoH, einst.abzugMinuten) : null;
+    const grp    = z.bauGruppeId ? gruppen.find(g => g.id === z.bauGruppeId) : null;
+    const bohr   = (z.bohrSchichten || []).map(b => b.schichtNr).join(', ');
+    const bp2    = allBp[p.id] || {};
+    const bed    = BED.filter(([k]) => bp2[k]).map(([, l]) => l).join(', ');
+
+    zeilen.push([
       'Mast ' + (p.mast || p.id),
       p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '',
       p.gleis || '',
-      ft?.name || '',
+      typeof getMassnahmeLabel === 'function' ? getMassnahmeLabel(bp2) : (bp2.massnahme || ''),
+      ft?.name || bp2.fundtyp || '',
+      team?.name || (pak ? 'Ohne Los' : ''),
       pak?.name || '',
+      pak?.startDatum ? bpFmtDisplay(pak.startDatum) : '',
       z.schichtNr || '',
       sch ? bpFmtDisplay(sch.datum) : '',
       sp?.name || '',
       effMin,
+      kap != null ? kap : '',
+      grp?.name || '',
+      bohr,
+      z.betoniertermin ? bpFmtDisplay(z.betoniertermin) : '',
+      z.ausschaltermin ? bpFmtDisplay(z.ausschaltermin) : '',
+      BP_GERAET[bp2.ausfGeraet] || bp2.ausfGeraet || '',
+      bed,
+      (getPairData(p.id).status) || 'geplant',
+    ]);
+  });
+
+  // Zweites Blatt: je Baupaket, mit der Auslastung und dem Terminkonflikt —
+  // die Aussagen der Legende und der Teamzeile, die auf dem Bildschirm nur
+  // als Farbe und Ueberlappung sichtbar sind.
+  const pakZeilen = [[
+    'Baupaket', 'Los / Team', 'Sperrmuster', 'Start', 'Nächte', 'Ende',
+    'Fundamente', 'Bedarf Nächte', 'Auslastung', 'Überschneidung im Los',
+  ]];
+  pakete.forEach(pak => {
+    const team = teams.find(t => t.id === pak.teamId);
+    const bd   = bpPaketBedarf(pak.id);
+    const sp   = resolveSpForPak(pak, pak.startDatum);
+    const ende = bpPaketEnd(pak);
+    // Ueberschneidung: ein anderes Paket desselben Loses im selben Zeitraum
+    const konflikt = pakete.filter(a => a.id !== pak.id
+        && (a.teamId || '') === (pak.teamId || '')
+        && a.startDatum && pak.startDatum && ende && bpPaketEnd(a)
+        && a.startDatum <= ende && bpPaketEnd(a) >= pak.startDatum)
+      .map(a => a.name).join(', ');
+    pakZeilen.push([
+      pak.name,
+      team?.name || 'Ohne Los',
+      sp?.name || '',
+      pak.startDatum ? bpFmtDisplay(pak.startDatum) : '',
+      pak.anzahlNaechte || '',
+      ende ? bpFmtDisplay(ende) : '',
+      bd.cnt,
+      bd.bedarf,
+      (pak.anzahlNaechte && bd.bedarf) ? bd.bedarf + ' / ' + pak.anzahlNaechte : '',
+      konflikt,
     ]);
   });
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Bauprogramm');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zeilen),    'Schichtzuweisung');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pakZeilen), 'Baupakete');
   XLSX.writeFile(wb, 'Bauprogramm_' + (getActiveProjectName()||'Projekt') + '.xlsx');
 }
 
