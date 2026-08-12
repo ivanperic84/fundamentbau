@@ -181,11 +181,14 @@ function fmMengen(ft) {
   // Bewehrung als Gewicht je Fundament. Sie steht am Typ und wird NICHT aus
   // der Geometrie geschaetzt: das Gewicht haengt am Bewehrungsplan, nicht am
   // Volumen, und ein angenommener Gehalt in kg/m3 waere eine erfundene Menge.
-  // Vermisst wird sie nur dort, wo Beton anfaellt — an Fels und Mauer gibt es
-  // keinen Bewehrungskorb, sondern Anker. Gleiche Regel wie bei den Buegeln.
+  //
+  // Fehlt sie, wird sie NICHT vermisst. Im Gleistiefbau treibt das Material
+  // die Kosten selten — dort haengen sie an den Schichten und den Stunden, die
+  // je Schicht verrechnet werden. Ein Mangel an jedem Standort, nur weil kein
+  // Bewehrungsgewicht hinterlegt ist, wuerde das Zeichen entwerten, das die
+  // fehlende Geometrie meldet.
   const bewKg = fmZahl(ft.bewehrungKg);
   if (bewKg != null) d.bewehrung = bewKg;
-  else if (d.beton != null) fehlend.push(FM_FELD_LABEL.bewehrung);
 
   d.fixierung = fmFixierung(ft).reduce((s, f) => s + (f.anzPro || 0), 0) || null;
 

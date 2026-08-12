@@ -108,6 +108,9 @@ const MK_HERKUENFTE = [
   { id: 'schicht',        label: 'Anzahl Schichten' },
   { id: 'schichtNacht',   label: 'Schichten Nacht' },
   { id: 'schichtSonntag', label: 'Schichten Sonntag' },
+  { id: 'stunden',        label: 'Verrechnete Stunden' },
+  { id: 'stundenNacht',   label: 'Verrechnete Stunden Nacht' },
+  { id: 'stundenSonntag', label: 'Verrechnete Stunden Sonntag' },
   ...MASSEN_GROESSEN.map(g => ({ id: g.id, label: g.label })),
 ];
 
@@ -137,6 +140,16 @@ function saveLvPositionen(liste) {
 function loadMkEinstellungen() {
   try { return jsonParse(store.getItem(LV_EINST_KEY())) || { zuschlag: 10, mwst: 8.1 }; }
   catch { return { zuschlag: 10, mwst: 8.1 }; }
+}
+
+// Verrechnete Stunden je Schicht. Im Gleistiefbau rechnet der Baumeister eine
+// GANZE Schicht ab — ueblich acht Stunden — auch wenn das Sperrintervall nur
+// ein paar Stunden dauert; dasselbe gilt fuer Maschinen und Geraete. Die
+// Nettodauer des Sperrmusters bestimmt, wie viel in einer Schicht geschafft
+// wird. Was die Schicht KOSTET, bestimmt sie nicht.
+function mkStundenJeSchicht() {
+  const n = Number(loadMkEinstellungen().stundenJeSchicht);
+  return Number.isFinite(n) && n > 0 ? n : 8;
 }
 function saveMkEinstellungen(e) {
   store.setItem(LV_EINST_KEY(), JSON.stringify(e));
@@ -407,12 +420,23 @@ const MK_SCHICHT_HERKUNFT = {
   schicht:        'Anzahl Schichten',
   schichtNacht:   'Schichten im Nachtfenster',
   schichtSonntag: 'Schichten an Sonntagen',
+  stunden:        'Verrechnete Stunden',
+  stundenNacht:   'Verrechnete Stunden im Nachtfenster',
+  stundenSonntag: 'Verrechnete Stunden an Sonntagen',
 };
 
+// teamId bindet die Zeile an ein Los, faktor ist die Anzahl — zwei Polier auf
+// derselben Schicht sind zwei mal acht Stunden. Beide stehen nur an Zeilen,
+// die aus der Besetzung erzeugt wurden.
 function lvMenge(zeile, summen) {
-  if (zeile.herkunft === 'schicht')         return schichtenGesamt();
-  if (zeile.herkunft === 'schichtNacht')    return schichtenAufteilung().nacht;
-  if (zeile.herkunft === 'schichtSonntag')  return schichtenAufteilung().sonntag;
+  const f = zeile.faktor > 0 ? zeile.faktor : 1;
+  if (MK_SCHICHT_HERKUNFT[zeile.herkunft]) {
+    const a  = zeile.teamId ? schichtenAufteilung(zeile.teamId) : schichtenAufteilung();
+    const nr = zeile.herkunft.endsWith('Nacht')   ? a.nacht
+             : zeile.herkunft.endsWith('Sonntag') ? a.sonntag
+             : (zeile.teamId ? a.total : schichtenGesamt());
+    return nr * f * (zeile.herkunft.startsWith('stunden') ? mkStundenJeSchicht() : 1);
+  }
   if (zeile.herkunft && summen[zeile.herkunft] != null) return summen[zeile.herkunft];
   return zeile.menge || 0;
 }
@@ -436,8 +460,11 @@ function schichtenBauprogramm() {
 // wird nur gezaehlt.
 //
 // Nacht heisst: das Sperrmuster beginnt ab 18 Uhr oder endet bis 08 Uhr.
-function schichtenAufteilung() {
-  const pakete = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
+// teamId grenzt auf die Baupakete EINES Loses ein — dafuer, dass Mannschaft
+// und Geraete je Los abgerechnet werden und nicht ueber das ganze Projekt.
+function schichtenAufteilung(teamId) {
+  const alle   = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
+  const pakete = teamId ? alle.filter(p => p.teamId === teamId) : alle;
   const muster = typeof loadSperrmuster === 'function' ? loadSperrmuster() : [];
   const aufteilung = { total: 0, nacht: 0, sonntag: 0 };
 
@@ -446,6 +473,10 @@ function schichtenAufteilung() {
   // Nachtschichten, weil in der Sperrpause gearbeitet wird; Sonntage bleiben
   // bei null, denn geraten wird nicht.
   if (!pakete.length || mkSchichtQuelle() !== 'auto') {
+    // Ein Los laesst sich ohne Bauprogramm nicht heraustrennen: die
+    // Schichtzahl von Hand gilt dem ganzen Projekt. Sie hier auszuweisen
+    // wuerde sie mit jedem weiteren Los ein zweites Mal verrechnen.
+    if (teamId) return { total: 0, nacht: 0, sonntag: 0, ohneTermine: true };
     const n = schichtenGesamt();
     return { total: n, nacht: n, sonntag: 0, ohneTermine: true };
   }
@@ -640,18 +671,29 @@ function _mkSchichtQuelle(sumAufwand) {
 function _mkKennzahlen(summen, zeilen) {
   const box = document.getElementById('mk-kennzahlen');
   if (!box) return;
-  const kachel = (wert, label, hinweis) =>
+  // warnung steht in Bernstein, zusatz in Grau: eine Aufteilung ist keine
+  // Beanstandung und darf nicht aussehen wie eine.
+  const kachel = (wert, label, warnung, zusatz) =>
     `<div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;">
        <div style="font-size:17px;font-weight:700;color:#1a3a5c;line-height:1.2;">${wert}</div>
        <div style="font-size:10px;color:#6b7280;margin-top:2px;">${escHtml(label)}</div>
-       ${hinweis ? `<div style="font-size:10px;color:#b45309;margin-top:3px;">${escHtml(hinweis)}</div>` : ''}
+       ${warnung ? `<div style="font-size:10px;color:#b45309;margin-top:3px;">${escHtml(warnung)}</div>` : ''}
+       ${zusatz  ? `<div style="font-size:10px;color:#9ca3af;margin-top:3px;">${escHtml(zusatz)}</div>` : ''}
      </div>`;
+
+  // Die Schichten stehen vorn: im Gleistiefbau haengen die Kosten an ihnen und
+  // an den Stunden, die je Schicht verrechnet werden — nicht an der Kubatur.
+  const auft = schichtenAufteilung();
+  const jeSch = mkStundenJeSchicht();
+  const auf = [auft.nacht ? auft.nacht + ' Nacht' : '',
+               auft.sonntag ? auft.sonntag + ' Sonntag' : ''].filter(Boolean).join(' · ');
   box.innerHTML =
-      kachel(summen.anzahl, 'Fundamente',
+      kachel(auft.total, 'Schichten', '', auf)
+    + kachel(_mkZahl(auft.total * jeSch, 0) + ' h', 'Verrechnete Stunden', '', jeSch + ' h je Schicht')
+    + kachel(summen.anzahl, 'Fundamente',
              summen.fehlend ? summen.fehlend + ' ohne rechenbare Menge' : '')
-    + kachel(_mkZahl(summen.beton, 1) + ' m³', 'Beton')
-    + kachel(_mkZahl(summen.aushub, 1) + ' m³', 'Aushub')
-    + kachel(zeilen.length, 'Gruppen im Auszug');
+    + kachel(_mkZahl(summen.beton, 1) + ' m³', 'Beton', '', zeilen.length + ' Gruppen im Auszug')
+    + kachel(_mkZahl(summen.aushub, 1) + ' m³', 'Aushub');
 }
 
 function _mkMassenTabelle(zeilen, summen, gliederung) {
@@ -742,8 +784,16 @@ function _mkLvTabelle(summen) {
             onfocus="this.style.borderColor='#d1d5db';this.style.background='white'"
             onblur="this.style.borderColor='transparent';this.style.background='transparent'">`;
 
-  const herkunftWahl = (z) =>
-    `<select onchange="lvFeldSpeichern('${z.id}','herkunft',this.value)"
+  // Zeilen aus der Besetzung haengen an einem Los und einer Anzahl. Ein
+  // Auswahlfeld waere hier irrefuehrend: geaendert wird die Besetzung, nicht
+  // die Zeile — sonst liefe der naechste Lauf gegen die Handaenderung.
+  const teamName = id => ((typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || [])
+                           .find(t => t.id === id)?.name || 'Los';
+  const herkunftWahl = (z) => z.quelle === 'besetzung'
+    ? `<span title="Aus der Besetzung von ${escHtml(teamName(z.teamId))} — dort ändern"
+             style="font-size:11px;color:#6b7280;white-space:nowrap;">${escHtml(mkHerkunftLabel(z.herkunft))}${
+               z.faktor > 1 ? ' × ' + z.faktor : ''}</span>`
+    : `<select onchange="lvFeldSpeichern('${z.id}','herkunft',this.value)"
              title="Menge aus dem Massenauszug übernehmen"
              style="padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-family:inherit;background:white;">
        ${_mkHerkunftOptionen(z.herkunft)}
@@ -821,7 +871,7 @@ function _mkLvTabelle(summen) {
        <tbody>${koerper}</tbody>
      </table>`;
   _mkInstBasis(abschnitte);
-  _mkSummenZeile(total);
+  _mkSummenZeile(total, summen.anzahl);
 }
 
 // ── Basis der Baustelleninstallation ─────────────────────────
@@ -894,7 +944,7 @@ function _mkInstBasis(abschnitte) {
      </div>`;
 }
 
-function _mkSummenZeile(netto) {
+function _mkSummenZeile(netto, anzahlFundamente) {
   const el = document.getElementById('mk-summen');
   if (!el) return;
   const e   = loadMkEinstellungen();
@@ -904,10 +954,24 @@ function _mkSummenZeile(netto) {
   const zeile = (label, wert, stark) =>
     `<div style="display:flex;justify-content:space-between;gap:16px;${stark ? 'border-top:1px solid #e5e7eb;margin-top:4px;padding-top:4px;' : 'font-weight:400;color:#6b7280;'}">
        <span>${label}</span><span style="font-variant-numeric:tabular-nums;">${_mkZahl(wert)}</span></div>`;
+
+  // Kosten je Fundament als Kontrollzahl. Gerechnet auf die Summe des
+  // Verzeichnisses OHNE Unvorhergesehenes und Mehrwertsteuer — das ist die
+  // Zahl, die sich mit der Erfahrung aus fruehereren Baustellen vergleichen
+  // laesst. Ein Stueckpreis mit Zuschlaegen drin waere ein anderer Massstab.
+  const jeStk = anzahlFundamente > 0
+    ? `<div style="display:flex;justify-content:space-between;gap:16px;border-top:1px solid #e5e7eb;
+             margin-top:5px;padding-top:5px;font-weight:400;color:#6b7280;font-size:11px;"
+            title="Summe des Verzeichnisses ohne Unvorhergesehenes und MWST, geteilt durch ${anzahlFundamente} Fundamente">
+         <span>je Fundament (${anzahlFundamente} Stk.)</span>
+         <span style="font-variant-numeric:tabular-nums;font-weight:700;color:#1a3a5c;">${_mkZahl(netto / anzahlFundamente)}</span></div>`
+    : '';
+
   el.innerHTML = zeile('Summe LV', netto)
     + zeile(`Unvorhergesehenes ${_mkZahl(e.zuschlag || 0, 0)} %`, zu)
     + zeile(`MWST ${_mkZahl(e.mwst || 0, 1)} %`, mw)
-    + zeile('Total inkl. MWST', zwi + mw, true);
+    + zeile('Total inkl. MWST', zwi + mw, true)
+    + jeStk;
 }
 
 // ── Einlesen und Ausgeben ────────────────────────────────────
@@ -1314,6 +1378,8 @@ function _mkParameterTab() {
     + feld('Unvorhergesehenes', 'mk-p-zuschlag', e.zuschlag, '1', '%', 'Zuschlag auf die Summe des Verzeichnisses')
     + feld('MWST', 'mk-p-mwst', e.mwst, '0.1', '%', '')
     + `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 4px;">Schichten</div>`
+    + feld('Verrechnete Stunden je Schicht', 'mk-p-stunden', mkStundenJeSchicht(), '0.5', 'h',
+           'Der Baumeister rechnet die ganze Schicht ab, auch wenn das Intervall kürzer ist — gilt ebenso für Maschinen und Geräte')
     + `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px;color:#374151;">
          <span style="flex:1 1 auto;">Intervalldauer<br><span style="font-size:10px;color:#9ca3af;">Nettodauer einer Schicht für die Rechnung mit den Aufwandswerten</span></span>
          <select onchange="lkIntervallSetzen(this.value)"
@@ -1357,11 +1423,14 @@ function _mkParameterTab() {
 function mkParameterSpeichern() {
   const zu = parseFloat(document.getElementById('mk-p-zuschlag')?.value);
   const mw = parseFloat(document.getElementById('mk-p-mwst')?.value);
+  const st = parseFloat(document.getElementById('mk-p-stunden')?.value);
   saveMkEinstellungen({
-    zuschlag: Number.isFinite(zu) ? zu : 0,
-    mwst:     Number.isFinite(mw) ? mw : 0,
+    zuschlag:        Number.isFinite(zu) ? zu : 0,
+    mwst:            Number.isFinite(mw) ? mw : 0,
+    stundenJeSchicht: Number.isFinite(st) && st > 0 ? st : 8,
   });
   renderMassenView();
+  _mkParameterTab();
 }
 
 // ── Uebersicht der Fundamenttypen ────────────────────────────
@@ -1468,6 +1537,11 @@ function saveLvVorlage(liste) { store.setItem(LV_VORLAGE_KEY, JSON.stringify(lis
 // Lesehilfe, kein Urteil: die verbindliche Zuordnung steht danach in der
 // Datenbank und faehrt ueber Excel mit.
 const MK_ZUORDNUNG_REGELN = [
+  // Nach Stunden abgerechnet zuerst: Personal, Maschinen und Geraete stehen im
+  // Verzeichnis mit Std. als Einheit, und ihre Zuschlaege ebenso. Stuende die
+  // Schicht-Regel oben, bekaeme eine Stundenposition die Schichtzahl.
+  { herkunft: 'stundenSonntag', text: /sonntag/, einheit: /^(std|h|stunde)/ },
+  { herkunft: 'stundenNacht',   text: /nacht/,   einheit: /^(std|h|stunde)/ },
   { herkunft: 'schichtSonntag', text: /sonntag/ },
   { herkunft: 'schichtNacht',   text: /nacht/ },
   { herkunft: 'schalung',       text: /schalung|einschal|ausschal/,           einheit: /m2/ },
@@ -1484,7 +1558,10 @@ const MK_ZUORDNUNG_REGELN = [
   { herkunft: 'pfahlStk',       text: /pfahl/,                                einheit: /stk|stück|stueck/ },
   { herkunft: 'ankerMeter',     text: /anker/,                                einheit: /^(m|lfm)$|laufmeter/ },
   { herkunft: 'ankerStk',       text: /anker/,                                einheit: /stk|stück|stueck/ },
-  { herkunft: 'schicht',        text: /schicht|einsatz|bauleit|sicherheitschef|sicherheitsw|wärter|waerter|maschinist|absperr|zugsicher/ },
+  // Alles, was nach Stunden geht, nimmt die verrechneten Stunden — welche
+  // Leistung dahintersteht, spielt keine Rolle: die Einheit sagt es.
+  { herkunft: 'stunden',        text: /./,       einheit: /^(std|h|stunde)/ },
+  { herkunft: 'schicht',        text: /schicht|einsatz|bauleit|sicherheitschef|sicherheitsw|wärter|waerter|maschinist|absperr|zugsicher|bahnersatz/ },
   { herkunft: 'anzahl',         text: /fundament/,                            einheit: /stk|stück|stueck/ },
 ];
 
@@ -1535,9 +1612,18 @@ function lvAusModell() {
   const gliederung = document.getElementById('mk-massen-gliederung')?.value || 'typ';
   const summen = massenSummen(massenauszugRechnen(gliederung));
   const liste  = loadLvPositionen();
-  let neu = 0, gebunden = 0, ohneMenge = 0;
+  let neu = 0, gebunden = 0, ohneMenge = 0, ausBesetzung = 0;
+
+  // Was in der Besetzung eines Loses steht, wird NICHT zusaetzlich projektweit
+  // gefuehrt. Sonst stuende der Polier zweimal im Verzeichnis: einmal mit den
+  // Schichten aller Lose, einmal je Los — die Summe waere doppelt.
+  const inBesetzung = new Set();
+  ((typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || []).forEach(t => {
+    [...(t.mannschaft || []), ...(t.geraete || [])].forEach(p => { if (p.pos) inBesetzung.add(p.pos); });
+  });
 
   db.forEach(v => {
+    if (inBesetzung.has(v.pos)) { ausBesetzung++; return; }
     const menge = lvMenge({ herkunft: v.herkunft, menge: 0 }, summen);
     if (!(menge > 0)) { ohneMenge++; return; }
     const da = liste.find(z => z.pos === v.pos);
@@ -1551,16 +1637,59 @@ function lvAusModell() {
     neu++;
   });
 
-  if (!neu && !gebunden) {
+  const bes = _lvBesetzungZeilen(liste);
+
+  if (!neu && !gebunden && !bes.neu && !bes.aktualisiert) {
     ui.toast('Nichts hinzuzufügen — die Positionen mit Menge stehen bereits im Verzeichnis.', 'fehler');
     return;
   }
   saveLvPositionen(liste);
   renderMassenView();
   ui.toast([neu ? neu + ' Positionen übernommen' : '',
+            bes.neu ? bes.neu + ' aus der Besetzung' : '',
+            bes.aktualisiert ? bes.aktualisiert + ' Besetzungszeilen nachgeführt' : '',
             gebunden ? gebunden + ' bestehende gebunden' : '',
+            ausBesetzung ? ausBesetzung + ' nur über die Besetzung geführt' : '',
             ohneMenge ? ohneMenge + ' ohne Menge im Modell übersprungen' : '']
            .filter(Boolean).join(' · '), 'erfolg');
+}
+
+// Mannschaft und Geraete der Lose als eigene Zeilen. Die Menge ist
+// Schichten des Loses × verrechnete Stunden × Anzahl — oder, wenn die
+// Position nach Schichten geht, Schichten × Anzahl.
+//
+// Erkannt werden diese Zeilen an quelle/teamId/schluessel, damit ein zweiter
+// Lauf die Anzahl nachfuehrt statt zu doppeln: aendert sich die Besetzung,
+// soll das Verzeichnis mitgehen und nicht zweimal dasselbe fuehren.
+function _lvBesetzungZeilen(liste) {
+  const teams = (typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || [];
+  const db    = loadLvVorlage();
+  let neu = 0, aktualisiert = 0;
+
+  teams.forEach(team => {
+    [...(team.mannschaft || []), ...(team.geraete || [])].forEach(p => {
+      if (!p.pos) return;
+      const v = db.find(x => x.pos === p.pos);
+      if (!v) return;
+      const herkunft = mkHerkunftVorschlag(v) === 'stunden' ? 'stunden' : 'schicht';
+      const schluessel = p.pos + '#' + (p.bez || '');
+      const da = liste.find(z => z.quelle === 'besetzung' && z.teamId === team.id && z.schluessel === schluessel);
+      if (da) {
+        if (da.faktor !== (p.anzahl || 1)) { da.faktor = p.anzahl || 1; aktualisiert++; }
+        return;
+      }
+      liste.push({
+        id: 'lv_bes_' + team.id + '_' + neu + '_' + Date.now().toString(36),
+        pos: v.pos,
+        text: v.text + ' — ' + (team.name || 'Los') + (p.bez ? ' · ' + p.bez : ''),
+        einheit: v.einheit, menge: 0, preis: v.preis || 0,
+        herkunft, teamId: team.id, faktor: p.anzahl || 1,
+        quelle: 'besetzung', schluessel,
+      });
+      neu++;
+    });
+  });
+  return { neu, aktualisiert };
 }
 
 function dbPosSetzen(index, feld, wert) {

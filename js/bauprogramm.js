@@ -6470,7 +6470,8 @@ function renderEinstTeamsList(teams) {
   wrap.innerHTML = teams.map((t, i) => {
     const gerOptHtml = '<option value="">— Gerät —</option>'
       + Object.entries(BP_GERAET).map(([g, l]) => '<option value="' + g + '"' + (t.geraet === g ? ' selected' : '') + '>' + l + '</option>').join('');
-    return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.06);" id="team-row-' + i + '">'
+    return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);" id="team-row-' + i + '">'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;">'
       + '<input type="text" value="' + (t.name || '') + '" placeholder="Los 1" id="team-name-' + i + '" '
         + 'style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;font-family:inherit;font-weight:600;">'
       + '<select id="team-geraet-' + i + '" style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;font-family:inherit;background:white;">'
@@ -6478,25 +6479,101 @@ function renderEinstTeamsList(teams) {
         + '</select>'
       + '<button onclick="removeTeamRow(' + i + ')" title="Los entfernen" '
         + 'style="padding:4px 8px;border-radius:5px;border:1px solid #fee2e2;background:#fff5f5;color:#dc2626;font-size:12px;cursor:pointer;white-space:nowrap;">✕</button>'
+      + '</div>'
+      + _teamBesetzungHtml(t, i)
       + '</div>';
   }).join('')
   + addTile;
+}
+
+// ── Besetzung eines Loses ────────────────────────────────────
+// Mannschaft und Geraete, die auf JEDER Schicht dieses Loses stehen. Sie sind
+// im Gleistiefbau der Kostentreiber: der Baumeister rechnet die ganze Schicht
+// ab, auch wenn das Intervall kuerzer ist, und dasselbe gilt fuer die Geraete.
+// Der Preis kommt nicht von hier, sondern aus der Position der
+// Kostendatenbank — hier steht nur, WER und WAS auf der Schicht ist.
+const TEAM_BESETZUNG = [
+  { art: 'mannschaft', titel: 'Mannschaft', platzhalter: 'z.B. Polier',   knopf: '+ Person' },
+  { art: 'geraete',    titel: 'Geräte',     platzhalter: 'z.B. Bagger 8t', knopf: '+ Gerät'  },
+];
+
+function _teamBesetzungHtml(t, i) {
+  const posListe = typeof loadLvVorlage === 'function' ? loadLvVorlage() : [];
+  const inpS = 'padding:4px 6px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-family:inherit;';
+
+  const block = ({ art, titel, platzhalter, knopf }) => {
+    const zeilen = (t[art] || []).map((p, j) => {
+      const id = 'team-' + i + '-' + art + '-' + j;
+      const opt = '<option value="">— Position —</option>'
+        + posListe.map(v => '<option value="' + v.pos + '"' + (p.pos === v.pos ? ' selected' : '') + '>'
+            + escHtml((v.pos ? v.pos + ' · ' : '') + _bpKuerzen(v.text || '', 46)) + '</option>').join('');
+      return '<div style="display:grid;grid-template-columns:1fr 54px 1.3fr auto;gap:5px;margin-bottom:4px;">'
+        + '<input type="text" id="' + id + '-bez" value="' + escHtml(p.bez || '') + '" placeholder="' + platzhalter + '" style="' + inpS + '">'
+        + '<input type="number" id="' + id + '-anz" value="' + (p.anzahl ?? 1) + '" min="1" step="1" style="' + inpS + 'text-align:right;">'
+        + '<select id="' + id + '-pos" style="' + inpS + 'background:white;">' + opt + '</select>'
+        + '<button onclick="teamPostenWeg(' + i + ',\'' + art + '\',' + j + ')" title="Zeile entfernen" '
+          + 'style="padding:2px 7px;border-radius:5px;border:1px solid #e5e7eb;background:white;color:#9ca3af;font-size:11px;cursor:pointer;">✕</button>'
+        + '</div>';
+    }).join('');
+    return '<div style="margin-top:7px;">'
+      + '<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">' + titel + '</div>'
+      + zeilen
+      + '<button onclick="teamPostenNeu(' + i + ',\'' + art + '\')" '
+        + 'style="padding:3px 9px;border-radius:5px;border:1px dashed #d1d5db;background:white;color:#6b7280;font-size:11px;cursor:pointer;font-family:inherit;">' + knopf + '</button>'
+      + '</div>';
+  };
+
+  return '<div style="margin-top:9px;padding-top:8px;border-top:1px dashed #e5e7eb;">'
+    + '<div style="font-size:10px;color:#6b7280;margin-bottom:2px;">Besetzung je Schicht — geht mit der Schichtzahl in die Kostenschätzung</div>'
+    + TEAM_BESETZUNG.map(block).join('')
+    + (posListe.length ? ''
+        : '<div style="font-size:10px;color:#b45309;margin-top:6px;">Noch keine Positionen in der Kostendatenbank — ohne sie bleibt die Besetzung ohne Preis.</div>')
+    + '</div>';
+}
+
+function teamPostenNeu(i, art) {
+  const teams = _readTeamRows();
+  (teams[i][art] = teams[i][art] || []).push({ bez: '', anzahl: 1, pos: '' });
+  renderEinstTeamsList(teams);
+}
+
+function teamPostenWeg(i, art, j) {
+  const teams = _readTeamRows();
+  (teams[i][art] || []).splice(j, 1);
+  renderEinstTeamsList(teams);
 }
 
 function _readTeamRows() {
   const wrap = document.getElementById('einst-teams-list');
   const rows = wrap ? wrap.querySelectorAll('[id^="team-row-"]') : [];
   const saved = loadProjEinst().teams || [];
+  // Die Besetzung wird ueber die vorhandenen Zeilen gelesen, nicht ueber eine
+  // feste Zahl: sie waechst und schrumpft mit den Knoepfen.
+  const posten = (i, art) => {
+    const out = [];
+    for (let j = 0; ; j++) {
+      const bez = document.getElementById('team-' + i + '-' + art + '-' + j + '-bez');
+      if (!bez) break;
+      out.push({
+        bez:    bez.value.trim(),
+        anzahl: parseFloat(document.getElementById('team-' + i + '-' + art + '-' + j + '-anz')?.value) || 1,
+        pos:    document.getElementById('team-' + i + '-' + art + '-' + j + '-pos')?.value || '',
+      });
+    }
+    return out;
+  };
   return Array.from(rows).map((_, i) => ({
-    id:     saved[i]?.id || 'team_' + Date.now() + i,
-    name:   document.getElementById('team-name-'+i)?.value || '',
-    geraet: document.getElementById('team-geraet-'+i)?.value || '',
+    id:         saved[i]?.id || 'team_' + Date.now() + i,
+    name:       document.getElementById('team-name-'+i)?.value || '',
+    geraet:     document.getElementById('team-geraet-'+i)?.value || '',
+    mannschaft: posten(i, 'mannschaft'),
+    geraete:    posten(i, 'geraete'),
   }));
 }
 
 function addTeamRow() {
   const teams = _readTeamRows();
-  teams.push({ id: 'team_' + Date.now(), name: '', geraet: '' });
+  teams.push({ id: 'team_' + Date.now(), name: '', geraet: '', mannschaft: [], geraete: [] });
   renderEinstTeamsList(teams);
 }
 
