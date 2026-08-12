@@ -8496,7 +8496,7 @@ function _ladeScript(pfad) {
     </div>
   </div>
   <!-- Karte oben (versteckt bis Toggle) — #overview-map wird per JS hierhin verschoben -->
-  <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;">
+  <div id="bp-fs-map-pane" style="display:none;height:45vh;flex-shrink:0;border-bottom:2px solid #e5e7eb;position:relative;overflow:hidden;transition:height 0.25s ease;">
     <div class="karten-knopf-spalte">
       <!-- Vollbild ueber GPS, wie in allen anderen Kartenansichten. Das
            Zeichen wechselt im fullscreenchange-Handler (js/bauprogramm.js). -->
@@ -8517,6 +8517,10 @@ function _ladeScript(pfad) {
         <span id="bp-zuw-leiste-titel" style="font-size:11px;font-weight:700;color:#374151;
               text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
         <span style="flex:1;"></span>
+        <button id="bp-zuw-auswahl-btn" class="btn btn-secondary btn-sm" onclick="bpZuwAuswahlAufheben()"
+                style="display:none;" title="Separierung und Tausch-Vormerkung aufheben (Escape)">Auswahl aufheben</button>
+        <button id="bp-zuw-verteilen-btn" class="btn btn-secondary btn-sm" onclick="bpZuwPaketNeuVerteilen()"
+                title="Nur dieses Paket neu auf seine Schichten verteilen">Neu verteilen</button>
         <button id="bp-zuw-zurueck-btn" class="btn btn-secondary btn-sm" onclick="bpZuwSchrittZurueck()" title="Letzten Klick zurücknehmen">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>
           Zurück

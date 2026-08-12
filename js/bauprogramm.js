@@ -2654,6 +2654,12 @@ function updateBpInfoBar() {
   } else {
     bar.textContent = infoText + bbHint;
   }
+
+  // Dieselbe Zeile steht im Vollbild unter der Karte. Sie war eine
+  // Momentaufnahme vom Oeffnen und blieb stehen, waehrend man daneben
+  // zuwies — sie zeigte «0/8», nachdem alle acht gesetzt waren.
+  const sub = document.getElementById('bp-fs-subtitle');
+  if (sub) sub.textContent = infoText + bbHint;
 }
 
 // ── Gantt SVG ─────────────────────────────────────────────────
@@ -3383,6 +3389,8 @@ let _bpZuwModus         = false;
 let _bpZuwAktivNr       = 1;
 let _bpZuwStapel        = [];   // Rueckgaengig-Stapel dieses Durchgangs
 let _bpZuwPopups        = null; // Marker-Popups, waehrend der Modus laeuft
+let _bpZuwIsoSchicht    = null; // separierte Schicht: nur sie bleibt auf der Karte stehen
+let _bpZuwTauschId      = null; // fuer den Tausch vorgemerkter Standort
 const BP_ZUW_STAPEL_MAX = 40;
 let _bpZuwSelected      = new Set();
 let _bpZuwSort          = 'mast';
@@ -3402,8 +3410,7 @@ function openBpFullscreen(paketId) {
   // des Overlays aufrufen.
   renderBpFundamenteGantt();
   _renderBpFsLegende();
-  const sub = document.getElementById('bp-fs-subtitle');
-  if (sub) sub.textContent = document.getElementById('bp-info-bar')?.textContent || '';
+  updateBpInfoBar();   // fuellt auch bp-fs-subtitle
   document.addEventListener('keydown', _bpFsKeyClose);
   // Karte immer einblenden
   const pane = document.getElementById('bp-fs-map-pane');
@@ -3431,7 +3438,8 @@ function _bpFsKeyClose(e) {
   if (e.key === 'Escape') {
     // ESC zuerst nativen Vollbild beenden — Overlay bleibt offen
     if (document.fullscreenElement) return;
-    // Danach den Zuweis-Modus: er ist die innerste Ebene
+    // Danach die Auswahl innerhalb des Zuweis-Modus, dann der Modus selbst
+    if (_bpZuwIsoSchicht != null || _bpZuwTauschId != null) { bpZuwAuswahlAufheben(); return; }
     if (_bpZuwModus) { _bpZuwModusEnde(); return; }
     closeBpFullscreen();
   }
@@ -3587,8 +3595,10 @@ function bpKarteClick(paketId) {
     });
     // Laeuft die Klick-Zuweisung, folgt sie dem neuen Paket samt Schichten
     if (_bpZuwModus) {
-      _bpZuwAktivNr = bpGetSchichten(pakete.find(p => p.id === paketId))[0]?.schichtNr || 1;
-      _bpZuwStapel  = [];
+      _bpZuwAktivNr    = bpGetSchichten(pakete.find(p => p.id === paketId))[0]?.schichtNr || 1;
+      _bpZuwStapel     = [];
+      _bpZuwIsoSchicht = null;
+      _bpZuwTauschId   = null;
       renderBpZuwLeiste();
       _bpZuwMarkerZeichnen();
     }
@@ -3652,13 +3662,16 @@ function bpZuwModusUmschalten() {
     ui.toast('Das Paket hat keine Schichten — Startdatum und Anzahl Nächte prüfen.', 'fehler');
     return;
   }
-  _bpZuwModus   = true;
-  _bpZuwAktivNr = bpGetSchichten(pak)[0].schichtNr;
-  _bpZuwStapel  = [];
+  _bpZuwModus      = true;
+  _bpZuwAktivNr    = bpGetSchichten(pak)[0].schichtNr;
+  _bpZuwStapel     = [];
+  _bpZuwIsoSchicht = null;
+  _bpZuwTauschId   = null;
   _bpZuwMarkerBinden(true);
   const leiste = document.getElementById('bp-zuw-leiste');
   if (leiste) leiste.style.display = 'block';
   document.getElementById('bp-zuw-modus-btn')?.classList.add('an');
+  _bpZuwKarteHoehe(true);
   renderBpZuwLeiste();
   _bpZuwMarkerZeichnen();
 }
@@ -3670,8 +3683,20 @@ function _bpZuwModusEnde() {
   const leiste = document.getElementById('bp-zuw-leiste');
   if (leiste) leiste.style.display = 'none';
   document.getElementById('bp-zuw-modus-btn')?.classList.remove('an');
-  _bpZuwStapel = [];
+  _bpZuwStapel     = [];
+  _bpZuwIsoSchicht = null;
+  _bpZuwTauschId   = null;
+  _bpZuwKarteHoehe(false);
   refreshBpMapHighlight();
+}
+
+// Waehrend der Zuweisung ist die Karte das Werkzeug — sie bekommt mehr Platz.
+// Das Gantt darunter bleibt erreichbar, der Bereich scrollt.
+function _bpZuwKarteHoehe(gross) {
+  const pane = document.getElementById('bp-fs-map-pane');
+  if (!pane) return;
+  pane.style.height = gross ? '72vh' : '45vh';
+  setTimeout(() => overviewMap?.invalidateSize(), 300);
 }
 
 // Solange der Modus laeuft, gehoert der Marker-Klick der Zuweisung. Das
@@ -3687,6 +3712,9 @@ function _bpZuwMarkerBinden(an) {
       if (popup) { _bpZuwPopups.set(rs, popup); rs.unbindPopup(); }
       rs.on('click', _bpZuwMarkerKlick);
     });
+    // Leaflet-Marker geben ihren Klick nicht an die Karte weiter — dieser
+    // Handler feuert also nur auf freier Flaeche.
+    overviewMap?.on('click', bpZuwAuswahlAufheben);
   } else {
     overviewMarkers.forEach(({ rs }) => {
       if (!rs) return;
@@ -3694,13 +3722,80 @@ function _bpZuwMarkerBinden(an) {
       const popup = _bpZuwPopups?.get(rs);
       if (popup) rs.bindPopup(popup);
     });
+    overviewMap?.off('click', bpZuwAuswahlAufheben);
     _bpZuwPopups = null;
   }
 }
 
 function _bpZuwMarkerKlick(e) {
   const eintrag = overviewMarkers.find(m => m.rs === e.target);
-  if (eintrag) _bpZuwStandortSetzen(eintrag.pairId);
+  if (!eintrag) return;
+  // Umschalt-Klick merkt vor und tauscht; der einfache Klick setzt
+  if (e.originalEvent?.shiftKey) _bpZuwTauschKlick(eintrag.pairId);
+  else                          _bpZuwStandortSetzen(eintrag.pairId);
+}
+
+// Separierung und Vormerkung aufheben — ueber den Knopf, Escape oder einen
+// Klick auf freie Kartenflaeche. Alle drei Wege enden hier.
+function bpZuwAuswahlAufheben() {
+  if (_bpZuwIsoSchicht == null && _bpZuwTauschId == null) return;
+  _bpZuwIsoSchicht = null;
+  _bpZuwTauschId   = null;
+  renderBpZuwLeiste();
+  _bpZuwMarkerZeichnen();
+}
+
+// Zwei Standorte tauschen ihre Schichten. Beide muessen im gewaehlten Paket
+// liegen — sonst waere es ein Umhaengen zwischen Paketen, und das tut die
+// Karte bewusst nicht. Pfahlfundamente rechnen ihre Bohrschichten am neuen
+// Platz neu; ihre Zahl kann sich mit der Nettodauer der Nacht aendern.
+function _bpZuwTauschKlick(pairId) {
+  const pak = loadBaupakete().find(p => p.id === _bpFsHighlightPaket);
+  if (!pak) return;
+  const zuw  = loadSchichtZuw();
+  const name = id => standortName(PAIRS.find(p => p.id == id));
+  const nrB  = _bpZuwSchichtVon(zuw[pairId], pak.id);
+  if (nrB == null) {
+    ui.toast(name(pairId) + ' ist in diesem Paket nicht zugewiesen — getauscht wird zwischen zugewiesenen Standorten.', 'fehler');
+    return;
+  }
+  if (_bpZuwTauschId == null || _bpZuwTauschId == pairId) {
+    // Erster Umschalt-Klick merkt vor, ein zweiter auf denselben hebt auf
+    _bpZuwTauschId = _bpZuwTauschId == pairId ? null : pairId;
+    renderBpZuwLeiste();
+    _bpZuwMarkerZeichnen();
+    return;
+  }
+  const ersterId = _bpZuwTauschId;
+  const nrA      = _bpZuwSchichtVon(zuw[ersterId], pak.id);
+  if (nrA == null) { _bpZuwTauschId = null; _bpZuwMarkerZeichnen(); return; }
+  if (nrA === nrB) {
+    ui.toast('Beide liegen in Schicht ' + nrA + ' — nichts zu tauschen.', 'fehler');
+    _bpZuwTauschId = null;
+    _bpZuwMarkerZeichnen();
+    return;
+  }
+  _bpZuwStapelAblegen(zuw);
+  const schichten = bpGetSchichten(pak);
+  _bpZuwEintragSchreiben(zuw, ersterId, pak, schichten, nrB);
+  _bpZuwEintragSchreiben(zuw, pairId,   pak, schichten, nrA);
+  saveSchichtZuw(zuw);
+  _bpZuwTauschId = null;
+  _recalcBaugruppenDates();
+  _bpZuwNachZeichnen();
+  ui.toast(name(ersterId) + ' ↔ ' + name(pairId) + ' getauscht (Schicht ' + nrA + ' ↔ ' + nrB + ').', 'erfolg');
+}
+
+function _bpZuwStapelAblegen(zuw) {
+  _bpZuwStapel.push(JSON.stringify(zuw));
+  if (_bpZuwStapel.length > BP_ZUW_STAPEL_MAX) _bpZuwStapel.shift();
+}
+
+// Liegt an diesem Standort ein Gleis an, fuer das in dieser Nacht kein
+// Sperrmuster gilt? Ein Muster ohne Gleisangabe deckt alles ab.
+function _bpZuwGleisKonflikt(p, datum) {
+  if (!p?.gleis || !datum) return false;
+  return !resolveSpForGleis(String(p.gleis), datum);
 }
 
 // Schicht, in der ein Standort innerhalb DIESES Pakets liegt — sonst null.
@@ -3714,8 +3809,12 @@ function _bpZuwSchichtVon(z, pakId) {
   return z.paketId === pakId ? (z.schichtNr || null) : null;
 }
 
+// Eine Kachel waehlt die Schicht UND separiert sie auf der Karte: nur ihre
+// Standorte bleiben stehen, der Rest tritt zurueck. Ein zweiter Klick auf die
+// bereits aktive Kachel hebt die Separierung auf — die Schicht bleibt aktiv.
 function bpZuwSchichtWaehlen(nr) {
-  _bpZuwAktivNr = nr;
+  _bpZuwIsoSchicht = (nr === _bpZuwAktivNr && _bpZuwIsoSchicht === nr) ? null : nr;
+  _bpZuwAktivNr    = nr;
   renderBpZuwLeiste();
   _bpZuwMarkerZeichnen();
 }
@@ -3742,8 +3841,7 @@ function _bpZuwStandortSetzen(pairId) {
     return;
   }
 
-  _bpZuwStapel.push(JSON.stringify(zuw));
-  if (_bpZuwStapel.length > BP_ZUW_STAPEL_MAX) _bpZuwStapel.shift();
+  _bpZuwStapelAblegen(zuw);
 
   const schichten = bpGetSchichten(pak);
   const aktuell   = _bpZuwSchichtVon(z, pak.id);
@@ -3751,10 +3849,75 @@ function _bpZuwStandortSetzen(pairId) {
     delete zuw[pairId];
   } else {
     _bpZuwEintragSchreiben(zuw, pairId, pak, schichten, _bpZuwAktivNr);
+    // Gleisabgleich: gesetzt wird trotzdem — die Entscheidung liegt beim
+    // Bauleiter, die App sagt nur, dass das Muster diese Nacht nicht deckt.
+    const p     = PAIRS.find(x => x.id == pairId);
+    const datum = schichten.find(s => s.schichtNr === _bpZuwAktivNr)?.datum;
+    if (_bpZuwGleisKonflikt(p, datum)) {
+      ui.toast(standortName(p) + ' liegt an Gleis ' + p.gleis
+               + ' — für diese Nacht (' + bpFmtDisplay(datum) + ') ist dafür kein Sperrmuster hinterlegt.', 'fehler');
+    }
   }
   saveSchichtZuw(zuw);
   _recalcBaugruppenDates();
   _bpZuwNachZeichnen();
+}
+
+// Nur dieses Paket neu auf seine Schichten verteilen. Gefuellt wird der Reihe
+// nach in KM-Ordnung, jede Schicht bis an ihre Kapazitaet: ein Fundament
+// belegt 1/Leistung, ein Pfahlfundament ganze Schichten. Dieselbe Rechnung
+// wie im grossen Zuweisungslauf — nur ohne die uebrigen Pakete anzuruehren.
+async function bpZuwPaketNeuVerteilen() {
+  const pak = loadBaupakete().find(p => p.id === _bpFsHighlightPaket);
+  if (!pak) return;
+  const zuw       = loadSchichtZuw();
+  const schichten = bpGetSchichten(pak);
+  if (!schichten.length) { ui.toast('Das Paket hat keine Schichten.', 'fehler'); return; }
+  const pairs = getFilteredSorted()
+    .filter(p => zuw[p.id]?.paketId === pak.id || zuw[p.id]?.bohrSchichten?.[0]?.paketId === pak.id)
+    .sort((a, b) => parseFloat(a.km_rs || 0) - parseFloat(b.km_rs || 0));
+  if (!pairs.length) { ui.toast('Diesem Paket ist noch kein Standort zugewiesen.', 'fehler'); return; }
+  if (!await ui.confirm(pairs.length + ' Standorte von «' + pak.name + '» neu auf '
+                        + schichten.length + ' Schichten verteilen?\n\n'
+                        + 'Die Zuweisungen der übrigen Pakete bleiben unberührt.',
+                        { ok: 'Neu verteilen' })) return;
+
+  _bpZuwStapelAblegen(zuw);
+  const ftAll = loadFtProfile();
+  const allBp = loadAllBauprojekt();
+  const abzug = loadProjEinst().abzugMinuten;
+  const maxNr = schichten[schichten.length - 1].schichtNr;
+  let nr = schichten[0].schichtNr, frei = 1, ueber = 0;
+
+  pairs.forEach(p => {
+    const ft     = ftTypZuStandort(ftAll, { ...p, ...(allBp[p.id] || {}) });
+    const nettoH = schichten.find(s => s.schichtNr === nr)?.nettoH;
+    if (bpIstPfahlTyp(ft)) {
+      // Pfahlfundamente belegen ganze Schichten — sie fangen eine neue an
+      if (frei < 1 && nr < maxNr) { nr++; frei = 1; }
+      _bpZuwEintragSchreiben(zuw, p.id, pak, schichten, nr);
+      const calc = _calcPfahlSchichten(ft, nettoH, abzug);
+      const bel  = calc ? calc.bohrShifts + calc.betonShifts : 1;
+      if (nr + bel > maxNr + 1) ueber++;
+      nr   = Math.min(nr + bel, maxNr);
+      frei = nr === maxNr ? 0 : 1;
+      return;
+    }
+    const kap    = nettoH ? getFtLeistung(ft, nettoH, abzug) : null;
+    const anteil = kap > 0 ? 1 / kap : 1;
+    if (frei - anteil < -1e-9) {
+      if (nr < maxNr) { nr++; frei = 1; } else ueber++;
+    }
+    _bpZuwEintragSchreiben(zuw, p.id, pak, schichten, nr);
+    frei -= anteil;
+  });
+
+  saveSchichtZuw(zuw);
+  _recalcBaugruppenDates();
+  _bpZuwNachZeichnen();
+  ui.toast(pairs.length + ' Standorte neu verteilt'
+           + (ueber ? ' · ' + ueber + ' passen nicht mehr in die letzte Schicht' : '') + '.',
+           ueber ? 'fehler' : 'erfolg');
 }
 
 // Schreibt eine Zuweisung. Pfahlfundamente bekommen ihre Bohrschichten neu
@@ -3802,6 +3965,7 @@ function _bpZuwNachZeichnen() {
   renderBpLegende();
   _renderBpFsLegende();
   updateBpInfoBar();
+  _syncBpDirtyButtons();
 }
 
 // Belegung je Schicht. Ein Fundament belegt 1/Leistung einer Schicht — bei 3
@@ -3815,24 +3979,27 @@ function _bpZuwAuslastung(pak, schichten) {
   const last  = {};
   // Gezaehlt werden STANDORTE, nicht Belegungen: ein Pfahlfundament, das in
   // derselben Schicht bohrt und betoniert, ist ein Standort und zwei Anteile.
-  const dazu  = (nr, anteil, pid) => {
+  const datumVon = nr => schichten.find(s => s.schichtNr === nr)?.datum;
+  const dazu  = (nr, anteil, p) => {
     if (!nr) return;
-    const e = last[nr] || (last[nr] = { anteil: 0, ids: new Set() });
-    e.anteil += anteil; e.ids.add(pid);
+    const e = last[nr] || (last[nr] = { anteil: 0, ids: new Set(), konflikt: 0 });
+    e.anteil += anteil;
+    if (!e.ids.has(p.id) && _bpZuwGleisKonflikt(p, datumVon(nr))) e.konflikt++;
+    e.ids.add(p.id);
   };
   getFilteredSorted().forEach(p => {
     const z = zuw[p.id];
     if (!z) return;
     if (z.bohrSchichten?.length) {
-      z.bohrSchichten.forEach(bs => { if (bs.paketId === pak.id) dazu(bs.schichtNr, 1, p.id); });
-      if (z.betonSchichtNr && z.paketId === pak.id) dazu(z.betonSchichtNr, 1, p.id);
+      z.bohrSchichten.forEach(bs => { if (bs.paketId === pak.id) dazu(bs.schichtNr, 1, p); });
+      if (z.betonSchichtNr && z.paketId === pak.id) dazu(z.betonSchichtNr, 1, p);
       return;
     }
     if (z.paketId !== pak.id) return;
     const ft     = ftTypZuStandort(ftAll, { ...p, ...(allBp[p.id] || {}) });
     const nettoH = schichten.find(s => s.schichtNr === z.schichtNr)?.nettoH;
     const kap    = nettoH ? getFtLeistung(ft, nettoH, abzug) : null;
-    dazu(z.schichtNr, kap > 0 ? 1 / kap : 1, p.id);
+    dazu(z.schichtNr, kap > 0 ? 1 / kap : 1, p);
   });
   Object.values(last).forEach(e => { e.anzahl = e.ids.size; delete e.ids; });
   return last;
@@ -3852,22 +4019,27 @@ function renderBpZuwLeiste() {
   if (titel) titel.textContent = pak.name + ' · ' + schichten.length + ' Schichten';
 
   wrap.innerHTML = schichten.map(s => {
-    const e     = last[s.schichtNr] || { anteil: 0, anzahl: 0 };
+    const e     = last[s.schichtNr] || { anteil: 0, anzahl: 0, konflikt: 0 };
     const pct   = Math.round(e.anteil * 100);
     const voll  = pct > 100;
     const aktiv = s.schichtNr === _bpZuwAktivNr;
+    const iso   = s.schichtNr === _bpZuwIsoSchicht;
     const sp    = spList.find(x => x.id === s.spId);
     const wt    = bpParseDate(s.datum).toLocaleDateString('de-CH', { weekday: 'short' });
     const rand  = voll ? '#dc2626' : (aktiv ? col : '#e5e7eb');
+    const gl    = e.konflikt
+      ? ` · ${e.konflikt} Standort(e) an einem Gleis ohne Sperrmuster für diese Nacht` : '';
     return `<button onclick="bpZuwSchichtWaehlen(${s.schichtNr})"
-      title="${sp ? sp.name.replace(/"/g,'') + ' · ' : ''}${s.nettoH || '?'} h netto · ${e.anzahl} Standort(e)"
+      title="${sp ? sp.name.replace(/"/g,'') + ' · ' : ''}${s.nettoH || '?'} h netto · ${e.anzahl} Standort(e)${gl}"
       style="flex:0 0 auto;min-width:104px;text-align:left;padding:5px 8px 6px;cursor:pointer;
         background:${aktiv ? col + '14' : '#fff'};border:1px solid ${rand};
         border-left:3px solid ${aktiv ? col : rand};border-radius:6px;
-        box-shadow:${aktiv ? '0 1px 6px ' + col + '44' : 'none'};font-family:inherit;">
+        box-shadow:${aktiv ? '0 1px 6px ' + col + '44' : 'none'};font-family:inherit;
+        outline:${iso ? '2px solid ' + col : 'none'};outline-offset:1px;">
       <div style="display:flex;align-items:baseline;gap:5px;">
         <span style="font-size:12px;font-weight:800;color:${aktiv ? col : '#374151'};">${s.schichtNr}</span>
         <span style="font-size:10.5px;color:#6b7280;">${wt} ${bpFmtDisplay(s.datum).slice(0, 6)}</span>
+        ${e.konflikt ? svgIcon('warnung', { groesse: 10, farbe: '#dc2626' }) : ''}
       </div>
       <div style="font-size:9.5px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
         ${s.nettoH ? s.nettoH + ' h' : '—'}${e.anzahl ? ' · ' + e.anzahl + ' St.' : ''}
@@ -3881,14 +4053,25 @@ function renderBpZuwLeiste() {
 
   const zurueck = document.getElementById('bp-zuw-zurueck-btn');
   if (zurueck) zurueck.disabled = !_bpZuwStapel.length;
+  const auswahl = document.getElementById('bp-zuw-auswahl-btn');
+  if (auswahl) auswahl.style.display = (_bpZuwIsoSchicht != null || _bpZuwTauschId != null) ? '' : 'none';
+
   // Der Hinweis steht nur, solange noch nichts geklickt wurde. Danach nimmt er
-  // der Karte nur Hoehe weg — die Regel hat man dann einmal angewandt.
+  // der Karte nur Hoehe weg — die Regel hat man dann einmal angewandt. Ist
+  // etwas vorgemerkt, sagt er stattdessen, was als Naechstes passiert.
   const hinweis = document.getElementById('bp-zuw-hinweis');
   if (hinweis) {
-    hinweis.style.display = _bpZuwStapel.length ? 'none' : 'block';
-    hinweis.textContent =
-      'Klick setzt den Standort in die aktive Schicht · nochmals klicken hebt auf · '
-      + 'nur innerhalb dieses Pakets · Pfahlfundament: der Klick setzt die erste Bohrschicht.';
+    if (_bpZuwTauschId != null) {
+      hinweis.style.display = 'block';
+      hinweis.textContent = standortName(PAIRS.find(p => p.id == _bpZuwTauschId))
+        + ' ist vorgemerkt — Umschalt-Klick auf einen zweiten Standort tauscht die beiden Schichten.';
+    } else {
+      hinweis.style.display = _bpZuwStapel.length ? 'none' : 'block';
+      hinweis.textContent =
+        'Klick setzt den Standort in die aktive Schicht · nochmals klicken hebt auf · '
+        + 'Umschalt-Klick merkt zum Tauschen vor · Schicht anklicken separiert sie auf der Karte · '
+        + 'Escape oder Klick ins Freie hebt die Auswahl auf.';
+    }
   }
 }
 
@@ -3902,14 +4085,29 @@ function _bpZuwMarkerZeichnen() {
   const col = pak?.farbe || '#1a3a5c';
   const mitte = 'display:flex;align-items:center;justify-content:center;line-height:1;font-weight:800;';
 
+  const schichten = pak ? bpGetSchichten(pak) : [];
+
   overviewMarkers.forEach(({ pairId, rs }) => {
     if (!rs) return;
-    const name  = _bpKuerzen(standortName(PAIRS.find(x => x.id === pairId)), 5);
+    const p     = PAIRS.find(x => x.id === pairId);
+    const name  = _bpKuerzen(standortName(p), 5);
     const z     = zuw[pairId] || {};
     const nr    = _bpZuwSchichtVon(z, pak?.id);
-    const fremd = !nr && !!(z.paketId || z.bohrSchichten?.length);
+    let   fremd = !nr && !!(z.paketId || z.bohrSchichten?.length);
+    // Separierung: ausserhalb der gewaehlten Schicht tritt alles zurueck —
+    // auch das noch Freie. Wer etwas hinzunehmen will, hebt sie auf.
+    if (_bpZuwIsoSchicht != null && nr !== _bpZuwIsoSchicht) fremd = true;
     let sz, koerper;
-    if (nr === _bpZuwAktivNr) {
+    if (pairId == _bpZuwTauschId) {
+      // Zum Tausch vorgemerkt: steht ueber allem anderen
+      sz = 34;
+      koerper = `<div style="${mitte}width:100%;height:100%;border-radius:50%;background:#fff;color:${col};
+                 font-size:10px;border:3px solid ${col};box-shadow:0 0 0 5px ${col}33,0 2px 8px rgba(0,0,0,0.35);">${name}</div>`;
+    } else if (fremd) {
+      sz = 20;
+      koerper = `<div style="${mitte}width:100%;height:100%;border-radius:50%;background:#d1d5db;color:#9ca3af;
+                 font-size:8px;border:2px solid #fff;">${name}</div>`;
+    } else if (nr === _bpZuwAktivNr) {
       sz = 34;
       koerper = `<div style="${mitte}width:100%;height:100%;border-radius:50%;background:${col};color:#fff;
                  font-size:10px;border:3px solid #fff;box-shadow:0 0 0 4px ${col}44,0 2px 8px rgba(0,0,0,0.35);">${name}</div>`;
@@ -3919,10 +4117,6 @@ function _bpZuwMarkerZeichnen() {
                  font-size:9px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.28);">${name}</div>`
               + `<div style="${mitte}position:absolute;top:-4px;right:-6px;min-width:14px;height:14px;padding:0 3px;
                  border-radius:8px;background:#fff;color:${col};border:1.5px solid ${col};font-size:9px;">${nr}</div>`;
-    } else if (fremd) {
-      sz = 20;
-      koerper = `<div style="${mitte}width:100%;height:100%;border-radius:50%;background:#d1d5db;color:#9ca3af;
-                 font-size:8px;border:2px solid #fff;">${name}</div>`;
     } else {
       // Noch keiner Schicht zugewiesen: offen, nicht gefuellt. Ein gestrichelter
       // Rand wirkte auf dem Luftbild wie ein Stern — darum durchgezogen.
@@ -3930,11 +4124,18 @@ function _bpZuwMarkerZeichnen() {
       koerper = `<div style="${mitte}width:100%;height:100%;border-radius:50%;background:#fff;color:${col};
                  font-size:9px;border:2px solid ${col};box-shadow:0 1px 4px rgba(0,0,0,0.28);">${name}</div>`;
     }
+    // Gleisabgleich: liegt der Standort an einem Gleis, fuer das in seiner
+    // Nacht kein Sperrmuster gilt, traegt er ein rotes Zeichen.
+    if (nr && !fremd && _bpZuwGleisKonflikt(p, schichten.find(s => s.schichtNr === nr)?.datum)) {
+      koerper += `<div style="${mitte}position:absolute;bottom:-3px;left:-5px;width:13px;height:13px;
+                  border-radius:50%;background:#dc2626;color:#fff;font-size:9px;border:1.5px solid #fff;"
+                  title="Gleis ohne Sperrmuster in dieser Nacht">!</div>`;
+    }
     rs.setIcon(L.divIcon({
       html: `<div style="position:relative;width:${sz}px;height:${sz}px;">${koerper}</div>`,
       iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2], className: ''
     }));
-    rs.setOpacity(fremd ? 0.4 : 1);
+    rs.setOpacity(fremd ? 0.35 : 1);
   });
 }
 
@@ -4608,9 +4809,31 @@ let _bpEinstActiveTab   = 'lose';
 let _bpZuwDirty         = false;
 let _bpRecalcDirty      = false;
 
+// Standorte, die eine Zuweisung brauchen und keine haben. «Erhalten» bleibt
+// aussen vor — dort wird nicht gebaut. Abbruch+Neubau traegt zwei Zeilen: die
+// Abbruchzeile lebt im eigenen Store und zaehlt eigens.
+function bpOffeneZuweisungen() {
+  const zuw    = loadSchichtZuw();
+  const abbZuw = loadAbbZuw();
+  const allBp  = loadAllBauprojekt();
+  let offen = 0;
+  getFilteredSorted().forEach(p => {
+    const typ = getPairBpTyp(p.id, allBp);
+    if (typ === 'erhalten') return;
+    if (!zuw[p.id]) offen++;
+    if (typ === 'abbruch-neubau' && !abbZuw[p.id]) offen++;
+  });
+  return offen;
+}
+
 function _syncBpDirtyButtons() {
+  // Der Ruf nach der Auto-Zuweisung erlischt, sobald nichts mehr zuzuweisen
+  // ist — auch wenn von Hand zugewiesen wurde, ueber Karte, Tabelle oder
+  // Ziehen. Vorher war es eine Sperrklinke: von der Paketerzeugung gesetzt,
+  // blieb der Knopf orange, bis genau die Auto-Zuweisung lief.
+  const zuwRuf = _bpZuwDirty && bpOffeneZuweisungen() > 0;
   [
-    [['bp-btn-autozuw'], _bpZuwDirty],
+    [['bp-btn-autozuw'], zuwRuf],
     [['bp-btn-recalc'],  _bpRecalcDirty],
   ].forEach(([ids, dirty]) => {
     ids.forEach(id => {
