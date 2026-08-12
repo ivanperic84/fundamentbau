@@ -59,6 +59,7 @@ const FM_FELD_LABEL = {
   pfahlLaenge: 'Pfahl-/Ankerlänge',
   anker:       'Ankerbolzen',
   buegel:      'Bügelbewehrung',
+  bewehrung:   'Bewehrung (kg)',
 };
 
 // ── Material aus der Typenpruefung ───────────────────────────
@@ -135,7 +136,7 @@ function fmMengen(ft) {
   const fehlend = noetig.filter(f => !vorhanden[f]).map(f => FM_FELD_LABEL[f]);
 
   const d = { beton: null, aushub: null, schalung: null, buegel: null,
-              schraub: null, fixierung: null, vfk: null,
+              bewehrung: null, schraub: null, fixierung: null, vfk: null,
               pfahlStk: null, pfahlMeter: null,
               ankerStk: null, ankerMeter: null };
 
@@ -176,6 +177,15 @@ function fmMengen(ft) {
   const bAnz = fmZahl(ft.buegelAnzahl);
   if (bAnz != null) d.buegel = bAnz;
   else if (d.beton != null) fehlend.push(FM_FELD_LABEL.buegel);
+
+  // Bewehrung als Gewicht je Fundament. Sie steht am Typ und wird NICHT aus
+  // der Geometrie geschaetzt: das Gewicht haengt am Bewehrungsplan, nicht am
+  // Volumen, und ein angenommener Gehalt in kg/m3 waere eine erfundene Menge.
+  // Vermisst wird sie nur dort, wo Beton anfaellt — an Fels und Mauer gibt es
+  // keinen Bewehrungskorb, sondern Anker. Gleiche Regel wie bei den Buegeln.
+  const bewKg = fmZahl(ft.bewehrungKg);
+  if (bewKg != null) d.bewehrung = bewKg;
+  else if (d.beton != null) fehlend.push(FM_FELD_LABEL.bewehrung);
 
   d.fixierung = fmFixierung(ft).reduce((s, f) => s + (f.anzPro || 0), 0) || null;
 

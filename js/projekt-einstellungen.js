@@ -1267,6 +1267,7 @@ function renderParamdbMat() {
         <td style="${tdS}">${inp('beton','C30/37','100%')}</td>
         <td style="${tdS}">${inp('betondeckung','40','52px','number')}</td>
         <td style="${tdS}">${inp('bewehrungsstahl','B500B','76px')}</td>
+        <td style="${tdS}">${inp('bewehrungKg','kg','58px','number')}</td>
         <!-- Seitenlänge als Textfeld: rechteckige Bügel tragen «260×750». -->
         <td style="${tdS}">${gruppe(inp('buegelAnzahl','Anz','40px','number') + mal + inp('buegelDurchmesser','Ø','40px','number')
                   + '<span style="color:#9ca3af;">/</span>' + inp('buegelSeitenlaenge','Seite','62px')
@@ -1281,6 +1282,7 @@ function renderParamdbMat() {
       <td style="${tdS}white-space:nowrap;">${m.beton   || fehlt}</td>
       <td style="${tdS}white-space:nowrap;">${m.deckung || fehlt}</td>
       <td style="${tdS}white-space:nowrap;">${m.stahl   || fehlt}</td>
+      <td style="${tdS}white-space:nowrap;">${m.bewKg   || fehlt}</td>
       <td style="${tdS}white-space:nowrap;">${m.quer    || fehlt}</td>
       <td style="${tdS}white-space:nowrap;">${m.anker   || fehlt}</td>
     </tr>`;
@@ -1337,7 +1339,7 @@ const PARAMDB_FELDER = {
   // Materialfelder heissen in der Datenbank genauso wie in der Bibliothek,
   // seit die Datenbank strukturierte Werte statt Fliesstext führt.
   mat: Object.fromEntries([
-    'beton', 'betondeckung', 'bewehrungsstahl',
+    'beton', 'betondeckung', 'bewehrungsstahl', 'bewehrungKg',
     'laengsAnzahl', 'laengsDurchmesser',
     'buegelAnzahl', 'buegelDurchmesser', 'buegelSeitenlaenge', 'buegelArtikelNr', 'buegelMaterial',
     'schraubenAnzahl', 'schraubenDurchmesser', 'schraubenLaenge', 'schraubenArtikelNr', 'schraubenMaterial',
@@ -1347,6 +1349,10 @@ const PARAMDB_FELDER = {
     // werden gelesen, also müssen sie zusammenbleiben.
     if (feld === 'schraubenLaenge') t.schraubLaenge = parseFloat(v) || null;
     if (feld === 'bewehrungsstahl') t.bewehrung = v;
+    // Das Bewehrungsgewicht ist eine Zahl — das Typ-Fenster speichert es als
+    // solche, und der Massenauszug rechnet damit. Als Zeichenkette abgelegt
+    // liefen Datenbank und Fenster mit zwei Formen desselben Werts.
+    if (feld === 'bewehrungKg') t.bewehrungKg = _zahlOderNull(v);
   }])),
 };
 
@@ -1482,6 +1488,9 @@ const PARAMDB_MAT_SPALTEN = [
   { titel: 'Beton',                feld: 'beton' },
   { titel: 'Betondeckung (mm)',    feld: 'betondeckung' },
   { titel: 'Bewehrungsstahl',      feld: 'bewehrungsstahl' },
+  // Gewicht je Fundament aus dem Bewehrungsplan. Ueber diesen Weg lassen sich
+  // alle Typen auf einmal hinterlegen, statt sechsundzwanzig Fenster zu oeffnen.
+  { titel: 'Bewehrung (kg)',       feld: 'bewehrungKg' },
   { titel: 'Bügel Anzahl',         feld: 'buegelAnzahl' },
   { titel: 'Bügel Ø (mm)',         feld: 'buegelDurchmesser' },
   { titel: 'Bügel Seitenlänge (mm)', feld: 'buegelSeitenlaenge' },

@@ -71,6 +71,8 @@ const MASSEN_GROESSEN = [
   { id: 'schalung',   label: 'Schalung',          einheit: 'm²'  },
   { id: 'buegel',     label: 'Bügel',             einheit: 'Stk',
     hinweis: 'Bügel je Fundament aus der Typenbibliothek — dieselbe Stückzahl, die die Materialliste je Artikelnummer führt' },
+  { id: 'bewehrung',  label: 'Bewehrung',         einheit: 'kg',
+    hinweis: 'Bewehrungsgewicht je Fundament, am Fundamenttyp hinterlegt — nicht aus dem Betonvolumen geschätzt' },
   // Materiell Teil der Bewehrung, abgerechnet aber nach Stueck
   { id: 'schraub',    label: 'Schrauben',         einheit: 'Stk',
     hinweis: 'Fundamentschrauben — materiell Teil der Bewehrung, abgerechnet nach Stück' },
@@ -95,7 +97,7 @@ const _mkSpaltenSichtbar = (summen) =>
 
 // Groessen, die als ganze Zahl angeschrieben werden
 const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'buegel',
-                             'ankerStk', 'fixierung', 'vfk']);
+                             'ankerStk', 'fixierung', 'vfk', 'bewehrung']);
 
 // ── Groessen, an die sich eine Position binden laesst ────────
 // Die drei Schichtzahlen und alles, was der Massenauszug fuehrt. Dieselbe
@@ -1472,6 +1474,9 @@ const MK_ZUORDNUNG_REGELN = [
   { herkunft: 'beton',          text: /beton/,                                einheit: /m3/ },
   { herkunft: 'aushub',         text: /aushub|abtrag|erdarbeit|graben/,       einheit: /m3/ },
   { herkunft: 'buegel',         text: /bügel|buegel/ },
+  // Nur in kg: eine Position in Tonnen an eine Kilogramm-Menge zu binden
+  // waere um den Faktor 1000 daneben — die bleibt offen und wird gesetzt.
+  { herkunft: 'bewehrung',      text: /bewehrung|armierung|betonstahl|b500|b550/, einheit: /kg/ },
   { herkunft: 'fixierung',      text: /fixier|flacheisen|schablone/ },
   { herkunft: 'schraub',        text: /schraube/ },
   { herkunft: 'vfk',            text: /vorgefertigt|fundamentkopf|vfk/ },

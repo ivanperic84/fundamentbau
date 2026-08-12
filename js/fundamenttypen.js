@@ -922,6 +922,7 @@ function exportFtXlsx() {
       'Einbautiefe (m)':         t.tiefe ? parseFloat(t.tiefe).toFixed(2) : '',
       'Schraubenlänge (mm)':     t.schraubLaenge || '',
       'Bewehrt':                 t.bewehrt === 'ja' ? 'Ja' : t.bewehrt === 'nein' ? 'Nein' : '',
+      'Bewehrung (kg)':          t.bewehrungKg ?? '',
       'Einsatzbedingung':        t.einsatzBedingung || '',
       'Statiknachweis':          t.nachweisRequired ? 'Erforderlich' : 'Nicht erforderlich',
       'Anzahl Standorte':        count,
@@ -1071,6 +1072,7 @@ function _ftFelderAusBasis(basis, { tiefeBehalten = false, nurLeere = false } = 
   sv('ft-prof-beton',           basis.beton);
   sv('ft-prof-betondeckung',    basis.betondeckung);
   sv('ft-prof-bewehrungsstahl', basis.bewehrungsstahl || basis.bewehrung);
+  sv('ft-prof-bewehrung-kg',    basis.bewehrungKg);
   sv('ft-prof-laengs-anzahl',   basis.laengsAnzahl);
   sv('ft-prof-laengs-dm',       basis.laengsDurchmesser);
   sv('ft-prof-buegel-anzahl',   basis.buegelAnzahl);
@@ -1366,6 +1368,7 @@ function ftMaterialAnzeige(t) {
     beton:   t.beton || alt.beton || '',
     deckung: t.betondeckung ? `${t.betondeckung} mm` : (alt.deckung || ''),
     stahl:   t.bewehrungsstahl || t.bewehrung || alt.stahl || '',
+    bewKg:   t.bewehrungKg != null && t.bewehrungKg !== '' ? `${t.bewehrungKg} kg` : '',
     quer, anker,
   };
 }
@@ -1607,6 +1610,7 @@ function openFundtypProfilModal(id, fallbackRefTyp, bulkIds) {
     setInput ('ft-prof-beton',          shared(t => t.beton          || ''));
     setInput ('ft-prof-betondeckung',   shared(t => t.betondeckung   || ''));
     setInput ('ft-prof-bewehrungsstahl',shared(t => t.bewehrungsstahl || ''));
+    setInput ('ft-prof-bewehrung-kg',   shared(t => t.bewehrungKg != null ? String(t.bewehrungKg) : ''));
     setInput ('ft-prof-intervall',      shared(t => t.ftIntervall        != null ? String(t.ftIntervall)        : ''));
     setInput ('ft-prof-intervall-abbruch', shared(t => t.ftIntervallAbbruch != null ? String(t.ftIntervallAbbruch) : ''));
     // Bewehrungs- und Ankerfelder: standen bisher NICHT in dieser Vorbelegung,
@@ -1742,6 +1746,7 @@ function openFundtypProfilModal(id, fallbackRefTyp, bulkIds) {
     v('ft-prof-beton',          t.beton || '');
     v('ft-prof-betondeckung',   t.betondeckung || '');
     v('ft-prof-bewehrungsstahl',t.bewehrungsstahl || '');
+    v('ft-prof-bewehrung-kg',   t.bewehrungKg != null ? t.bewehrungKg : '');
     v('ft-prof-laengs-anzahl',  t.laengsAnzahl || '');
     v('ft-prof-laengs-dm',      t.laengsDurchmesser || '');
     v('ft-prof-buegel-anzahl',  t.buegelAnzahl || '');
@@ -1765,7 +1770,8 @@ function openFundtypProfilModal(id, fallbackRefTyp, bulkIds) {
     ['ft-prof-name','ft-prof-block-b','ft-prof-block-l','ft-prof-pfaehle','ft-prof-pfahl-laenge',
      'ft-prof-pfahl-leistung','ft-prof-tiefe','ft-prof-intervall','ft-prof-intervall-abbruch',
      'ft-prof-einsatz','ft-prof-bemerkung','ft-prof-schraub-laenge','ft-prof-beton',
-     'ft-prof-betondeckung','ft-prof-bewehrungsstahl','ft-prof-laengs-anzahl','ft-prof-laengs-dm',
+     'ft-prof-betondeckung','ft-prof-bewehrungsstahl','ft-prof-bewehrung-kg',
+     'ft-prof-laengs-anzahl','ft-prof-laengs-dm',
      'ft-prof-buegel-anzahl','ft-prof-buegel-dm','ft-prof-buegel-seite',
      'ft-prof-schraub-anzahl','ft-prof-schraub-dm','ft-prof-schraub-artnr','ft-prof-vfk-zeich']
       .forEach(eid => { const el = document.getElementById(eid); if (el) el.value = ''; });
@@ -2291,6 +2297,7 @@ function saveFundtypProfil() {
     maybeAdd   ('betondeckung',     'ft-prof-betondeckung',   null);
     maybeAdd   ('bewehrungsstahl',  'ft-prof-bewehrungsstahl',null);
     maybeAdd   ('bewehrung',        'ft-prof-bewehrungsstahl',null);
+    maybeAdd   ('bewehrungKg',      'ft-prof-bewehrung-kg',   toFloat);
     // Bewehrungsfelder waren im Formular sichtbar, wurden aber nie übernommen —
     // eine Eingabe verschwand beim Speichern kommentarlos.
     maybeAdd   ('laengsAnzahl',      'ft-prof-laengs-anzahl',  null);
@@ -2338,6 +2345,7 @@ function saveFundtypProfil() {
     bewehrung:          v('ft-prof-bewehrungsstahl')   || '',
     bewehrungsstahl:    v('ft-prof-bewehrungsstahl')   || '',
     betondeckung:       v('ft-prof-betondeckung')      || '',
+    bewehrungKg:        parseFloat(v('ft-prof-bewehrung-kg')) || null,
     laengsAnzahl:       v('ft-prof-laengs-anzahl')     || '',
     laengsDurchmesser:  v('ft-prof-laengs-dm')         || '',
     buegelAnzahl:       v('ft-prof-buegel-anzahl')     || '',

@@ -6557,6 +6557,7 @@ function _ladeScript(pfad) {
               <option value="beton">Beton (Güte)</option>
               <option value="betondeckung">Betondeckung (mm)</option>
               <option value="bewehrungsstahl">Bewehrungsstahl</option>
+              <option value="bewehrungKg">Bewehrung (kg je Fundament)</option>
             </optgroup>
             <optgroup label="Anker (Fels / Mauer)">
               <option value="laengsAnzahl">Anker Anzahl</option>
@@ -6874,10 +6875,17 @@ function _ladeScript(pfad) {
         <input class="modal-input" id="ft-prof-betondeckung" type="number" min="10" max="120" step="5" placeholder="z.B. 40">
       </div>
 
-      <!-- Bewehrungsstahl -->
-      <div class="modal-field full">
+      <!-- Bewehrungsstahl: Sorte und Gewicht. Das Gewicht kommt aus dem
+           Bewehrungsplan und wird nirgends aus dem Volumen geschaetzt; es
+           traegt die Position «Bewehrung» im Massenauszug und im
+           Leistungsverzeichnis. -->
+      <div class="modal-field">
         <label>Bewehrungsstahl</label>
         <input class="modal-input" id="ft-prof-bewehrungsstahl" type="text" placeholder="z.B. B500B">
+      </div>
+      <div class="modal-field">
+        <label>Bewehrung (kg je Fundament)</label>
+        <input class="modal-input" id="ft-prof-bewehrung-kg" type="number" min="0" step="1" placeholder="gem. Bewehrungsplan">
       </div>
 
       <!-- Anker — ausschliesslich bei Verankerung in Fels und Befestigung an
@@ -7726,6 +7734,7 @@ function _ladeScript(pfad) {
                 <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Beton</th>
                 <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Deckung (mm)</th>
                 <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Stahl</th>
+                <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Bewehrung (kg)</th>
                 <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Bügel (Anz × Ø / Seite · Art.-Nr.)</th>
                 <th style="padding:6px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;">Fundamentschrauben (Anz × Ø · L cm · Art.-Nr.)</th>
               </tr>
