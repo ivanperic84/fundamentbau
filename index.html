@@ -8476,10 +8476,10 @@ function _ladeScript(pfad) {
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-weight:700;font-size:14px;">Bauprogramm</span>
     </div>
-    <!-- Aufnahme fuer die Standort-Navigation. Sie steht im Kopf statt auf der
-         Karte — dieselbe Loesung wie in der Abnahme-Checkliste; der Inhalt
-         wird von _moveFsMap() hierher gehaengt. -->
-    <div id="bp-fs-nav-halter"></div>
+    <!-- Keine Standort-Leiste mehr: sie blaetterte durch eine Liste, waehrend
+         die Karte daneben die Lage zeigt. Der Halter bleibt leer und
+         unsichtbar, damit _moveFsMap() nichts ins Leere haengt. -->
+    <div id="bp-fs-nav-halter" style="display:none;"></div>
     <div style="display:flex;gap:6px;align-items:center;">
       <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -8505,16 +8505,32 @@ function _ladeScript(pfad) {
     <!-- Zeitraster und Kennzahlen wie in der normalen Bauprogramm-Ansicht:
          auf hellem Grund ueber dem Gantt, nicht im dunklen Kopf. -->
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <div class="seg">
-        <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag');  renderBpGantt('bp-fs-gantt-wrap',true);" class="aktiv">Tage</button>
-        <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche');renderBpGantt('bp-fs-gantt-wrap',true);">Wochen</button>
-        <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat');renderBpGantt('bp-fs-gantt-wrap',true);">Monate</button>
-        <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr'); renderBpGantt('bp-fs-gantt-wrap',true);">Jahre</button>
-      </div>
       <div id="bp-fs-subtitle" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
     </div>
+    <!-- Dasselbe Diagramm wie in der Bauprogramm-Ansicht: Team → Paket →
+         Fundament. Vorher stand hier das alte Paketdiagramm, das wir ueberall
+         sonst ersetzt haben — zwei Darstellungen fuer dieselbe Sache. -->
     <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:10px;">
-      <div id="bp-fs-gantt-wrap" style="overflow-x:auto;min-height:120px;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid #f3f4f6;flex-wrap:wrap;gap:6px;">
+        <span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.05em;">Fundamente</span>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <span class="toolbar-label nur-breit">Zeitraster</span>
+          <span class="seg seg-kompakt">
+            <button id="bp-fs-zoom-tag"   onclick="setBpZoom('tag')"   class="aktiv">Tage</button>
+            <button id="bp-fs-zoom-woche" onclick="setBpZoom('woche')">Wochen</button>
+            <button id="bp-fs-zoom-monat" onclick="setBpZoom('monat')">Monate</button>
+            <button id="bp-fs-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
+          </span>
+          <span class="toolbar-label nur-breit">Sortierung</span>
+          <span class="seg seg-kompakt">
+            <button id="bp-fs-fsort-paket"     onclick="setBpFundSort('paket')" class="aktiv">Paket</button>
+            <button id="bp-fs-fsort-km"        onclick="setBpFundSort('km')">KM</button>
+            <button id="bp-fs-fsort-datum"     onclick="setBpFundSort('datum')">Datum</button>
+            <button id="bp-fs-fsort-baugruppe" onclick="setBpFundSort('baugruppe')">Baugruppe</button>
+          </span>
+        </div>
+      </div>
+      <div id="bp-fs-fund-gantt-wrap" style="overflow-x:auto;min-height:200px;"></div>
     </div>
     <div id="bp-fs-legende" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
   </div>

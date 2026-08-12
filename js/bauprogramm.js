@@ -1034,7 +1034,17 @@ async function executeBpReset() {
 // Wohin die Zieh-Rueckmeldung gezeichnet wird. Das eigene Paketdiagramm gibt
 // es in der Ausfuehrungsansicht nicht mehr; in der Kartenansicht schon.
 function bpGanttZielId() {
-  return document.getElementById('bp-gantt-wrap') ? 'bp-gantt-wrap' : 'bp-fund-gantt-wrap';
+  return document.getElementById('bp-gantt-wrap') ? 'bp-gantt-wrap' : bpFundZielId();
+}
+
+// Wohin das Fundamente-Gantt gezeichnet wird. Im Vollbild mit Karte gibt es
+// einen zweiten Rahmen; gezeichnet wird immer in den SICHTBAREN, damit
+// Auswahl, Zuklapp-Zustand und Zieh-Rueckmeldung nicht doppelt gefuehrt
+// werden muessen.
+function bpFundZielId() {
+  const fs = document.getElementById('bp-fullscreen-overlay');
+  return (fs && fs.style.display !== 'none' && document.getElementById('bp-fs-fund-gantt-wrap'))
+    ? 'bp-fs-fund-gantt-wrap' : 'bp-fund-gantt-wrap';
 }
 
 function bpResizeMove(e) {
@@ -1198,7 +1208,7 @@ function bpFundMoveMove(e) {
   if (Math.abs(delta) > 3) _bpFundMoveDrag.moved = true;
   if (!_bpFundMoveDrag.moved) return;
   const ref  = _bpFundGanttRef;
-  const wrap = document.getElementById('bp-fund-gantt-wrap');
+  const wrap = document.getElementById(bpFundZielId());
   if (!wrap || !ref.projStart || !_bpFundMoveDrag.origDatum) return;
 
   // Zieldatum aus der ZUGDISTANZ, nicht aus der absoluten Mausposition:
@@ -1219,7 +1229,7 @@ function bpFundMoveMove(e) {
     tip.style.top  = (e.clientY - 32) + 'px';
   }
   // Snap-Highlight auf der Spalte des Zieldatums (xFor kennt die Zoom-Umrechnung)
-  if (ref.xFor) _bpShowSnapHighlight('bp-fund-gantt-wrap', ref.xFor(_bpFundMoveDrag.currentDate), ref.colW);
+  if (ref.xFor) _bpShowSnapHighlight(bpFundZielId(), ref.xFor(_bpFundMoveDrag.currentDate), ref.colW);
 }
 
 // Schicht-Nr auf nächsten gültigen Sperrmuster-Tag innerhalb Paket snappen (datum-getrieben)
@@ -1450,7 +1460,7 @@ function renderBauprogrammTab() {
   try { renderBpLegende(); } catch(e) { console.error('renderBpLegende:', e); }
   try { renderBpFundamenteGantt(); } catch(e) {
     console.error('renderBpFundamenteGantt:', e);
-    const w = document.getElementById('bp-fund-gantt-wrap');
+    const w = document.getElementById(bpFundZielId());
     if (w) w.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">Fehler beim Rendern des Fundamentplan (siehe Konsole).</div>';
   }
   try { renderBpZuweisungTable(); } catch(e) {
@@ -1583,7 +1593,9 @@ function setBpFundSort(sort) {
   bpFundAuswahlLeeren(false);
   // Aktiven Zustand über die Klasse .aktiv (siehe .seg im Stylesheet)
   ['km','datum','paket','baugruppe'].forEach(s => {
+    // Zwei Leisten: die der Bauprogramm-Ansicht und die im Vollbild mit Karte
     document.getElementById('bp-fsort-' + s)?.classList.toggle('aktiv', s === sort);
+    document.getElementById('bp-fs-fsort-' + s)?.classList.toggle('aktiv', s === sort);
   });
   if (sort === 'paket' && vorher !== 'paket') bpPaketeZuklappen();
   renderBpFundamenteGantt();
@@ -1607,7 +1619,7 @@ function bpPaketeZuklappen() {
 // hinzugekommenen Zeilen blenden sich zusaetzlich kurz ein (CSS-Klasse
 // .bp-fund-auf). Wer Bewegung abgestellt hat, bekommt den Sprung.
 function bpPaketZeileUmschalten(pid) {
-  const wrap = document.getElementById('bp-fund-gantt-wrap');
+  const wrap = document.getElementById(bpFundZielId());
   const wenigerBewegung = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const alt = wrap ? wrap.getBoundingClientRect().height : 0;
 
@@ -1972,7 +1984,7 @@ rowDefs.unshift(...vaRows);
 }
 
 function renderBpFundamenteGantt() {
-  const wrap    = document.getElementById('bp-fund-gantt-wrap');
+  const wrap    = document.getElementById(bpFundZielId());
   if (!wrap) return;
   const pakete    = loadBaupakete();
   const zuw       = loadSchichtZuw();
@@ -3377,7 +3389,10 @@ function openBpFullscreen(paketId) {
   overlay.style.display = 'flex';
   const _pakete = loadBaupakete();
   _bpFsHighlightPaket = paketId || (_pakete.length ? _pakete[0].id : null);
-  renderBpGantt('bp-fs-gantt-wrap', true);
+  // Dasselbe Diagramm wie in der Bauprogramm-Ansicht. Es zeichnet sich in den
+  // sichtbaren Rahmen (siehe bpFundZielId) — deshalb erst nach dem Einblenden
+  // des Overlays aufrufen.
+  renderBpFundamenteGantt();
   _renderBpFsLegende();
   const sub = document.getElementById('bp-fs-subtitle');
   if (sub) sub.textContent = document.getElementById('bp-info-bar')?.textContent || '';
@@ -7168,6 +7183,11 @@ function bpZuwAusfuehren() {
   bpFundAuswahlLeeren(false);
   _recalcBaugruppenDates();
   renderBpFundamenteGantt();
+  // Die Tabelle fuehrte die neue Zuweisung nicht nach: sie wurde nach dem
+  // Zuweisen nirgends neu gezeichnet und zeigte den alten Stand, bis man die
+  // Ansicht wechselte.
+  renderBpZuweisungTable();
+  renderBpLegende();
   updateBpInfoBar();
   ui.toast(treffer.length + ' Fundamente zugewiesen', 'erfolg', null,
            { text: 'Rückgängig', aufRuf: bpUndo });
