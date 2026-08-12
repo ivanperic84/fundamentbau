@@ -111,6 +111,7 @@ const MK_HERKUENFTE = [
   { id: 'stunden',        label: 'Verrechnete Stunden' },
   { id: 'stundenNacht',   label: 'Verrechnete Stunden Nacht' },
   { id: 'stundenSonntag', label: 'Verrechnete Stunden Sonntag' },
+  { id: 'installation',   label: '% der Bausumme' },
   ...MASSEN_GROESSEN.map(g => ({ id: g.id, label: g.label })),
 ];
 
@@ -428,7 +429,14 @@ const MK_SCHICHT_HERKUNFT = {
 // teamId bindet die Zeile an ein Los, faktor ist die Anzahl — zwei Polier auf
 // derselben Schicht sind zwei mal acht Stunden. Beide stehen nur an Zeilen,
 // die aus der Besetzung erzeugt wurden.
+// Der Preis einer Zeile. Nur die Installation hat einen gerechneten: sie ist
+// ein Anteil der Bausumme und keine Zahl, die jemand einträgt.
+function lvPreis(zeile, instBetrag) {
+  return zeile.herkunft === 'installation' ? (instBetrag || 0) : (zeile.preis || 0);
+}
+
 function lvMenge(zeile, summen) {
+  if (zeile.herkunft === 'installation') return 1;
   const f = zeile.faktor > 0 ? zeile.faktor : 1;
   if (MK_SCHICHT_HERKUNFT[zeile.herkunft]) {
     const a  = zeile.teamId ? schichtenAufteilung(zeile.teamId) : schichtenAufteilung();
@@ -799,8 +807,14 @@ function _mkLvTabelle(summen) {
        ${_mkHerkunftOptionen(z.herkunft)}
      </select>`;
 
-  const zeileHtml = (z, menge, betrag) => {
-    const gebunden = MK_SCHICHT_HERKUNFT[z.herkunft] || !!(z.herkunft && summen[z.herkunft] != null);
+  const zeileHtml = (z, menge, betrag, instBetrag) => {
+    const gebunden = MK_SCHICHT_HERKUNFT[z.herkunft] || z.herkunft === 'installation'
+                     || !!(z.herkunft && summen[z.herkunft] != null);
+    // Der Preis der Installation folgt der Bausumme — er wird gerechnet, nicht
+    // eingegeben. Ein Eingabefeld daneben waere eine Einladung zum Widerspruch.
+    const preisFeld = z.herkunft === 'installation'
+      ? `<span title="${_mkZahl(mkInstProzent(), 1)} % der Bausumme" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(instBetrag)}</span>`
+      : eingabe(z.id, 'preis', z.preis, '90px', 'zahl');
     return `<tr>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${eingabe(z.id,'pos',z.pos,'70px')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${eingabe(z.id,'text',z.text,'100%')}</td>
@@ -810,7 +824,7 @@ function _mkLvTabelle(summen) {
           ? `<span title="${MK_SCHICHT_HERKUNFT[z.herkunft] || 'aus dem Massenauszug'}" style="font-variant-numeric:tabular-nums;color:#1a3a5c;font-weight:600;">${_mkZahl(menge, 1)}</span>`
           : eingabe(z.id,'menge',z.menge,'80px','zahl')}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;">${herkunftWahl(z)}</td>
-      <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">${eingabe(z.id,'preis',z.preis,'90px','zahl')}</td>
+      <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;">${preisFeld}</td>
       <td style="padding:4px 10px;border-bottom:1px solid #f3f4f6;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">${_mkZahl(betrag)}</td>
       <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
         <button onclick="lvZeileLoeschen('${z.id}')" title="Position löschen"
@@ -820,25 +834,34 @@ function _mkLvTabelle(summen) {
     </tr>`;
   };
 
+  // ERSTER DURCHGANG: die Abschnittssummen, aus denen sich die Installation
+  // bemisst. Die Installationszeilen selbst bleiben aussen vor — ihr Betrag
+  // steht erst fest, wenn die Basis steht, und er darf nicht in sie eingehen.
+  const abschnitte = new Map();
+  positionen.forEach(z => {
+    if (z.herkunft === 'installation') return;
+    const g = _lvGruppe(z.pos);
+    if (!abschnitte.has(g.abschnitt)) abschnitte.set(g.abschnitt, { summe: 0, anzahl: 0 });
+    const a = abschnitte.get(g.abschnitt);
+    a.summe += lvMenge(z, summen) * (z.preis || 0);
+    a.anzahl++;
+  });
+  const instBetrag = mkInstBasisSumme(abschnitte) * mkInstProzent() / 100;
+
   // Nach Kapitel gruppiert — die ersten drei Ziffern der Positionsnummer.
   // Die Zwischensumme je Kapitel ist die Groesse, die in der Zusammenstellung
   // gebraucht wird; die Abschnitte darunter tragen die Installationsbasis.
   const gruppen = new Map();
-  const abschnitte = new Map();
   let total = 0;
   positionen.forEach(z => {
     const menge  = lvMenge(z, summen);
-    const betrag = menge * (z.preis || 0);
+    const betrag = menge * lvPreis(z, instBetrag);
     total += betrag;
     const g = _lvGruppe(z.pos);
     if (!gruppen.has(g.kapitel)) gruppen.set(g.kapitel, { summe: 0, zeilen: [] });
     const eintrag = gruppen.get(g.kapitel);
     eintrag.summe += betrag;
-    eintrag.zeilen.push(zeileHtml(z, menge, betrag));
-    if (!abschnitte.has(g.abschnitt)) abschnitte.set(g.abschnitt, { summe: 0, anzahl: 0 });
-    const a = abschnitte.get(g.abschnitt);
-    a.summe += betrag;
-    a.anzahl++;
+    eintrag.zeilen.push(zeileHtml(z, menge, betrag, instBetrag));
   });
 
   const sortiert = [...gruppen.keys()].sort((a, b) =>
@@ -888,6 +911,27 @@ function loadInstAus() {
   catch { return INST_AUS_VORGABE.slice(); }
 }
 
+// Anteil der Installation an der Bausumme. Die Zusammenstellung fuehrt dafuer
+// eine Staffel — von Bausumme X bis Y ein fester Betrag. Ein Prozentsatz sagt
+// dasselbe, ohne an den Stufengrenzen zu springen: waechst das Projekt um ein
+// Fundament, waechst die Installation mit, statt eine Stufe lang stillzustehen
+// und dann zu hopsen.
+function mkInstProzent() {
+  const n = Number(loadMkEinstellungen().instProzent);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// Bausumme, an der sich die Installation bemisst: die Summe der Abschnitte,
+// die dafuer angehakt sind. Nicht dazu zaehlen die Installation selbst, das
+// Personal und die Sicherheitsausruestung — sonst bemaesse sie sich an sich
+// selbst (siehe INST_AUS_VORGABE).
+function mkInstBasisSumme(abschnitte) {
+  const aus = loadInstAus();
+  let basis = 0;
+  abschnitte.forEach((a, k) => { if (!aus.includes(k)) basis += a.summe; });
+  return basis;
+}
+
 function instAbschnittUmschalten(abschnitt) {
   const aus = loadInstAus();
   const i = aus.indexOf(abschnitt);
@@ -913,11 +957,10 @@ function _mkInstBasis(abschnitte) {
   const aus = loadInstAus();
   const keys = [...abschnitte.keys()].sort((a, b) =>
     (a === '—') - (b === '—') || a.localeCompare(b, 'de', { numeric: true }));
-  let basis = 0;
+  const basis = mkInstBasisSumme(abschnitte);
   const zeilen = keys.map(k => {
     const a = abschnitte.get(k);
     const drin = !aus.includes(k);
-    if (drin) basis += a.summe;
     return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;
                  color:${drin ? '#374151' : '#9ca3af'};cursor:pointer;">
         <input type="checkbox" ${drin ? 'checked' : ''} onchange="instAbschnittUmschalten('${k}')"
@@ -935,13 +978,32 @@ function _mkInstBasis(abschnitte) {
        <div style="max-width:420px;">${zeilen}
          <div style="display:flex;gap:8px;border-top:1px solid #e5e7eb;margin-top:5px;padding-top:5px;
                      font-size:12px;font-weight:700;color:#1a3a5c;">
-           <span style="flex:1 1 auto;">Summe</span>
+           <span style="flex:1 1 auto;">Bausumme</span>
            <span style="font-variant-numeric:tabular-nums;">${_mkZahl(basis)}</span></div>
+         <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:#374151;">
+           <span style="flex:1 1 auto;">davon Installation</span>
+           <input type="number" step="0.1" min="0" max="100" value="${mkInstProzent() || ''}"
+                  onchange="mkInstProzentSetzen(this.value)" placeholder="0"
+                  style="width:62px;padding:3px 6px;border:1px solid #e5e7eb;border-radius:5px;
+                         font-size:11px;font-family:inherit;text-align:right;">
+           <span style="flex:0 0 12px;color:#9ca3af;">%</span>
+           <span style="flex:0 0 92px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;
+                        color:${mkInstProzent() ? '#1a3a5c' : '#c7cdd4'};">${_mkZahl(basis * mkInstProzent() / 100)}</span>
+         </div>
        </div>
-       <div style="font-size:10px;color:#9ca3af;margin-top:5px;">
+       <div style="font-size:10px;color:#9ca3af;margin-top:6px;line-height:1.6;">
          Abgewählte Abschnitte zählen nicht mit — die Installation, das Personal und die
-         Sicherheitsausrüstung bemessen sich nicht an sich selbst.</div>
+         Sicherheitsausrüstung bemessen sich nicht an sich selbst.
+         ${mkInstProzent()
+           ? 'Der Betrag steht als Einheitspreis in jeder Position, deren Menge auf «% der Bausumme» steht.'
+           : 'Ohne Prozentsatz bleibt der Betrag bei null — die Zusammenstellung führt dafür eine Staffel nach Bausumme.'}</div>
      </div>`;
+}
+
+function mkInstProzentSetzen(wert) {
+  const n = parseFloat(String(wert).replace(',', '.'));
+  saveMkEinstellungen({ ...loadMkEinstellungen(), instProzent: Number.isFinite(n) && n > 0 ? n : 0 });
+  renderMassenView();
 }
 
 function _mkSummenZeile(netto, anzahlFundamente) {
@@ -1306,10 +1368,24 @@ function lkKatalogExport() {
 function lvExportXlsx() {
   const summen = massenSummen(massenauszugRechnen(
     document.getElementById('mk-massen-gliederung')?.value || 'typ'));
-  const zeilen = loadLvPositionen().map(z => {
+  const positionen = loadLvPositionen();
+  // Dieselbe Rechnung wie in der Ansicht: die Installation traegt den Anteil
+  // an der Bausumme, nicht die Zahl aus der Datenbank.
+  const abschnitte = new Map();
+  positionen.forEach(z => {
+    if (z.herkunft === 'installation') return;
+    const g = _lvGruppe(z.pos);
+    if (!abschnitte.has(g.abschnitt)) abschnitte.set(g.abschnitt, { summe: 0, anzahl: 0 });
+    const a = abschnitte.get(g.abschnitt);
+    a.summe += lvMenge(z, summen) * (z.preis || 0);
+    a.anzahl++;
+  });
+  const instBetrag = mkInstBasisSumme(abschnitte) * mkInstProzent() / 100;
+  const zeilen = positionen.map(z => {
     const menge = lvMenge(z, summen);
+    const preis = lvPreis(z, instBetrag);
     return { 'Pos.': z.pos, 'Bezeichnung': z.text, 'Einheit': z.einheit,
-             'Menge': menge, 'Einheitspreis': z.preis, 'Betrag': menge * (z.preis || 0) };
+             'Menge': menge, 'Einheitspreis': preis, 'Betrag': menge * preis };
   });
   if (!zeilen.length) { ui.toast('Keine Positionen zum Ausgeben.', 'fehler'); return; }
   const wb = XLSX.utils.book_new();
@@ -1544,6 +1620,8 @@ const MK_ZUORDNUNG_REGELN = [
   { herkunft: 'stundenNacht',   text: /nacht/,   einheit: /^(std|h|stunde)/ },
   { herkunft: 'schichtSonntag', text: /sonntag/ },
   { herkunft: 'schichtNacht',   text: /nacht/ },
+  // Die Installation bemisst sich an der Bausumme, nicht an Schichten
+  { herkunft: 'installation',   text: /installation|baustelleneinrichtung|einrichten und räumen|einrichten und raeumen/ },
   { herkunft: 'schalung',       text: /schalung|einschal|ausschal/,           einheit: /m2/ },
   { herkunft: 'beton',          text: /beton/,                                einheit: /m3/ },
   { herkunft: 'aushub',         text: /aushub|abtrag|erdarbeit|graben/,       einheit: /m3/ },
