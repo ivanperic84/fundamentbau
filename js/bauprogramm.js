@@ -926,7 +926,10 @@ function _calcPfahlSchichten(ft, nettoH, abzugMin) {
 
 // ── Zoom-Zustand ──────────────────────────────────────────────
 let _bpZoom          = 'tag'; // 'tag' | 'woche' | 'monat' | 'jahr'
-let _bpFundSort      = 'datum';  // 'km' | 'datum' | 'baugruppe'
+// Vorgabe ist die Paketansicht: seit das eigene Paketdiagramm entfallen ist,
+// sind die Paketbalken nur dort zu sehen. Wer in «Datum» startete, fand die
+// Pakete nicht.
+let _bpFundSort      = 'paket';  // 'km' | 'datum' | 'paket' | 'baugruppe'
 let _bpCollapsed     = new Set(); // IDs kollabierter Baugruppen
 let _bpZoomColW      = 28;    // aktuell gepixelter Spaltenbreite (für Resize)
 let _bpResizeDrag    = null;  // { pakId, side, startX, startNaechte, startDatum, currentNaechte, currentStart }
@@ -1582,13 +1585,19 @@ function setBpFundSort(sort) {
   ['km','datum','paket','baugruppe'].forEach(s => {
     document.getElementById('bp-fsort-' + s)?.classList.toggle('aktiv', s === sort);
   });
-  // In der Paketansicht beginnt jedes Paket zugeklappt: bei zwanzig Standorten
-  // ist die Uebersicht sonst genauso lang wie vorher.
-  if (sort === 'paket' && vorher !== 'paket') {
-    loadBaupakete().forEach(p => _bpCollapsed.add(p.id));
-    _bpCollapsed.add('__ohne_paket__');
-  }
+  if (sort === 'paket' && vorher !== 'paket') bpPaketeZuklappen();
   renderBpFundamenteGantt();
+}
+
+// In der Paketansicht beginnt jedes Paket zugeklappt: bei zwanzig Standorten
+// waere die Uebersicht sonst genauso lang wie vorher. Gilt beim Umschalten in
+// die Ansicht UND beim ersten Aufbau, seit sie die Vorgabe ist.
+let _bpPaketeErstZugeklappt = false;
+
+function bpPaketeZuklappen() {
+  loadBaupakete().forEach(p => _bpCollapsed.add(p.id));
+  _bpCollapsed.add('__ohne_paket__');
+  _bpPaketeErstZugeklappt = true;
 }
 
 // Paketzeile auf- und zuklappen. Das Diagramm ist EIN SVG mit ausgerechneten
@@ -1738,7 +1747,11 @@ function _bpFundHeaderSvg(g) {
     if (_bpZoom === 'tag') {
       const kw = _isoWeek(col);
       if (kw !== prevKw) {
-        svg += `<text x="${x+2}" y="12" font-size="9" fill="#64748b" font-weight="700" font-family="system-ui">KW${kw}</text>`;
+        // Monat neben der Kalenderwoche: sonst muss man in die Wochen- oder
+        // Monatsansicht wechseln, nur um zu sehen, wo man im Jahr steht.
+        const monat = col.toLocaleDateString('de-CH', { month: 'short', year: '2-digit' });
+        svg += `<text x="${x+2}" y="12" font-size="9" fill="#64748b" font-weight="700" font-family="system-ui">KW${kw}`
+             + `<tspan fill="#9ca3af" font-weight="400"> · ${monat}</tspan></text>`;
         prevKw = kw;
       }
       const dow    = col.getDay();
@@ -2008,6 +2021,10 @@ function renderBpFundamenteGantt() {
   };
 
   // Zeilenstruktur (siehe _bpFundZeilenstruktur)
+  // Beim ersten Aufbau in der Paketansicht alles zuklappen — muss VOR der
+  // Zeilenstruktur stehen, sonst greift es erst beim naechsten Zeichnen.
+  if (_bpFundSort === 'paket' && !_bpPaketeErstZugeklappt && pakete.length) bpPaketeZuklappen();
+
   const rowDefs = _bpFundZeilenstruktur({ abbruchPairs, gruppen, neubauPairs, pairs, pakete, sortPairs, zuw });
 
   // Wenn alle Standorte "Bestand erhalten" sind → kein Gantt nötig
