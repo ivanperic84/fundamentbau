@@ -655,7 +655,7 @@ function renderCards() {
         ${customTags.length ? customTags.map(t => { const active=(getPairData(p.id).tags||[]).includes(t.id); return `<label class="card-tag-picker-item"><input type="checkbox" ${active?'checked':''} onchange="togglePairTag(${p.id},'${t.id}')"><span style="color:${t.color}">${t.name}</span></label>`; }).join('') : '<span style="font-size:11px;color:#9ca3af;">Noch keine Tags.</span>'}
       </div>
       <div class="card-top">
-        <div class="card-id">Mast ${p.mast || '—'}</div>
+        <div class="card-id">${standortName(p)}</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">${badgesHtml}</div>
       </div>
       ${kachelZeigt('km') ? `<div class="card-km">${infoLine}</div>` : ''}
@@ -775,7 +775,7 @@ function getNotizContext() {
   }
   // Detailansicht → Mast-Kontext
   const pair = PAIRS.find(p => p.id === currentPairId);
-  return pair ? 'Mast ' + (pair.mast || currentPairId) : '';
+  return pair ? standortName(pair) : '';
 }
 
 function setNotizPhaseFilter(val) {
@@ -848,7 +848,7 @@ function renderNotizSection() {
     const label  = isGlobal
       ? `<span style="font-size:11px;font-weight:700;color:#6b7280;">Allgemein${phaseBadge}</span>`
       : `<span style="font-size:11px;font-weight:700;color:#1a3a5c;cursor:pointer;"
-           onclick="event.stopPropagation();showDetail(${p.id})">Mast ${p.mast || p.id}</span>`;
+           onclick="event.stopPropagation();showDetail(${p.id})">${standortName(p)}</span>`;
     return `
       <div style="position:relative;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;
                   padding:9px 11px;${!isGlobal ? 'cursor:pointer;' : ''}box-sizing:border-box;"

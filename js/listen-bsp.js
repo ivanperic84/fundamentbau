@@ -184,7 +184,7 @@ function exportListExcel() {
   const stripHtml = s => String(s).replace(/<[^>]*>/g, '').trim();
 
   const rows = pairs.map(p => {
-    const row = { 'Standort': p.bezeichnung || (p.mast ? 'Mast '+p.mast : 'ID '+p.id) };
+    const row = { 'Standort': standortName(p) };
     cols.forEach(c => { row[c.label] = stripHtml(c.render(p)); });
     row['Tags'] = (getPairData(p.id).tags||[]).map(tid => { const t=customTags.find(x=>x.id===tid); return t?t.name:''; }).filter(Boolean).join(', ');
     return row;
@@ -216,7 +216,7 @@ function exportListPdf() {
   // Tabellenspalten
   const head = [['Standort', ...cols.map(c=>c.label), 'Tags']];
   const body = pairs.map(p => [
-    p.bezeichnung || (p.mast ? 'Mast '+p.mast : 'ID '+p.id),
+    standortName(p),
     ...cols.map(c => stripHtml(c.render(p))),
     (getPairData(p.id).tags||[]).map(tid => { const t=customTags.find(x=>x.id===tid); return t?t.name:''; }).filter(Boolean).join(', ')
   ]);
@@ -313,7 +313,7 @@ function openBegehungSkizze(pairId, bgImageDataUrl, idx) {
 
   const title = document.getElementById('beg-skizze-title');
   const phaseLabel = PHASEN_CONFIG[_activePhase]?.label || _activePhase;
-  if (title) title.textContent = `Mast ${pair.mast || pairId} · ${phaseLabel} · Skizze ${_bskIndex}${count > 1 ? ' / ' + count : ''}`;
+  if (title) title.textContent = `${standortName(pair)} · ${phaseLabel} · Skizze ${_bskIndex}${count > 1 ? ' / ' + count : ''}`;
 
   const all = loadAllBskSkizzen();
   const d   = all[bskKey(pairId, _activePhase, _bskIndex)];
@@ -1383,7 +1383,7 @@ function renderFundamente() {
       : '';
     return `<div class="card" onclick="openFundamentModal('${f.id}')" style="border-left:4px solid ${typColor};">
       <div class="card-top">
-        <div class="card-id">Mast ${f.mast || '—'}</div>
+        <div class="card-id">${standortName(f)}</div>
         <span style="font-size:10px;background:${typBg};color:${typColor};padding:2px 8px;border-radius:4px;font-weight:700;">${f.typ === 'standard' ? 'Standard' : 'Spezial'}</span>
       </div>
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">${typLabel}</div>
@@ -2463,7 +2463,7 @@ async function _renderBspFotosGrid() {
   Object.entries(allFotos).forEach(([pairId, fotos]) => {
     const pair = (typeof PAIRS !== 'undefined' ? PAIRS : []).find(p => p.id === parseInt(pairId));
     (fotos || []).forEach(f => {
-      if (f.src) items.push({ src: f.src, caption: f.caption || '', label: pair ? ('Mast ' + (pair.mast || pairId)) : ('ID ' + pairId) });
+      if (f.src) items.push({ src: f.src, caption: f.caption || '', label: pair ? (standortName(pair)) : ('ID ' + pairId) });
     });
   });
   if (!items.length) {

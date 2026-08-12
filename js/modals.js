@@ -1836,7 +1836,7 @@ function openBriefModal(pairId, tab, type) {
   const sel = document.getElementById('brief-standort-select');
   sel.innerHTML = '<option value="">— Kein Standort gewählt —</option>' +
     PAIRS.map(p => {
-      const name = isBP ? `Mast ${p.mast || p.id}` : (p.bezeichnung || 'Standort ' + p.id);
+      const name = isBP ? `${standortName(p)}` : (p.bezeichnung || 'Standort ' + p.id);
       const km   = p.km_rs ? ' · KM ' + parseFloat(p.km_rs).toFixed(3) : '';
       return `<option value="${p.id}">${name}${km}</option>`;
     }).join('');
@@ -1898,7 +1898,7 @@ function buildBriefText() {
   const standorteListe = fundStandorte.length
     ? fundStandorte.map((p, i) => {
         const km  = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '–';
-        const name = p.mast ? `Mast ${p.mast}` : (p.bezeichnung || 'Standort ' + p.id);
+        const name = standortName(p);
         return `  ${i + 1}. ${name} · KM ${km}`;
       }).join('\n')
     : '  (Noch keine Fundamentstandorte erfasst)';

@@ -811,7 +811,7 @@ function exportFtXlsxKombiniert() {
     const ft = ftList.find(t => t.id === zuw[p.id]);
     const bp = allBp[p.id] || {};
     const km = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : (p.km_rks ? parseFloat(p.km_rks).toFixed(3) : '');
-    zuwRows.push(['Mast '+(p.mast||p.id), km, ft?.name||'—', bp.neigung||'—', ft ? (ft.nachweisRequired?'Nachweis erf.':'Zugewiesen') : 'Nicht zugewiesen']);
+    zuwRows.push([standortName(p), km, ft?.name||'—', bp.neigung||'—', ft ? (ft.nachweisRequired?'Nachweis erf.':'Zugewiesen') : 'Nicht zugewiesen']);
   });
   const wsZuw = window.XLSX.utils.aoa_to_sheet(zuwRows);
 

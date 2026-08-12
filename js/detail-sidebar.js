@@ -404,7 +404,7 @@ function pairJumpQuelle() {
 function pairJumpName(p) {
   if (p._objType === 'installation') return p.bezeichnung || 'Installation ' + p.id;
   return _activePhase !== 'baugrund'
-    ? 'Mast ' + (p.mast || p.id)
+    ? standortName(p)
     : (p.bezeichnung || 'Standort ' + p.id);
 }
 
@@ -580,7 +580,7 @@ function renderDetail() {
   const phaseIdx    = phasePairs.findIndex(p => p.id === currentPairId);
   const phaseLabel  = isInst
     ? (pair.bezeichnung || 'Installation ' + pair.id)
-    : (_activePhase !== 'baugrund' ? `Mast ${pair.mast || pair.id}` : (pair.bezeichnung || 'Standort ' + pair.id));
+    : (_activePhase !== 'baugrund' ? `${standortName(pair)}` : (pair.bezeichnung || 'Standort ' + pair.id));
   const navText = document.getElementById('pair-nav-text');
   if (navText) navText.textContent = `${phaseLabel} / ${phasePairs.length}`;
   const prevBtn = document.getElementById('prev-btn');
@@ -1257,7 +1257,7 @@ async function schlagBuildPdf(pairIds, single) {
     doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont(undefined,'bold');
     doc.text('Rammsondierprotokoll', 14, 10);
     doc.setFontSize(9); doc.setFont(undefined,'normal');
-    doc.text(`${projekt?.name || ''} · Mast ${pair.mast || '—'} · KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`, 14, 16);
+    doc.text(`${projekt?.name || ''} · ${standortName(pair)} · KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`, 14, 16);
 
     let y = 26;
     doc.setTextColor(0,0,0); doc.setFontSize(8);

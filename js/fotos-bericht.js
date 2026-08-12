@@ -69,7 +69,7 @@ function kopfSuchListe(val) {
   if (!treffer.length && !bahn.length && !notizen.length) { panel.classList.remove('offen'); return; }
   const standortHtml = treffer.map((p, i) => {
     const km   = p.km_rs || p.km_rks;
-    const name = p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id);
+    const name = standortName(p);
     return '<button class="pair-jump-eintrag' + (i === 0 ? ' markiert' : '')
       + '" data-kopf-pair="' + p.id + '">'
       + '<span>' + escHtml(name) + '</span>'
@@ -83,7 +83,7 @@ function kopfSuchListe(val) {
     + '<span class="pj-neben">' + escHtml(t.neben || t.art) + '</span></button>').join('');
   const notizHtml = notizen.map((n, i) => {
     const pair = PAIRS.find(p => p.id === n.pairId);
-    const name = pair?.mast ? 'Mast ' + pair.mast : 'Standort ' + n.pairId;
+    const name = pair?.mast ? standortName(pair) : 'Standort ' + n.pairId;
     return '<button class="pair-jump-eintrag" data-kopf-notiz="' + i + '"'
       + ' title="' + escHtml(n.text) + '" style="align-items:flex-start;">'
       + '<span style="white-space:normal;line-height:1.35;">' + escHtml(_kopfSuchAuszug(n.text, val)) + '</span>'
@@ -703,7 +703,7 @@ function exportChangelogPdf(scope) {
     doc.setFillColor(240,244,250);
     doc.rect(14,y-4,182,8,'F');
     doc.setTextColor(26,58,92); doc.setFontSize(10); doc.setFont('helvetica','bold');
-    doc.text(`Mast ${pair.mast || pair.id}${pair.km_rs ? '  ·  KM '+parseFloat(pair.km_rs).toFixed(3) : ''}`, 16, y+1);
+    doc.text(`${standortName(pair)}${pair.km_rs ? '  ·  KM '+parseFloat(pair.km_rs).toFixed(3) : ''}`, 16, y+1);
     y += 9;
 
     log.forEach(e => {

@@ -61,7 +61,7 @@ function renderAusfPlanungInline() {
     const pd  = getPairData(p.id);
     const km  = p.km_rs  ? parseFloat(p.km_rs).toFixed(3)  :
                 p.km_rks ? parseFloat(p.km_rks).toFixed(3) : '—';
-    const lbl = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+    const lbl = standortName(p);
     const bg  = i % 2 === 0 ? '#ffffff' : '#f9fafb';
 
     // Anzahl Schichten aus Auto-Berechnung
@@ -236,7 +236,7 @@ function exportAusfIlXlsx() {
     const sp  = resolveSpForPair(p.id);
     const sch = getSchichtenForPair(p.id);
     const km  = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '';
-    const lbl = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+    const lbl = standortName(p);
     rows.push([
       `T${i+1}`, lbl, km, sp ? sp.name : '',
       sch || '', bp.ausfGeraet || '',
@@ -290,7 +290,7 @@ function exportAusfIlPdf() {
     const sp  = resolveSpForPair(p.id);
     const sch = getSchichtenForPair(p.id);
     const km  = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—';
-    const lbl = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+    const lbl = standortName(p);
     const stVal = pd.status || 'geplant';
     const stCols = { geplant:[37,99,235], bestaetigt:[22,163,74], abgeschlossen:[21,128,61], abgesagt:[220,38,38] };
 
@@ -423,7 +423,7 @@ function renderTermineMatBestellung() {
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:7px;background:white;">
       <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;"></span>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:600;color:#1a3a5c;">Mast ${p.mast || p.id}
+        <div style="font-size:12px;font-weight:600;color:#1a3a5c;">${standortName(p)}
           <span style="font-size:10px;font-weight:400;color:#9ca3af;margin-left:4px;">${bp.bestand === 'prov' ? 'Prov.' : 'Neubau'}</span>
         </div>
         ${meta ? `<div style="font-size:10px;color:#6b7280;margin-top:1px;">${meta}</div>` : ''}
@@ -528,7 +528,7 @@ function renderTermineAbnahmen() {
     return `<div onclick="openCheckliste(${p.id})"
       style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:white;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:2px;">Mast ${p.mast || p.id} · KM ${p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—'}</div>
+        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:2px;">${standortName(p)} · KM ${p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—'}</div>
         <div style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px;">${calSvgA} ${fmt(ck.datum)}${ck.ort ? ' · ' + ck.ort : ''}</div>
         ${anw.length ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px;display:flex;align-items:center;gap:4px;">${pplSvgA} ${anw.join(', ')}</div>` : ''}
       </div>
@@ -678,7 +678,7 @@ function renderStandortTermine() {
     const pd  = getPairData(p.id);
     const km  = p.km_rs  ? parseFloat(p.km_rs).toFixed(3)
               : p.km_rks ? parseFloat(p.km_rks).toFixed(3) : '—';
-    const lbl = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+    const lbl = standortName(p);
     const selHtml = schichtBaseOpts.replace(`value="${p.schichtId || ''}"`, `value="${p.schichtId || ''}" selected`);
     const isFirst = i === 0;
     return `<div id="st-row-${p.id}" style="display:grid;grid-template-columns:${cols};gap:5px;align-items:center;padding:2px 0;border-radius:5px;transition:background 0.1s;">
@@ -847,7 +847,7 @@ function renderErgAbnahmeLinks() {
     if (!p) return '';
     return `<button type="button" onclick="closeEreignisModal();openCheckliste(${pid})"
       style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit;background:#7c3aed;color:white;border:none;">
-      Abnahme Mast ${p.mast || pid} öffnen
+      Abnahme ${standortName(p)} öffnen
     </button>`;
   }).join('');
 }
@@ -860,7 +860,7 @@ function ausfPlanungZuTermin() {
   const pair = PAIRS.find(p => p.id === currentPairId);
   if (!pair) return;
 
-  const pairName = pair.bezeichnung || ('Mast ' + (pair.mast || pair.id));
+  const pairName = standortName(pair);
   const schichtLbl = { tag:'Tagarbeit', nacht:'Nachtarbeit', gemischt:'Gemischt' };
 
   // Vorhandenes Bau-Ereignis für diesen Standort suchen (erstes treffen)
@@ -1194,13 +1194,13 @@ function notizNeu() {
   const pairSel = document.getElementById('schnellnotiz-pair');
   const inp     = document.getElementById('schnellnotiz-input');
   const ctxInp  = document.getElementById('schnellnotiz-context');
-  if (titleEl) titleEl.textContent = pair ? `Notiz · Mast ${pair.mast || currentPairId}` : 'Neue Notiz';
+  if (titleEl) titleEl.textContent = pair ? `Notiz · ${standortName(pair)}` : 'Neue Notiz';
   if (pairRow) pairRow.style.display = 'none';
   if (ctxInp) ctxInp.value = getNotizContext();
   // Optionen befüllen damit value korrekt gesetzt werden kann
   if (pairSel) {
     pairSel.innerHTML = PAIRS.map(p =>
-      `<option value="${p.id}">Mast ${p.mast || p.id}</option>`).join('');
+      `<option value="${p.id}">${standortName(p)}</option>`).join('');
     pairSel.value = currentPairId || '';
   }
   if (inp) inp.value = '';
@@ -1308,7 +1308,7 @@ function renderAlleNotizenList(phase) {
     const label  = isGlobal
       ? `<span style="font-size:11px;font-weight:700;color:#6b7280;">Allgemein</span>`
       : `<span style="font-size:11px;font-weight:700;color:#1a3a5c;cursor:pointer;"
-           onclick="closeAlleNotizenModal();showDetail(${p.id})">Mast ${p.mast || p.id}</span>`;
+           onclick="closeAlleNotizenModal();showDetail(${p.id})">${standortName(p)}</span>`;
     return `
     <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -1337,7 +1337,7 @@ function openSchnellNotizModal() {
   if (pairRow) pairRow.style.display = '';
   if (sel) {
     sel.innerHTML = '<option value="_global">— Mastunabhängig —</option>' +
-      PAIRS.map(p => `<option value="${p.id}">Mast ${p.mast || p.id} · KM ${p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—'}</option>`).join('');
+      PAIRS.map(p => `<option value="${p.id}">${standortName(p)} · KM ${p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—'}</option>`).join('');
     sel.value = '_global';
   }
   if (inp) inp.value = '';
@@ -1353,7 +1353,7 @@ function onSchnellnotizPairChange(val) {
     ctxInp.value = getNotizContext();
   } else {
     const pair = PAIRS.find(p => String(p.id) === String(val));
-    ctxInp.value = pair ? 'Mast ' + (pair.mast || pair.id) : '';
+    ctxInp.value = pair ? standortName(pair) : '';
   }
 }
 
@@ -1550,7 +1550,7 @@ function renderEreignisPairSelection(selected) {
     html += `<div id="erg-pair-checkboxes" style="${allChecked ? 'display:none' : 'display:flex'};flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;padding-left:4px;">
       ${fundamente.map(p => {
         const km  = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '–';
-        const lbl = `Mast ${p.mast || p.id} · KM ${km}`;
+        const lbl = `${standortName(p)} · KM ${km}`;
         const chk = selected && selected.includes(p.id) ? 'checked' : '';
         return `<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
           <input type="checkbox" class="erg-pair-chk" value="${p.id}" ${chk}> ${lbl}</label>`;

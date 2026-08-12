@@ -1362,7 +1362,7 @@ function openAusschalModal(pairId) {
   const curAT = z.customAushaerteTage ?? defaultAT;
   const betonD = z.betoniertermin;
   const pakName = (loadBaupakete().find(p => p.id === z.paketId) || {}).name;
-  document.getElementById('ausschal-modal-title').textContent = 'Aushärtezeit · Mast ' + (pair.mast || '—');
+  document.getElementById('ausschal-modal-title').textContent = 'Aushärtezeit · ' + standortName(pair);
   document.getElementById('ausschal-modal-pairid').value = pairId;
   document.getElementById('ausschal-modal-tage').value   = curAT;
   document.getElementById('ausschal-modal-default').textContent =
@@ -2210,7 +2210,7 @@ function renderBpFundamenteGantt() {
       const p      = r.pair;
       const z      = _getEffZ(p);
       const indent = r.indent ? 12 : 0;
-      const lbl    = ('Mast '+(p.mast||'—')).slice(0,13);
+      const lbl    = (standortName(p)).slice(0,13);
       const kmStr  = p.km_rs ? 'km ' + parseFloat(p.km_rs).toFixed(3) : '';
       const glStr  = p.gleis ? 'Gl '  + p.gleis : '';
       // Ausserhalb der Paketansicht steht keine Paketzeile ueber der Zeile —
@@ -3748,7 +3748,7 @@ function _bpZuwZeileHtml(p, rowMode, showControls, zuwData, ctx) {
 
     return '<tr class="list-hover-row" style="background:' + rowBg + ';' + verifyBorder + rowBorder + '" id="' + rowId + '">'
       + cbCell
-      + '<td style="' + tdS + 'font-weight:700;color:#1a3a5c;">Mast ' + (p.mast||'—') + '</td>'
+      + '<td style="' + tdS + 'font-weight:700;color:#1a3a5c;">' + escHtml(standortName(p)) + '</td>'
       + '<td style="' + tdS + 'color:#6b7280;">' + (p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—') + '</td>'
       + '<td style="' + tdS + 'text-align:center;">' + typBadge + '</td>'
       + '<td style="' + tdS + '">'
@@ -4059,7 +4059,7 @@ function assignFundtypFromTable(pairId, val) {
       ft = resolveFtByFamilieNeigung(val.replace('__fam__', ''), neigung, null);
       if (!ft) {
         const famName = val.replace('__fam__', '');
-        skipped.push(`${famName} ≠ Neigung "${neigung || '—'}" (Mast ${loadPairs().find(p=>p.id===id)?.mast || id})`);
+        skipped.push(`${famName} ≠ Neigung "${neigung || '—'}" (${standortNameZuId(id)})`);
         return;
       }
     } else {
@@ -4067,7 +4067,7 @@ function assignFundtypFromTable(pairId, val) {
     }
 
     if (ft && !_ftMatchesNeigung(ft, neigung)) {
-      skipped.push(`${ft.name.split('/')[0].trim()} ≠ Neigung "${neigung}" (Mast ${loadPairs().find(p=>p.id===id)?.mast || id})`);
+      skipped.push(`${ft.name.split('/')[0].trim()} ≠ Neigung "${neigung}" (${standortNameZuId(id)})`);
       return;
     }
 
@@ -6343,7 +6343,7 @@ function showFpCtxMenu(pairId, clientX, clientY) {
   const header = document.getElementById('fp-ctx-header');
   if (header) header.textContent = ziele.length > 1
     ? ziele.length + ' Fundamente ausgewählt'
-    : 'Mast ' + (pair?.mast || '—') + (z.paketId ? ' · ' + (pakete.find(p=>p.id===z.paketId)?.name||'') : '');
+    : standortName(pair) + (z.paketId ? ' · ' + (pakete.find(p=>p.id===z.paketId)?.name||'') : '');
 
   // Baupaket-Select befüllen
   const pakSel = document.getElementById('fp-ctx-pak-sel');
@@ -6680,7 +6680,7 @@ function exportBauprogrammXlsx() {
     const bed    = BED.filter(([k]) => bp2[k]).map(([, l]) => l).join(', ');
 
     zeilen.push([
-      'Mast ' + (p.mast || p.id),
+      standortName(p),
       p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '',
       p.gleis || '',
       typeof getMassnahmeLabel === 'function' ? getMassnahmeLabel(bp2) : (bp2.massnahme || ''),
@@ -6782,7 +6782,7 @@ function exportBauprogrammPdf() {
         if (y > 190) { doc.addPage(); y = 14; }
         const z = zuw[p.id];
         const ft = ftList.find(t => t.id === ftZuw[p.id]);
-        doc.text('  Schicht ' + (z?.schichtNr||'?') + ' · Mast ' + (p.mast||'—') + ' · KM ' + (p.km_rs?parseFloat(p.km_rs).toFixed(3):'—') + ' · ' + (ft?.name||'—'), 20, y); y += 5;
+        doc.text('  Schicht ' + (z?.schichtNr||'?') + ' · ' + standortName(p) + ' · KM ' + (p.km_rs?parseFloat(p.km_rs).toFixed(3):'—') + ' · ' + (ft?.name||'—'), 20, y); y += 5;
       });
       y += 4;
     }
@@ -6831,7 +6831,7 @@ function exportBauprogrammIcs() {
       const nettoH  = sch.nettoH || sp?.nettoH || 4;
       const schPairs = pakPairs.filter(p => zuw[p.id]?.schichtNr === sch.schichtNr);
       const ftNames  = [...new Set(schPairs.map(p => ftList.find(t => t.id === ftZuw[p.id])?.name).filter(Boolean))];
-      const mastList = schPairs.map(p => 'Mast ' + (p.mast || p.id)).join(', ');
+      const mastList = schPairs.map(p => standortName(p)).join(', ');
 
       const desc = [
         `Baupaket: ${pak.name}`,
@@ -7025,7 +7025,7 @@ function bpZuweisenSchliessen() {
 }
 
 function _bpZuwStandortName(p) {
-  return 'Mast ' + (p.mast || p.id) + (p.km ? ' · km ' + p.km : '');
+  return standortName(p) + (p.km ? ' · km ' + p.km : '');
 }
 
 function _bpZuwZeichnen() {

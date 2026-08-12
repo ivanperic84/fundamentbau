@@ -875,7 +875,7 @@ function exportTermineIcs() {
   getFilteredSorted().forEach((p, i) => {
     const pd = getPairData(p.id);
     if (!pd.startdatum) return;
-    const lbl    = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+    const lbl    = standortName(p);
     const sch    = schichtForPair(p.id);
     const schLbl = sch ? sch.name : (SCHICHT_LABEL[pd.startSchicht] || 'Tagarbeit');
     const [y, m, d] = pd.startdatum.split('-');
@@ -945,7 +945,7 @@ function exportTermineIcs() {
       .filter(p => getPairData(p.id).startdatum)
       .map((p, i) => {
         const pd  = getPairData(p.id);
-        const lbl = p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'ID ' + p.id);
+        const lbl = standortName(p);
         const sch = schichtForPair(p.id);
         const [y, m, d] = pd.startdatum.split('-');
         return `${d}.${m}.${y}  T${i+1} ${lbl}  (${sch ? sch.name : 'Tagarbeit'})`;

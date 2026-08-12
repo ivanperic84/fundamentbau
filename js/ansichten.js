@@ -829,7 +829,7 @@ function renderAbnahmeListView() {
     });
 
     rows += `<tr onclick="openCheckliste(${p.id})" style="cursor:pointer;" class="list-hover-row">
-      <td style="padding:6px 8px;font-weight:600;font-size:12px;">Mast ${p.mast||'—'}</td>
+      <td style="padding:6px 8px;font-weight:600;font-size:12px;">${standortName(p)}</td>
       <td style="padding:6px 8px;font-size:12px;color:#6b7280;">${p.km_rs?parseFloat(p.km_rs).toFixed(3):'—'}</td>
       <td style="padding:6px 8px;">${gesamt}</td>
       ${cells}
@@ -940,7 +940,7 @@ function exportAbnahmeListPdf() {
 
     // Mast
     doc.setFontSize(8); doc.setFont(undefined,'bold'); doc.setTextColor(...COL_BG);
-    doc.text('Mast ' + (p.mast || '—'), L + 2, y);
+    doc.text(standortName(p), L + 2, y);
 
     // KM
     doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
@@ -1046,7 +1046,7 @@ function exportAbnahmeListXlsx() {
     const gesamt = noD ? '–' : mng > 0 ? (mng + ' Mangel') : okCt === CK_PRUEFPUNKTE.length ? 'Bestanden' : (okCt + '/' + CK_PRUEFPUNKTE.length);
 
     const row = [
-      'Mast ' + (p.mast || '—'),
+      standortName(p),
       p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '—',
       gesamt,
     ];
@@ -1178,7 +1178,7 @@ function renderAushubView() {
 
     const trStyle = hasData ? '' : 'opacity:0.75;';
     return `<tr onclick="openAushubModal(${p.id})" style="cursor:pointer;${trStyle}" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''">
-      <td style="${tdS}font-weight:700;color:#1a3a5c;">Mast ${p.mast || '—'}${profilePreview}</td>
+      <td style="${tdS}font-weight:700;color:#1a3a5c;">${standortName(p)}${profilePreview}</td>
       <td style="${tdS}color:#6b7280;">${km}</td>
       <td style="${tdS}">${ausfText || dash}</td>
       <td style="${tdS}border-left:2px solid #f0f2f5;">${ah.grubeL || dash}</td>
@@ -1220,7 +1220,7 @@ function openAushubModal(pairId) {
   const bp     = loadAllBauprojekt()[pairId]  || {};
   const fd     = getPairData(pairId).felddaten || {};
 
-  document.getElementById('aushub-modal-title').textContent = 'Aushubprotokoll — Mast ' + (pair.mast || pairId);
+  document.getElementById('aushub-modal-title').textContent = 'Aushubprotokoll — ' + standortName(pair);
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
   set('ah-dokNr',           ah.dokNr || '');
@@ -1721,7 +1721,7 @@ function exportAushubPdf() {
     const ausf = allAusf[p.id] || {};
     const km   = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '';
     const rowData = {
-      mast:           'Mast ' + (p.mast || '—'),
+      mast:           standortName(p),
       km,
       ausfuehrung:    ah.ausfuehrung || ausf.firma || '',
       grubeL:         ah.grubeL     || '',
@@ -1791,7 +1791,7 @@ function exportAushubXlsx() {
     const ah   = allAh[p.id]   || {};
     const ausf = allAusf[p.id] || {};
     return [
-      'Mast ' + (p.mast || '—'),
+      standortName(p),
       p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '',
       ah.ausfuehrung    || ausf.firma || '',
       ah.grubeL         || '',
@@ -1907,7 +1907,7 @@ function _navStateLabel(state) {
   if (!state) return '';
   if (state.type === 'detail') {
     const p = PAIRS.find(x => x.id === state.pairId);
-    if (p) return p.bezeichnung || (p.mast ? 'Mast ' + p.mast : 'Standort ' + p.id);
+    if (p) return standortName(p);
     return 'Standort';
   }
   return { karten:'Kacheln', liste:'Liste', karte:'Karte', baugrund:'Baugrund', fundamente:'Bausortiment', programm:'Programm', termine:'Termine', abnahme:'Abnahmen', bauprogramm:'Bauprogramm' }[state.view] || state.view;
@@ -2078,7 +2078,7 @@ function bulkToggleCustomTag() {
 
 async function deletePair(id) {
   const p = PAIRS.find(x => x.id === id);
-  const name = p ? (p.mast ? `Mast ${p.mast}` : p.bezeichnung || 'Standort') : 'Standort';
+  const name = standortName(p) || 'Standort';
   if (!await ui.confirm(`«${name}» wirklich löschen?`)) return;
   pushUndo();
   const idx = PAIRS.findIndex(x => x.id === id);
@@ -2213,9 +2213,13 @@ function renderList() {
     }).join('');
 
     const nameCell = isBPlist
+      // Die Bezeichnung nur als Unterzeile, wenn sie nicht schon oben steht:
+      // ohne Mast-Nr. faellt standortName auf sie zurueck, und sie erschien
+      // zweimal untereinander.
       ? `<td onclick="showDetail(${p.id})" style="cursor:pointer;">
-           <strong>Mast ${p.mast || '—'}</strong>
-           ${p.bezeichnung ? `<div style="font-size:10px;color:#9ca3af;">${p.bezeichnung}</div>` : ''}
+           <strong>${standortName(p)}</strong>
+           ${p.bezeichnung && p.bezeichnung !== standortName(p)
+              ? `<div style="font-size:10px;color:#9ca3af;">${p.bezeichnung}</div>` : ''}
          </td>`
       : `<td onclick="showDetail(${p.id})" style="cursor:pointer"><strong>${p.bezeichnung || 'Standort '+p.id}</strong></td>`;
 
@@ -2514,7 +2518,7 @@ function initOverviewMap() {
       const bpData   = allBpData[p.id] || {};
       const col      = getMassnahmeColor(bpData);
       const massLabel= getMassnahmeLabel(bpData);
-      const mastLabel= p.mast || '?';
+      const mastLabel= standortName(p);
       const ll       = lv95ToWgs84(_coordE, _coordN);
 
       const mkIcon = () => L.divIcon({
@@ -2540,7 +2544,7 @@ function initOverviewMap() {
       const popup = `
         <div style="font-family:'Segoe UI',system-ui,sans-serif;min-width:190px;">
           <div style="background:${col};color:white;padding:7px 10px 6px;border-radius:7px 7px 0 0;font-size:12px;font-weight:700;white-space:nowrap;">
-            Mast ${mastLabel} &ndash; ${massLabel}
+            ${mastLabel} &ndash; ${massLabel}
           </div>
           <div style="padding:7px 10px 4px;font-size:11px;line-height:1.6;">
             ${p.km_rs ? `<div>KM ${parseFloat(p.km_rs).toFixed(3)}</div>` : ''}
@@ -2737,7 +2741,7 @@ function karteNavAufbauen(halterId, opt) {
     such:  halter.querySelector('.app-suche'),
     liste: halter.querySelector('.pair-jump-liste'),
   };
-  const name = opt.name || (p => p.mast ? 'Mast ' + p.mast : (p.bezeichnung || 'Standort ' + p.id));
+  const name = opt.name || (p => standortName(p));
   let markiert = 0;
 
   const aktualisieren = () => {

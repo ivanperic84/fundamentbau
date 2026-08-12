@@ -436,6 +436,28 @@ function _migrateFtProfilId() {
 // Aufruf erfolgt in js/start.js — diese Migration braucht Funktionen
 // aus spaeter geladenen Modulen (fundamenttypen.js, init-phasen.js).
 
+// Beschriftung eines Standorts — an EINER Stelle.
+//
+// Angeschrieben wird, was der Anwender eingegeben hat, ohne das Wort «Mast»
+// davor. Vorher setzten fuenfundsechzig Stellen den Namen selbst zusammen:
+// aus der Eingabe «A 79» wurde «Mast A 79», aus «Mast 6B» sogar «Mast Mast 6B».
+//
+// Welches Feld fuehrt, haengt am Objekt und nicht an der Phase: ein Fundament
+// traegt seine Nummer im Feld «mast», eine Sondage ihren Namen in
+// «bezeichnung». Ist beides leer, bleibt die Kennung als letzter Anker.
+function standortName(p) {
+  if (!p) return '';
+  const nr  = String(p.mast || '').trim();
+  const bez = String(p.bezeichnung || '').trim();
+  const name = p._objType === 'fundament' ? (nr || bez) : (bez || nr);
+  return name || ('Standort ' + p.id);
+}
+
+// Dasselbe ueber die Kennung, fuer Aufrufer, die nur eine Id zur Hand haben
+function standortNameZuId(pairId) {
+  return standortName(PAIRS.find(p => String(p.id) === String(pairId)));
+}
+
 function getFundamente()     { return PAIRS.filter(p => p._objType === 'fundament'); }
 function getSondagen()       { return PAIRS.filter(p => p._objType === 'sondage'); }
 function getInstallationen() { return PAIRS.filter(p => p._objType === 'installation'); }
@@ -568,6 +590,10 @@ function wgs84ToLv95(lat, lng) {
   return { e: Math.round(E), n: Math.round(N) };
 }
 function pairCenter(p) {
+  // Ohne Standort auf die Schweiz-Mitte zurueckfallen statt zu werfen: die
+  // Karte wird auch aufgebaut, wenn der zugehoerige Standort inzwischen
+  // geloescht ist (Detailansicht offen, Standort entfernt).
+  if (!p) p = {};
   const rs   = p.rs?.e   ? p.rs   : null;
   const rks  = p.rks?.e  ? p.rks  : null;
   const fund = p.fund?.e ? p.fund : null; // Fallback für BP/AF-Paare ohne gesetztes rs

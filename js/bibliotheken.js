@@ -429,7 +429,7 @@ function renderBgZuweisungList() {
           style="cursor:pointer;width:14px;height:14px;accent-color:#1a3a5c;">
       </td>
       <td style="${tdS}">
-        <span style="font-size:12px;font-weight:700;color:#1a3a5c;">Mast ${p.mast || p.id}</span>
+        <span style="font-size:12px;font-weight:700;color:#1a3a5c;">${standortName(p)}</span>
       </td>
       ${col('massnahme') ? `<td style="${tdS}white-space:nowrap;">${massSet
         ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:${massCol}22;color:${massCol};border:1px solid ${massCol}44;">${massLbl}</span>`
@@ -523,7 +523,7 @@ function exportBgzXlsx() {
     const km         = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : '';
     let status = '—';
     if (assigned) { const b = beurteileBgProfil(assigned); status = b.ok === true ? 'Erfüllt' : b.ok === false ? 'Nicht erfüllt' : 'k.A.'; }
-    rows.push([`Mast ${p.mast || p.id}`, km, fundtyp, assigned ? assigned.name : '', status]);
+    rows.push([`${standortName(p)}`, km, fundtyp, assigned ? assigned.name : '', status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -573,7 +573,7 @@ function exportBgzPdf() {
     if (assigned) { const b = beurteileBgProfil(assigned); status = b.ok === true ? '✓ Erfüllt' : b.ok === false ? '✗ Nicht erfüllt' : 'k.A.'; sCol = b.ok === true ? [22,163,74] : b.ok === false ? [220,38,38] : [150,150,150]; }
     if (ri % 2 === 1) { doc.setFillColor(248,250,252); doc.rect(14, y-4, 182, 6, 'F'); }
     doc.setFont(undefined,'bold'); doc.setFontSize(7); doc.setTextColor(30,30,30);
-    doc.text(`Mast ${p.mast || p.id}`, xs[0], y);
+    doc.text(`${standortName(p)}`, xs[0], y);
     doc.setFont(undefined,'normal');
     doc.text(km, xs[1], y);
     doc.text(doc.splitTextToSize(fundtyp, 43)[0], xs[2], y);
@@ -822,7 +822,7 @@ function renderSchichtZuweisungList() {
       </tr></thead>
       <tbody>${pairs.map(p => {
         const km  = p.km_rs ? parseFloat(p.km_rs).toFixed(3) : (p.km_rks ? parseFloat(p.km_rks).toFixed(3) : '—');
-        const lbl = p.bezeichnung || (p.mast ? `Mast ${p.mast}` : `ID ${p.id}`);
+        const lbl = standortName(p);
         const opts = baseOpts.replace(`value="${p.schichtId||''}"`, `value="${p.schichtId||''}" selected`);
         return `<tr style="border-bottom:1px solid #f3f4f6;">
           <td style="padding:5px 8px;color:#374151;font-weight:600;">${lbl}</td>

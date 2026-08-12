@@ -194,7 +194,7 @@ function openBegehungPdfModal() {
       const dot = hasBeg ? '<span style="color:#16a34a;font-size:10px;margin-left:2px;">●</span>' : '';
       return `<label style="display:flex;align-items:center;gap:7px;font-size:11px;padding:3px 0;cursor:pointer;color:#374151;">
         <input type="checkbox" class="beg-pdf-chk" value="${p.id}" ${checked} style="accent-color:#1a3a5c;">
-        Mast ${p.mast||'?'} · KM ${km}${dot}
+        ${standortName(p)} · KM ${km}${dot}
       </label>`;
     }).join('');
   }
@@ -252,7 +252,7 @@ async function exportBegehungPdf(pairIds, inclFotos) {
     doc.setFillColor(26,58,92);
     doc.roundedRect(14, y-4, 182, 11, 2, 2, 'F');
     doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(255,255,255);
-    doc.text(`Mast ${pair.mast||'—'}  ·  KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`, 18, y+3);
+    doc.text(`${standortName(pair)}  ·  KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`, 18, y+3);
     if (beg.status) {
       const sl = STATUS_LABEL[beg.status] || beg.status;
       doc.setFillColor(...statusCol); doc.roundedRect(162, y-2, 30, 7, 2, 2, 'F');
@@ -513,7 +513,7 @@ function renderMaterialliste() {
   out.innerHTML = `
     <div style="border:1px solid #d1d5db;border-radius:6px;overflow:hidden;margin-top:6px;font-family:inherit;">
       <div style="background:#1a3a5c;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:11px;font-weight:700;color:white;letter-spacing:.02em;">Materialliste &nbsp;·&nbsp; Mast ${pair.mast || currentPairId}</span>
+        <span style="font-size:11px;font-weight:700;color:white;letter-spacing:.02em;">Materialliste &nbsp;·&nbsp; ${standortName(pair)}</span>
         <span style="font-size:10px;color:#93c5fd;">${bestand === 'prov' ? 'Provisorium' : 'Neubau'} &nbsp;·&nbsp; ${ft.name}${ft.zeichnungsNr ? ' &nbsp;·&nbsp; Zeichn. ' + ft.zeichnungsNr : ''}${vfk ? ' &nbsp;·&nbsp; VFK' : ''}</span>
       </div>
       <table style="width:100%;border-collapse:collapse;">
@@ -1055,7 +1055,7 @@ function exportMaterialbestellungXlsx() {
     const vol = ft ? _ftBetonVolumen(ft, vfk) : null;
     const nutz = bp.nutzungsart ? (MAST_DATEN[bp.nutzungsart]?.label || bp.nutzungsart) : '—';
     detailRows.push([
-      'Mast ' + (p.mast || p.id),
+      standortName(p),
       km,
       bp.bestand === 'prov' ? 'Provisorium' : 'Neubau',
       ft?.name || '—',
@@ -1496,7 +1496,7 @@ function openCheckliste(pairId) {
   // Kopfdaten setzen
   const pair = PAIRS.find(p => p.id === pairId) || {};
   const sub = document.getElementById('ck-header-sub');
-  if (sub) sub.textContent = `Mast ${pair.mast || '—'} · KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`;
+  if (sub) sub.textContent = `${standortName(pair)} · KM ${pair.km_rs ? parseFloat(pair.km_rs).toFixed(3) : '—'}`;
 
   // Prüfpunkte rendern
   renderCkGruppe('schrauben', 'ck-group-schrauben');
@@ -1509,7 +1509,7 @@ function openCheckliste(pairId) {
   const ck = all[pairId] || {};
   const v = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
   const _prof = loadUserProfile();
-  v('ck-objekt',    ck.objekt    || (pair.bezeichnung || `Mast ${pair.mast || ''}`));
+  v('ck-objekt',    ck.objekt    || (pair.bezeichnung || `${standortName(pair)}`));
   v('ck-projektnr', ck.projektnr || _prof.projektnummer || '');
   // Datum: today als Standard falls noch nicht gesetzt
   const _pd = getPairData(pairId);
@@ -1693,7 +1693,7 @@ function openChecklistePdfDialog(pairId) {
   const pairs   = getFilteredSorted();
   const allCk   = loadAllChecklisten();
   const pair    = PAIRS.find(p => p.id === _ckPdfScopeForPairId);
-  const lbl     = pair ? (pair.bezeichnung || (pair.mast ? 'Mast ' + pair.mast : 'ID ' + pair.id)) : 'Dieser Standort';
+  const lbl     = pair ? (standortName(pair)) : 'Dieser Standort';
   const filledN = pairs.filter(p => allCk[p.id] && Object.keys(allCk[p.id]).length > 0).length;
   const singleLbl = document.getElementById('ck-pdf-scope-single-label');
   if (singleLbl) singleLbl.textContent = lbl;
@@ -1745,7 +1745,7 @@ async function exportCkMultiPdf(pairs) {
   pairs.forEach((pair, pairIdx) => {
     if (pairIdx > 0) doc.addPage();
     const startPage = doc.internal.getCurrentPageInfo().pageNumber;
-    const lbl = pair.bezeichnung || (pair.mast ? 'Mast ' + pair.mast : 'ID ' + pair.id);
+    const lbl = standortName(pair);
     tocEntries.push({ label: lbl, pairId: pair.id, page: startPage });
     const ck    = allCk[pair.id] || {};
     const fotos = (getPairData(pair.id)?.fotos || []).filter(f => f.kategorie === 'abnahme');
@@ -1797,7 +1797,7 @@ function _ckPdfPage(doc, ck, pair, pn, fotos) {
   doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.setTextColor(26,58,92);
   doc.text('Abnahme FL-Fundamente', M, y);
   doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(107,114,128);
-  const sub = [pair.mast ? 'Mast ' + pair.mast : '', pair.km_rs ? 'KM ' + parseFloat(pair.km_rs).toFixed(3) : ''].filter(Boolean).join('  ·  ');
+  const sub = [pair.mast ? standortName(pair) : '', pair.km_rs ? 'KM ' + parseFloat(pair.km_rs).toFixed(3) : ''].filter(Boolean).join('  ·  ');
   if (sub) doc.text(sub, M, y+5);
   const date = ck.datum || new Date().toLocaleDateString('de-CH');
   doc.setFontSize(8); doc.text(date, W-M, y, { align:'right' });

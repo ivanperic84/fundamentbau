@@ -478,7 +478,7 @@ function mkFundPopupHtml(pair, ll) {
   return `<div class="map-popup" style="min-width:210px;">
     <div class="map-popup-header" style="background:${col};">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      Mast ${pair.mast || '?'} &ndash; ${massLabel}
+      ${standortName(pair)} &ndash; ${massLabel}
     </div>
     <div class="map-popup-body">
       <div class="map-popup-row"><span class="map-popup-label">LV95 E</span><span class="map-popup-val">${E}</span></div>
@@ -565,6 +565,14 @@ function addGhostMarkers(currentPair) {
 }
 
 function addMarkers(pair) {
+  // Ohne Standort nur aufraeumen: die Karte wird auch dann neu gezeichnet,
+  // wenn der zugehoerige Eintrag inzwischen geloescht wurde.
+  if (!pair) {
+    if (rsMarker)  rsMarker.remove();
+    if (rksMarker) rksMarker.remove();
+    if (window.bsMarker) { window.bsMarker.remove(); window.bsMarker = null; }
+    return;
+  }
   if (rsMarker)  rsMarker.remove();
   if (rksMarker) rksMarker.remove();
   if (window.bsMarker) { window.bsMarker.remove(); window.bsMarker = null; }
