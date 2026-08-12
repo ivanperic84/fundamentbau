@@ -793,6 +793,87 @@ function bpZeitachse() {
   };
 }
 
+// ── Sperrmusterband im Kopf ──────────────────────────────────
+// Zeigt je Sperrmuster, an welchen Tagen es gilt. Es stand nur im
+// Paketdiagramm; seit dieses entfallen ist, braucht es das Fundamentdiagramm
+// genauso — ohne die Sperrpausen im Kopf steht jeder Balken ohne Bezug da.
+// Gemeinsame Funktion statt zweiter Fassung: die Streifen sind knifflig genug
+// (Gueltigkeitsgrenzen, Wochentage, Anteil je Spalte bei groberem Zoom).
+const BP_SP_STRIP_H = 18;
+
+function bpSpBandHoehe(spList) {
+  return spList.length ? spList.length * BP_SP_STRIP_H + 4 : 0;
+}
+
+function bpSpBandSvg(o) {
+  const { spList, cols, colW, leftW, topY, totalW, zoom, xFor } = o;
+  if (!spList.length) return { inner: '', left: '' };
+
+  const aktiv = (sp, ds, dow) => {
+    if (sp.gueltigVon && ds < sp.gueltigVon) return false;
+    if (sp.gueltigBis && ds > sp.gueltigBis) return false;
+    if (sp.wochentage?.length && !sp.wochentage.includes(dow)) return false;
+    return true;
+  };
+
+  let inner = `<rect x="0" y="${topY}" width="${totalW}" height="${bpSpBandHoehe(spList)}" fill="#f8fafc" style="pointer-events:none;"/>`;
+  let left  = '';
+
+  spList.forEach((sp, si) => {
+    const bandY  = topY + si * BP_SP_STRIP_H + 2;
+    const stripH = BP_SP_STRIP_H - 4;
+    const col    = sp.farbe || '#64748b';
+    const bgY    = topY + si * BP_SP_STRIP_H;
+
+    const kopf = `<rect x="0" y="${bgY}" width="${leftW}" height="${BP_SP_STRIP_H}" fill="#f8fafc"/>`;
+    const sub  = [sp.gleisNr ? 'Gl. ' + sp.gleisNr : '', sp.nettoH ? sp.nettoH + ' h' : ''].filter(Boolean).join(' · ');
+    const text = sub
+      ? `<text x="${leftW - 5}" y="${bandY + 7}" font-size="8" fill="${col}" font-weight="700" text-anchor="end" font-family="system-ui" style="pointer-events:none;">${escHtml(sp.name.slice(0, 16))}</text>`
+        + `<text x="${leftW - 5}" y="${bandY + 14}" font-size="7" fill="#9ca3af" text-anchor="end" font-family="system-ui" style="pointer-events:none;">${escHtml(sub)}</text>`
+      : `<text x="${leftW - 5}" y="${bandY + stripH/2 + 3}" font-size="8" fill="${col}" font-weight="700" text-anchor="end" font-family="system-ui" style="pointer-events:none;">${escHtml(sp.name.slice(0, 16))}</text>`;
+    const trenner = `<line x1="${leftW}" y1="${bgY}" x2="${leftW}" y2="${bgY + BP_SP_STRIP_H}" stroke="#e5e7eb" stroke-width="1"/>`;
+    inner += kopf + text + trenner;
+    left  += kopf + text + trenner;
+
+    if (zoom === 'tag') {
+      cols.forEach((c, ci) => {
+        if (!aktiv(sp, bpFmtDate(c), c.getDay())) return;
+        inner += `<rect x="${leftW + ci * colW + 1}" y="${bandY}" width="${colW - 2}" height="${stripH}" fill="${col}" opacity="0.35" rx="2" style="pointer-events:none;"/>`;
+      });
+    } else {
+      cols.forEach((c, ci) => {
+        const ende = new Date(c);
+        if (zoom === 'woche')      ende.setDate(ende.getDate() + 6);
+        else if (zoom === 'monat') { ende.setMonth(ende.getMonth() + 1); ende.setDate(0); }
+        else                       { ende.setFullYear(ende.getFullYear() + 1); ende.setDate(0); }
+        let an = 0, alle = 0;
+        for (let d = new Date(c); d <= ende; d.setDate(d.getDate() + 1)) {
+          alle++;
+          if (aktiv(sp, bpFmtDate(d), d.getDay())) an++;
+        }
+        if (!an) return;
+        const op = (0.15 + (an / Math.max(alle, 1)) * 0.30).toFixed(2);
+        inner += `<rect x="${leftW + ci * colW + 1}" y="${bandY}" width="${colW - 2}" height="${stripH}" fill="${col}" opacity="${op}" rx="2" style="pointer-events:none;"/>`;
+      });
+    }
+
+    // Gueltigkeitsgrenzen als senkrechte Marken
+    [[sp.gueltigVon, 0], [sp.gueltigBis, colW]].forEach(([datum, versatz]) => {
+      if (!datum) return;
+      const vx = xFor(datum) + versatz;
+      if (vx >= leftW && vx <= totalW)
+        inner += `<line x1="${vx}" y1="${bandY}" x2="${vx}" y2="${bandY + stripH}" stroke="${col}" stroke-width="2" style="pointer-events:none;"/>`;
+    });
+
+    if (si < spList.length - 1) {
+      const y = topY + (si + 1) * BP_SP_STRIP_H;
+      inner += `<line x1="${leftW}" y1="${y}" x2="${totalW}" y2="${y}" stroke="#e5e7eb" stroke-width="0.5" style="pointer-events:none;"/>`;
+    }
+  });
+
+  return { inner, left };
+}
+
 // Pfahltypen, die im Projekt vorkommen, aber weder am Typ noch am Profil eine
 // Bohrleistung fuehren. Ohne sie laesst sich die Bohrzeit nicht rechnen — das
 // gehoert sichtbar gemacht und nicht durch eine andere Groesse ersetzt.
@@ -1097,7 +1178,11 @@ function bpMoveEnd(e) {
       renderBauprogrammTab();
     }
   } else if (!_bpMoveDrag.moved) {
-    openBaupaketModal(_bpMoveDrag.pakId);
+    // Ein Klick ohne Zug: im Paketdiagramm oeffnet er den Dialog, im
+    // Fundamentdiagramm klappt er die Zeile auf. Dort waere das Oeffnen die
+    // falsche Antwort — man klickt auf ein Paket, um zu sehen, was drinsteckt.
+    if (_bpMoveDrag.ausFund) bpPaketZeileUmschalten(_bpMoveDrag.pakId);
+    else                     openBaupaketModal(_bpMoveDrag.pakId);
   }
   _bpMoveDrag = null;
 }
@@ -1619,6 +1704,33 @@ function _bpFundHintergrundSvg(g) {
 
 // Spaltenkopf des Fundamente-Gantts inkl. Spalten-Trennlinien.
 // Tagesansicht: KW-Wechsel, Wochentag und Datum; sonst Gruppenlabel + Spaltenlabel.
+// Leerzustand des Fundamente-Gantts. Er sagte immer «Auto-Zuweisung starten»
+// — auch dann, wenn es noch gar kein Baupaket gab und die Auto-Zuweisung
+// folgerichtig mit einer Fehlmeldung antwortete. Genannt wird jetzt der
+// Schritt, der wirklich ansteht; die Voraussetzungen kennt bpVoraussetzungen().
+function _bpFundLeerHtml() {
+  const vor    = bpVoraussetzungen();
+  const pakete = loadBaupakete();
+  let titel, hinweis;
+
+  if (vor.naechsterSchritt) {
+    titel   = vor.naechsterSchritt.text;
+    hinweis = 'Danach lassen sich Baupakete anlegen und Schichten zuweisen.';
+  } else if (!pakete.length) {
+    titel   = 'Noch kein Baupaket';
+    hinweis = 'Oben in der Werkzeugleiste unter <b>Neu</b> ein Baupaket anlegen — '
+            + 'oder <b>Auto-Pakete</b> aus den Fundamenttypen erzeugen lassen.';
+  } else {
+    titel   = 'Noch keine Schicht zugewiesen';
+    hinweis = '<b>Auto-Zuweisung</b> verteilt alle Standorte auf die Pakete, '
+            + '<b>Zuweisen</b> nur eine Auswahl davon.';
+  }
+  return `<div style="text-align:center;padding:34px 20px;color:#6b7280;font-size:12px;line-height:1.7;">
+      <div style="font-weight:700;color:#374151;margin-bottom:4px;">${escHtml(titel)}</div>
+      <div style="font-size:11px;color:#9ca3af;">${hinweis}</div>
+    </div>`;
+}
+
 function _bpFundHeaderSvg(g) {
   let svg = '', prevGrp = '', prevKw = -1;
   g.cols.forEach((col, ci) => {
@@ -1910,13 +2022,16 @@ function renderBpFundamenteGantt() {
   // Zeitachse gemeinsam mit dem Paket-Gantt — siehe bpZeitachse()
   const achse = bpZeitachse();
   if (!achse) {
-    wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:12px;">Noch keine Zuweisung. Auto-Zuweisung starten.</div>';
+    wrap.innerHTML = _bpFundLeerHtml();
     return;
   }
   const { projStart, projEnd } = achse;
 
   // Layout
-  const ROW_H   = 32, GROUP_H = 28, HEADER_H = 44, LEFT_W = BP_ACHSE_LEFT_W;
+  const ROW_H   = 38, GROUP_H = 32, LEFT_W = BP_ACHSE_LEFT_W;
+  const DATUM_H = 48;                                  // Kalenderkopf
+  const SP_BAND = bpSpBandHoehe(spList);                // Sperrpausen darunter
+  const HEADER_H = DATUM_H + SP_BAND;
   const COL_W   = _bpZoom === 'tag' ? 28 : _bpZoom === 'woche' ? 44 : _bpZoom === 'jahr' ? 90 : 50;
   // Referenz für Drag-Reverse-Mapping speichern
   _bpFundGanttRef = { projStart, colW: COL_W, leftW: LEFT_W, zoom: _bpZoom };
@@ -1956,8 +2071,14 @@ function renderBpFundamenteGantt() {
   svg += _bpFundHintergrundSvg({ rowDefs, cols, COL_W, LEFT_W, HEADER_H, ROW_H, GROUP_H,
                                  totalW, totalH, projStart, projEnd, xFor });
   svg += _bpFundHeaderSvg({ cols, COL_W, LEFT_W, HEADER_H, totalH });
+  // Sperrpausen im Kopf — dieselbe Darstellung wie frueher im Paketdiagramm
+  const _spBand = bpSpBandSvg({ spList, cols, colW: COL_W, leftW: LEFT_W,
+                                topY: DATUM_H, totalW, zoom: _bpZoom, xFor });
+  svg     += _spBand.inner;
+  svgLeft += _spBand.left;
 
   // Zeilen rendern
+  const _pakGeometrie = new Map();   // Paket-Id → Balkenlage, fuer die Abhaengigkeiten
   let rowY = HEADER_H;
   rowDefs.forEach(r => {
     const h   = ['gruppe','abbruch-header','paket','team'].includes(r.type) ? GROUP_H : ROW_H;
@@ -2010,9 +2131,12 @@ function renderBpFundamenteGantt() {
       if (r.pak?.startDatum) {
         const bx = xFor(r.pak.startDatum);
         const bw = Math.max(COL_W, xFor(bpPaketEnd(r.pak) || r.pak.startDatum) + COL_W - bx);
+        // Merken fuer die Abhaengigkeitslinien, die nach allen Zeilen kommen
+        _pakGeometrie.set(r.pak.id, { x: bx, w: bw, y: rowY, h });
         svg += `<rect x="${bx}" y="${rowY+5}" width="${bw}" height="${h-10}" rx="4" fill="${col}"`
              + ` opacity="${zu ? 0.85 : 0.28}" style="cursor:grab;"`
-             + ` data-bp-modal="${r.pak.id}" data-bp-move="${r.pak.id}" data-bp-start="${r.pak.startDatum}" data-bp-ctx="${r.pak.id}"/>`;
+             + ` data-bp-modal="${r.pak.id}" data-bp-move="${r.pak.id}" data-bp-start="${r.pak.startDatum}" data-bp-ctx="${r.pak.id}">`
+             + `<title>${escHtml(r.pak.name)} — Klick: auf-/zuklappen · Doppelklick: bearbeiten · ziehen: verschieben · Rechtsklick: Menü</title></rect>`;
         // Griffe zum Verlaengern — wie im frueheren Paketdiagramm
         const griff = (gx, seite) =>
           `<rect x="${gx}" y="${rowY+8}" width="5" height="${h-16}" rx="2" fill="rgba(255,255,255,0.65)"`
@@ -2165,6 +2289,26 @@ function renderBpFundamenteGantt() {
     rowY += h;
   });
 
+  // Abhaengigkeiten zwischen Baupaketen: vom Ende des Vorgaengers zum Anfang
+  // des Nachfolgers. Sie standen nur im Paketdiagramm; ohne sie ist nicht zu
+  // sehen, warum ein Paket beim Verschieben eines anderen mitwandert.
+  pakete.forEach(pak => {
+    if (!pak.vorgaengerId) return;
+    const a = _pakGeometrie.get(pak.vorgaengerId);
+    const b = _pakGeometrie.get(pak.id);
+    if (!a || !b) return;
+    const nachEnde = (pak.vorgaengerRefPunkt || 'ende') === 'ende';
+    const x1 = nachEnde ? a.x + a.w : a.x;
+    const y1 = a.y + a.h / 2;
+    const x2 = b.x;
+    const y2 = b.y + b.h / 2;
+    const knick = Math.max(x1 + 8, x2 - 10);
+    svg += `<path d="M${x1} ${y1} H${knick} V${y2} H${x2}" fill="none" stroke="#94a3b8"`
+         + ` stroke-width="1.2" stroke-dasharray="3,2" style="pointer-events:none;"/>`
+         + `<path d="M${x2 - 5} ${y2 - 3} L${x2} ${y2} L${x2 - 5} ${y2 + 3}" fill="none" stroke="#94a3b8"`
+         + ` stroke-width="1.2" style="pointer-events:none;"/>`;
+  });
+
   // Meilenstein-Linien
   loadMeilensteine().forEach(ms => {
     const d = msMsResolvedDatum(ms);
@@ -2248,10 +2392,15 @@ function renderBpFundamenteGantt() {
           startX:       e.clientX,
           currentStart: el.getAttribute('data-bp-start'),
           moved:        false,
+          ausFund:      true,   // Klick ohne Zug klappt auf (siehe bpMoveEnd)
         };
       });
-      // Klick ohne Zug klappt auf; der Paketdialog liegt auf dem Kontextmenue
-      el.onclick = () => { if (!_bpMoveDrag?.moved) bpPaketZeileUmschalten(el.getAttribute('data-bp-move')); };
+      // Doppelklick oeffnet den Paketdialog — ein Klick allein klappt auf.
+      el.addEventListener('dblclick', e => {
+        e.preventDefault(); e.stopPropagation();
+        _bpMoveDrag = null;
+        openBaupaketModal(el.getAttribute('data-bp-move'));
+      });
     });
     if (!wrap._bpPakCtxAttached) {
       wrap._bpPakCtxAttached = true;
@@ -6418,6 +6567,13 @@ function rejectBpKaskade() {
 async function deleteBaupaket() {
   if (!_bpEditId || !await ui.confirm('Baupaket wirklich löschen? Alle Schichtzuweisungen dieses Pakets werden entfernt.')) return;
   const allPak = loadBaupakete().filter(p => p.id !== _bpEditId);
+  // Verweise auf das geloeschte Paket loesen: ein Nachfolger, dessen Vorgaenger
+  // nicht mehr existiert, behielte sonst eine tote Kennung — die Kaskade
+  // liefe ins Leere und im Dialog stuende ein leeres Auswahlfeld ueber einer
+  // gesetzten Abhaengigkeit.
+  allPak.forEach(p => {
+    if (p.vorgaengerId === _bpEditId) { p.vorgaengerId = null; p.mindestAbstand = 0; }
+  });
   saveBaupakete(allPak);
   const zuw = loadSchichtZuw();
   Object.keys(zuw).forEach(k => { if (zuw[k]?.paketId === _bpEditId) delete zuw[k]; });
