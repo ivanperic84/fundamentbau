@@ -192,6 +192,10 @@
     text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px;
     white-space: nowrap;
   }
+  /* Beschriftungen, die auf schmalen Schirmen weichen. Die Segmentknoepfe
+     darunter sagen selbst, worum es geht — die Grossbuchstaben-Etiketten
+     kosten dort nur Platz und erzwingen einen Umbruch. */
+  @media (max-width: 1000px) { .nur-breit { display: none; } }
   /* Höhe 22px: so war der Bestandswert der zweiten, später im Stylesheet
      stehenden Definition — die hat gewonnen. Beide sind hier zusammengeführt. */
   .toolbar-sep { width: 1px; height: 22px; background: var(--c-border); margin: 0 2px; flex-shrink: 0; }
@@ -2355,6 +2359,13 @@
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           Auto-Zuweisung
         </button>
+        <!-- Dieselbe Handlung fuer eine Auswahl statt fuer alles — gehoert
+             neben die Auto-Zuweisung, nicht ueber das Diagramm. -->
+        <button onclick="bpZuweisenOeffnen()" class="btn btn-secondary btn-sm"
+                title="Fundamente nach Typ, Massnahme oder Ort einem Baupaket zuweisen">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Zuweisen
+        </button>
       </div>
       <!-- Zuweisung zurücksetzen -->
       <button id="bp-btn-reset" onclick="openBpResetModal()" title="Bauprogramm-Daten zurücksetzen" class="btn btn-danger btn-sm">
@@ -2383,14 +2394,10 @@
     </div>
   </div>
 
-  <!-- Zoom-Kontrolle + Info-Bar -->
+  <!-- Info-Bar. Das Zeitraster ist zum Diagramm gewandert: Zeitraster und
+       Sortierung stellen beide dessen Darstellung ein — das eine die Achse,
+       das andere die Zeilen — und gehoeren deshalb nebeneinander. -->
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-    <div class="seg">
-      <button id="bp-zoom-tag"   onclick="setBpZoom('tag')"   class="aktiv">Tage</button>
-      <button id="bp-zoom-woche" onclick="setBpZoom('woche')">Wochen</button>
-      <button id="bp-zoom-monat" onclick="setBpZoom('monat')">Monate</button>
-      <button id="bp-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
-    </div>
     <div id="bp-info-bar" style="font-size:var(--fs-sm);color:var(--c-text-muted);"></div>
     <!-- Rechts aussen: die Vollbildansicht mit Karte und Gantt -->
     <button onclick="openBpFullscreen()" title="Bauprogramm mit Karte im Vollbild"
@@ -2414,11 +2421,19 @@
         <button onclick="renderBpFundamenteGantt()" title="Gantt aktualisieren"
           style="padding:2px 7px;border-radius:4px;border:1px solid #e5e7eb;background:white;font-size:13px;color:#6b7280;cursor:pointer;line-height:1;display:inline-flex;align-items:center;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
       </div>
-      <div style="display:flex;gap:5px;align-items:center;">
+      <!-- Beide Regler der Darstellung nebeneinander: Zeitraster stellt die
+           Achse, Sortierung die Zeilen. Die Beschriftungen weichen auf
+           schmalen Schirmen (.nur-breit) — die Segmente sprechen fuer sich. -->
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <span id="bp-fund-auswahl" style="display:none;align-items:center;margin-right:6px;padding:2px 4px 2px 8px;border-radius:4px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;font-size:10px;"></span>
-        <button onclick="bpZuweisenOeffnen()" class="btn btn-secondary btn-sm"
-                title="Mehrere Fundamente nach Typ, Massnahme oder Ort einem Baupaket zuweisen">Zuweisen</button>
-        <span class="toolbar-label">Sortierung</span>
+        <span class="toolbar-label nur-breit">Zeitraster</span>
+        <span class="seg">
+          <button id="bp-zoom-tag"   onclick="setBpZoom('tag')"   class="aktiv">Tage</button>
+          <button id="bp-zoom-woche" onclick="setBpZoom('woche')">Wochen</button>
+          <button id="bp-zoom-monat" onclick="setBpZoom('monat')">Monate</button>
+          <button id="bp-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
+        </span>
+        <span class="toolbar-label nur-breit">Sortierung</span>
         <span class="seg">
           <button id="bp-fsort-km"        onclick="setBpFundSort('km')">KM</button>
           <button id="bp-fsort-datum"     onclick="setBpFundSort('datum')">Datum</button>
