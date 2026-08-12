@@ -216,6 +216,14 @@
   .seg > button:last-child { border-right: none; }
   .seg > button:hover:not(.aktiv) { background: var(--c-surface-inset); color: var(--c-text); }
   .seg > button.aktiv { background: var(--c-primary); color: #fff; }
+  /* Kompakte Segmentleiste für Regler, die selten umgestellt werden
+     (Zeitraster, Sortierung). Sie standen in voller Knopfgroesse da und
+     zogen mehr Aufmerksamkeit auf sich als das Diagramm darunter. Die Hoehe
+     bleibt bei 28 px — die App wird auf der Baustelle mit dem Finger bedient,
+     unter diese Marke will ich nicht. */
+  .seg.seg-kompakt > button {
+    padding: 3px 9px; min-height: 28px; font-size: 11px; font-weight: 600;
+  }
   /* Volle Breite: Umschalter, der eine Zeile ausfüllt (Phase, Briefansicht) */
   .seg.seg-full { display: flex; width: 100%; }
   .seg.seg-full > button { flex: 1; justify-content: center; }
@@ -2427,17 +2435,17 @@
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <span id="bp-fund-auswahl" style="display:none;align-items:center;margin-right:6px;padding:2px 4px 2px 8px;border-radius:4px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;font-size:10px;"></span>
         <span class="toolbar-label nur-breit">Zeitraster</span>
-        <span class="seg">
+        <span class="seg seg-kompakt">
           <button id="bp-zoom-tag"   onclick="setBpZoom('tag')"   class="aktiv">Tage</button>
           <button id="bp-zoom-woche" onclick="setBpZoom('woche')">Wochen</button>
           <button id="bp-zoom-monat" onclick="setBpZoom('monat')">Monate</button>
           <button id="bp-zoom-jahr"  onclick="setBpZoom('jahr')">Jahre</button>
         </span>
         <span class="toolbar-label nur-breit">Sortierung</span>
-        <span class="seg">
+        <span class="seg seg-kompakt">
+          <button id="bp-fsort-paket"     onclick="setBpFundSort('paket')" class="aktiv">Paket</button>
           <button id="bp-fsort-km"        onclick="setBpFundSort('km')">KM</button>
           <button id="bp-fsort-datum"     onclick="setBpFundSort('datum')">Datum</button>
-          <button id="bp-fsort-paket"     onclick="setBpFundSort('paket')" class="aktiv">Paket</button>
           <button id="bp-fsort-baugruppe" onclick="setBpFundSort('baugruppe')">Baugruppe</button>
         </span>
       </div>

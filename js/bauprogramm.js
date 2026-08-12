@@ -1879,6 +1879,13 @@ wrap.querySelectorAll('[data-fp-abbruch-move]').forEach(el => {
 // Auf-/Zuklapp-Zeichen als SVG statt als Textpfeil. Die Projektregel will
 // Icons als SVG; ausserdem rendern ▶/▼ je nach Schriftfamilie unterschiedlich
 // gross und rueckten die Beschriftung daneben.
+// Beschriftung kuerzen, ohne mitten im Wort ein Leerzeichen stehen zu lassen:
+// «Pfahlgruppe A».slice(0,12) ergab «Pfahlgruppe » mit Leerzeichen am Ende.
+function _bpKuerzen(text, max) {
+  const t = String(text || '').trim();
+  return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…';
+}
+
 function _bpChevron(x, y, zu) {
   const d = zu ? 'M4.5 2.5 L7.5 6 L4.5 9.5' : 'M2.5 4.5 L6 7.5 L9.5 4.5';
   return `<g transform="translate(${x},${y - 6})" fill="none" stroke="currentColor"`
@@ -2170,7 +2177,7 @@ function renderBpFundamenteGantt() {
     } else if (r.type === 'gruppe') {
       const collapsed = _bpCollapsed.has(r.gid);
       beide(`<g color="#1a3a5c">${_bpChevron(8, midY, collapsed)}</g>`);
-      beide(`<text x="22" y="${midY}" font-size="11" fill="#1a3a5c" font-weight="600" font-family="system-ui">${escHtml((r.grp?.name||'Gruppe').slice(0,12))}</text>`);
+      beide(`<text x="22" y="${midY}" font-size="11" fill="#1a3a5c" font-weight="600" font-family="system-ui">${escHtml(_bpKuerzen(r.grp?.name || 'Gruppe', 13))}</text>`);
       // Klickbare Fläche für Toggle
       svg += `<rect x="0" y="${rowY}" width="${LEFT_W}" height="${h}" fill="transparent" style="cursor:pointer;" data-toggle-grp="${r.gid}"/>`;
       // Sammelbalken
@@ -2206,7 +2213,12 @@ function renderBpFundamenteGantt() {
       const lbl    = ('Mast '+(p.mast||'—')).slice(0,13);
       const kmStr  = p.km_rs ? 'km ' + parseFloat(p.km_rs).toFixed(3) : '';
       const glStr  = p.gleis ? 'Gl '  + p.gleis : '';
-      const sub    = [kmStr, glStr].filter(Boolean).join(' · ');
+      // Ausserhalb der Paketansicht steht keine Paketzeile ueber der Zeile —
+      // dann gehoert das Paket in die Unterzeile, sonst sagt der Balken zwar
+      // ueber seine Farbe, aber nirgends im Klartext, wohin er gehoert.
+      const pakName = (_bpFundSort === 'paket') ? ''
+        : (pakete.find(pk => pk.id === z.paketId)?.name || (z.paketId ? '' : 'ohne Paket'));
+      const sub    = [kmStr, glStr, pakName].filter(Boolean).join(' · ');
       beide(`<text x="${8+indent}" y="${rowY+11}" font-size="9" fill="#374151" font-weight="${r.indent?'400':'600'}" font-family="system-ui">${lbl}</text>`);
       if (sub) beide(`<text x="${8+indent}" y="${rowY+22}" font-size="8" fill="#9ca3af" font-family="system-ui">${sub}</text>`);
 
