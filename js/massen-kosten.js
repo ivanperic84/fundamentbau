@@ -97,6 +97,34 @@ const _mkSpaltenSichtbar = (summen) =>
 const MASSEN_GANZ = new Set(['anzahl', 'schraub', 'pfahlStk', 'buegel',
                              'ankerStk', 'fixierung', 'vfk']);
 
+// ── Groessen, an die sich eine Position binden laesst ────────
+// Die drei Schichtzahlen und alles, was der Massenauszug fuehrt. Dieselbe
+// Liste bedient das Auswahlfeld im Verzeichnis, das in der Datenbank und die
+// Spalte «Menge aus» beim Ein- und Auslesen — sonst liefen die drei
+// auseinander.
+const MK_HERKUENFTE = [
+  { id: 'schicht',        label: 'Anzahl Schichten' },
+  { id: 'schichtNacht',   label: 'Schichten Nacht' },
+  { id: 'schichtSonntag', label: 'Schichten Sonntag' },
+  ...MASSEN_GROESSEN.map(g => ({ id: g.id, label: g.label })),
+];
+
+const mkHerkunftLabel = id => MK_HERKUENFTE.find(h => h.id === id)?.label || '';
+
+// Beim Einlesen wird die Beschriftung erkannt, die beim Auslesen geschrieben
+// wurde — und ebenso die interne Kennung, falls jemand sie eintraegt.
+function mkHerkunftId(wert) {
+  const w = String(wert || '').trim().toLowerCase();
+  if (!w) return '';
+  return MK_HERKUENFTE.find(h => h.label.toLowerCase() === w || h.id.toLowerCase() === w)?.id || '';
+}
+
+function _mkHerkunftOptionen(aktiv) {
+  return '<option value="">von Hand</option>'
+    + MK_HERKUENFTE.map(h =>
+        `<option value="${h.id}"${aktiv === h.id ? ' selected' : ''}>${h.label}</option>`).join('');
+}
+
 // ── Speicher ─────────────────────────────────────────────────
 function loadLvPositionen() {
   try { return jsonParse(store.getItem(LV_POS_KEY())) || []; } catch { return []; }
@@ -236,6 +264,7 @@ function lvVorlageAusPuffer(puffer) {
       text:    text.replace(/\s+/g, ' ').slice(0, 160),
       einheit: String(z[sp.einheit] ?? '').trim() || ausKatalog?.einheit || '',
       preis:   ausKatalog?.preis ?? null,
+      herkunft: '',
     });
   });
   if (!eintraege.length) throw new Error('Keine Positionen mit Positionsnummer erkannt.');
@@ -715,11 +744,7 @@ function _mkLvTabelle(summen) {
     `<select onchange="lvFeldSpeichern('${z.id}','herkunft',this.value)"
              title="Menge aus dem Massenauszug übernehmen"
              style="padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-family:inherit;background:white;">
-       <option value="">von Hand</option>
-       <option value="schicht"${z.herkunft === 'schicht' ? ' selected' : ''}>Anzahl Schichten</option>
-       <option value="schichtNacht"${z.herkunft === 'schichtNacht' ? ' selected' : ''}>Schichten Nacht</option>
-       <option value="schichtSonntag"${z.herkunft === 'schichtSonntag' ? ' selected' : ''}>Schichten Sonntag</option>
-       ${MASSEN_GROESSEN.map(g => `<option value="${g.id}"${z.herkunft === g.id ? ' selected' : ''}>${g.label}</option>`).join('')}
+       ${_mkHerkunftOptionen(z.herkunft)}
      </select>`;
 
   const zeileHtml = (z, menge, betrag) => {
@@ -1433,6 +1458,106 @@ function mkAnsatzExport() {
 // Dieselbe Liste, aus der «+ aus Vorlage» schoepft — hier aber aenderbar.
 function saveLvVorlage(liste) { store.setItem(LV_VORLAGE_KEY, JSON.stringify(liste)); }
 
+// ── Zuordnung: welche Position traegt welche Groesse ─────────
+// Gelesen wird der Beschrieb, die Einheit engt ein: «Beton» in m3 ist die
+// Kubatur, «Beton» in Stk waere etwas anderes. Die erste zutreffende Regel
+// gewinnt, darum stehen die engeren oben. Der Vorschlag fuellt nur LEERE
+// Zuordnungen — was der Anwender gesetzt hat, bleibt stehen. Er ist eine
+// Lesehilfe, kein Urteil: die verbindliche Zuordnung steht danach in der
+// Datenbank und faehrt ueber Excel mit.
+const MK_ZUORDNUNG_REGELN = [
+  { herkunft: 'schichtSonntag', text: /sonntag/ },
+  { herkunft: 'schichtNacht',   text: /nacht/ },
+  { herkunft: 'schalung',       text: /schalung|einschal|ausschal/,           einheit: /m2/ },
+  { herkunft: 'beton',          text: /beton/,                                einheit: /m3/ },
+  { herkunft: 'aushub',         text: /aushub|abtrag|erdarbeit|graben/,       einheit: /m3/ },
+  { herkunft: 'buegel',         text: /bügel|buegel/ },
+  { herkunft: 'fixierung',      text: /fixier|flacheisen|schablone/ },
+  { herkunft: 'schraub',        text: /schraube/ },
+  { herkunft: 'vfk',            text: /vorgefertigt|fundamentkopf|vfk/ },
+  { herkunft: 'pfahlMeter',     text: /pfahl|bohrung/,                        einheit: /^(m|lfm)$|laufmeter/ },
+  { herkunft: 'pfahlStk',       text: /pfahl/,                                einheit: /stk|stück|stueck/ },
+  { herkunft: 'ankerMeter',     text: /anker/,                                einheit: /^(m|lfm)$|laufmeter/ },
+  { herkunft: 'ankerStk',       text: /anker/,                                einheit: /stk|stück|stueck/ },
+  { herkunft: 'schicht',        text: /schicht|einsatz|bauleit|sicherheitschef|sicherheitsw|wärter|waerter|maschinist|absperr|zugsicher/ },
+  { herkunft: 'anzahl',         text: /fundament/,                            einheit: /stk|stück|stueck/ },
+];
+
+function mkHerkunftVorschlag(pos) {
+  const text = String(pos?.text || '').toLowerCase();
+  const le   = String(pos?.einheit || '').toLowerCase()
+                 .replace(/³/g, '3').replace(/²/g, '2').replace(/[.\s]/g, '');
+  if (!text) return '';
+  for (const r of MK_ZUORDNUNG_REGELN) {
+    if (r.einheit && !r.einheit.test(le)) continue;
+    if (r.text.test(text)) return r.herkunft;
+  }
+  return '';
+}
+
+function mkZuordnungVorschlagen() {
+  const liste = loadLvVorlage();
+  if (!liste.length) { ui.toast('Die Datenbank ist leer.', 'fehler'); return; }
+  let n = 0;
+  liste.forEach(v => {
+    if (v.herkunft) return;
+    const vor = mkHerkunftVorschlag(v);
+    if (vor) { v.herkunft = vor; n++; }
+  });
+  if (!n) { ui.toast('Kein neuer Vorschlag — alles Erkennbare ist bereits zugeordnet.', 'fehler'); return; }
+  saveLvVorlage(liste);
+  _mkPositionenTab();
+  ui.toast(n + ' Positionen zugeordnet — bitte durchsehen', 'erfolg');
+}
+
+// ── Verzeichnis aus dem Modell zusammenstellen ───────────────
+// Genommen wird jede Position der Datenbank, die an eine Groesse gebunden ist
+// UND im Projekt eine Menge traegt. Damit stehen Pfahlpositionen nur da, wo
+// Pfaehle vorkommen, Ankerpositionen nur bei Verankerung, der Nachtzuschlag
+// nur bei Nachtschichten — die Auswahl folgt dem Modell und nicht einer
+// Vorstellung davon, was ueblich ist.
+//
+// Bestehende Zeilen werden nicht ueberschrieben: eine von Hand gesetzte Menge
+// oder ein verhandelter Preis waere sonst weg. Fehlt einer vorhandenen Zeile
+// nur die Bindung, wird sie nachgetragen.
+function lvAusModell() {
+  const db = loadLvVorlage().filter(v => v.herkunft && v.pos);
+  if (!db.length) {
+    ui.toast('In der Datenbank ist noch keine Position an eine Grösse gebunden.\n'
+             + 'Im Fenster «Datenbank» über «Zuordnung vorschlagen» oder von Hand setzen.', 'fehler');
+    return;
+  }
+  const gliederung = document.getElementById('mk-massen-gliederung')?.value || 'typ';
+  const summen = massenSummen(massenauszugRechnen(gliederung));
+  const liste  = loadLvPositionen();
+  let neu = 0, gebunden = 0, ohneMenge = 0;
+
+  db.forEach(v => {
+    const menge = lvMenge({ herkunft: v.herkunft, menge: 0 }, summen);
+    if (!(menge > 0)) { ohneMenge++; return; }
+    const da = liste.find(z => z.pos === v.pos);
+    if (da) {
+      if (!da.herkunft) { da.herkunft = v.herkunft; gebunden++; }
+      return;
+    }
+    liste.push({ id: 'lv_' + Date.now().toString(36) + '_' + neu,
+                 pos: v.pos, text: v.text, einheit: v.einheit,
+                 menge: 0, preis: v.preis || 0, herkunft: v.herkunft });
+    neu++;
+  });
+
+  if (!neu && !gebunden) {
+    ui.toast('Nichts hinzuzufügen — die Positionen mit Menge stehen bereits im Verzeichnis.', 'fehler');
+    return;
+  }
+  saveLvPositionen(liste);
+  renderMassenView();
+  ui.toast([neu ? neu + ' Positionen übernommen' : '',
+            gebunden ? gebunden + ' bestehende gebunden' : '',
+            ohneMenge ? ohneMenge + ' ohne Menge im Modell übersprungen' : '']
+           .filter(Boolean).join(' · '), 'erfolg');
+}
+
 function dbPosSetzen(index, feld, wert) {
   const liste = loadLvVorlage();
   if (!liste[index]) return;
@@ -1444,7 +1569,7 @@ function dbPosSetzen(index, feld, wert) {
 
 function dbPosNeu() {
   const liste = loadLvVorlage();
-  liste.push({ pos: '', text: '', einheit: '', preis: null });
+  liste.push({ pos: '', text: '', einheit: '', preis: null, herkunft: '' });
   saveLvVorlage(liste);
   _mkPositionenTab();
 }
@@ -1465,7 +1590,8 @@ function dbAusLv() {
   let n = 0;
   loadLvPositionen().forEach(z => {
     if (!z.pos || drin.has(z.pos)) return;
-    liste.push({ pos: z.pos, text: z.text, einheit: z.einheit, preis: z.preis || null });
+    liste.push({ pos: z.pos, text: z.text, einheit: z.einheit, preis: z.preis || null,
+                 herkunft: z.herkunft || '' });
     drin.add(z.pos);
     n++;
   });
@@ -1479,8 +1605,11 @@ function dbExport() {
   const liste = loadLvVorlage();
   if (!liste.length) { ui.toast('Die Datenbank ist leer.', 'fehler'); return; }
   const wb = XLSX.utils.book_new();
+  // «Menge aus» faehrt mit: die Zuordnung ist der eigentliche Wert der
+  // Datenbank und soll zwischen Projekten weitergegeben werden koennen.
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(liste.map(v =>
-    ({ 'Pos.': v.pos, 'Bezeichnung': v.text, 'Einheit': v.einheit, 'Einheitspreis': v.preis ?? '' }))),
+    ({ 'Pos.': v.pos, 'Bezeichnung': v.text, 'Einheit': v.einheit,
+       'Einheitspreis': v.preis ?? '', 'Menge aus': mkHerkunftLabel(v.herkunft) }))),
     'Positionen');
   XLSX.writeFile(wb, 'Kostendatenbank.xlsx');
 }
@@ -1500,7 +1629,8 @@ function dbImport(input) {
         if (!pos && !text) return;
         const preis = parseFloat(String(z['Einheitspreis'] ?? z['Preis'] ?? '').replace(',', '.'));
         liste.push({ pos, text, einheit: String(z['Einheit'] ?? z['LE'] ?? '').trim(),
-                     preis: Number.isFinite(preis) ? preis : null });
+                     preis: Number.isFinite(preis) ? preis : null,
+                     herkunft: mkHerkunftId(z['Menge aus'] ?? z['Herkunft'] ?? '') });
       });
       if (!liste.length) throw new Error('Keine Positionen erkannt. Erwartet: Pos., Bezeichnung, Einheit, Einheitspreis.');
       saveLvVorlage(liste);
@@ -1521,6 +1651,8 @@ function _mkPositionenTab() {
   const knoepfe =
     `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
        <button onclick="dbPosNeu()" class="btn btn-secondary btn-sm">+ Position</button>
+       <button onclick="mkZuordnungVorschlagen()" class="btn btn-secondary btn-sm"
+               title="Aus Beschrieb und Einheit vorschlagen, welche Grösse eine Position trägt — füllt nur leere Zuordnungen">Zuordnung vorschlagen</button>
        <button onclick="dbAusLv()" class="btn btn-secondary btn-sm"
                title="Positionen aus dem Leistungsverzeichnis dieses Projekts übernehmen">Aus LV übernehmen</button>
        <label class="btn btn-secondary btn-sm" style="cursor:pointer;">Einlesen
@@ -1555,15 +1687,26 @@ function _mkPositionenTab() {
     `<th style="text-align:${rechts ? 'right' : 'left'};padding:6px 8px;font-size:10px;color:#6b7280;
          text-transform:uppercase;letter-spacing:.05em;">${t}</th>`;
 
+  const gebunden = liste.filter(v => v.herkunft).length;
   el.innerHTML =
-    `<div style="max-height:52vh;overflow-y:auto;">
+    `<div style="font-size:10px;color:#9ca3af;margin-bottom:7px;">
+       ${liste.length} Positionen · ${gebunden} an eine Grösse gebunden — nur diese kann
+       «Aus Modell» ins Verzeichnis übernehmen, und nur wenn das Projekt eine Menge dafür trägt.
+     </div>
+     <div style="max-height:52vh;overflow-y:auto;">
      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-       <thead><tr style="background:#f9fafb;">${th('Pos.')}${th('Bezeichnung')}${th('Einheit')}${th('Einheitspreis', true)}${th('')}</tr></thead>
+       <thead><tr style="background:#f9fafb;">${th('Pos.')}${th('Bezeichnung')}${th('Einheit')}${th('Einheitspreis', true)}${th('Menge aus')}${th('')}</tr></thead>
        <tbody>${liste.map((v, i) => `<tr>
          <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'pos', v.pos, '92px')}</td>
          <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'text', v.text, '100%')}</td>
          <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">${eingabe(i, 'einheit', v.einheit, '64px')}</td>
          <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;text-align:right;">${eingabe(i, 'preis', v.preis, '92px', true)}</td>
+         <td style="padding:4px 8px;border-bottom:1px solid #f3f4f6;">
+           <select onchange="dbPosSetzen(${i},'herkunft',this.value)"
+                   style="padding:3px 5px;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;
+                          font-family:inherit;background:white;max-width:150px;">
+             ${_mkHerkunftOptionen(v.herkunft)}
+           </select></td>
          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
            <button onclick="dbPosLoeschen(${i})" title="Position löschen"
              style="border:none;background:none;cursor:pointer;color:#9ca3af;padding:2px;display:flex;align-items:center;">

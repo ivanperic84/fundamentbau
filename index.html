@@ -2255,6 +2255,10 @@
         <div id="mk-vorlage-panel" style="display:none;position:fixed;z-index:300;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.14);width:min(560px,94vw);"></div>
       </div>
       <button onclick="lvZeileNeu()" class="btn btn-secondary btn-sm">+ Position</button>
+      <!-- Stellt das Verzeichnis aus der Datenbank zusammen: jede Position,
+           die an eine Groesse gebunden ist und im Projekt eine Menge traegt. -->
+      <button onclick="lvAusModell()" class="btn btn-primary btn-sm"
+              title="Positionen aus der Datenbank übernehmen, die im Modell eine Menge tragen">Aus Modell</button>
       <button onclick="lvExportXlsx()" class="btn btn-secondary btn-sm">Export</button>
     </div>
   </div>
