@@ -8481,6 +8481,14 @@ function _ladeScript(pfad) {
          unsichtbar, damit _moveFsMap() nichts ins Leere haengt. -->
     <div id="bp-fs-nav-halter" style="display:none;"></div>
     <div style="display:flex;gap:6px;align-items:center;">
+      <!-- Klick-Zuweisung auf der Karte. Der Zustand steht am Knopf selbst
+           (Klasse «an»), damit sichtbar bleibt, dass die Karte gerade ein
+           Werkzeug ist und kein Betrachter. -->
+      <button id="bp-zuw-modus-btn" class="kopf-knopf" onclick="bpZuwModusUmschalten()"
+              title="Standorte auf der Karte einer Schicht zuweisen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg>
+        Zuweisen
+      </button>
       <button class="kopf-knopf" onclick="closeBpFullscreen()" title="Bauprogramm-Vollbild schliessen">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Schliessen
@@ -8498,6 +8506,25 @@ function _ladeScript(pfad) {
       <button id="btn-bp-fs-gps" class="karten-knopf aus" onclick="toggleOverviewGPS()" title="GPS">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
+    </div>
+    <!-- Schichtleiste der Klick-Zuweisung. Sie liegt UEBER der Karte am
+         unteren Rand: die Schicht ist das Werkzeug, der Standort das Ziel —
+         beides muss gleichzeitig zu sehen sein. z-index ueber den
+         Leaflet-Steuerungen (1000). -->
+    <div id="bp-zuw-leiste" style="display:none;position:absolute;left:0;right:0;bottom:0;z-index:1200;
+         background:rgba(255,255,255,0.97);border-top:1px solid #e5e7eb;box-shadow:0 -2px 12px rgba(0,0,0,0.14);">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px 5px;border-bottom:1px solid #f3f4f6;">
+        <span id="bp-zuw-leiste-titel" style="font-size:11px;font-weight:700;color:#374151;
+              text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+        <span style="flex:1;"></span>
+        <button id="bp-zuw-zurueck-btn" class="btn btn-secondary btn-sm" onclick="bpZuwSchrittZurueck()" title="Letzten Klick zurücknehmen">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>
+          Zurück
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="bpZuwModusUmschalten()">Fertig</button>
+      </div>
+      <div id="bp-zuw-schichtleiste" style="display:flex;gap:6px;overflow-x:auto;padding:8px 10px;"></div>
+      <div id="bp-zuw-hinweis" style="padding:0 10px 7px;font-size:10.5px;color:#6b7280;line-height:1.5;"></div>
     </div>
   </div>
   <!-- Gantt + Legende unten -->
