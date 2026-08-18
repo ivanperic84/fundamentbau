@@ -5,6 +5,53 @@
 // ============================================================
 // BLOCKCALC-BRÜCKE — statischer Nachweis im iframe
 // ============================================================
+//
+// FACHLICHE HINWEISE
+// Uebernommen aus der Integrationsanleitung, die als eigener Ordner im
+// Projekt lag und nach dem Einbau entfernt wurde. Die Punkte stehen sonst
+// nirgends im Code und sind keiner Datei anzusehen.
+//
+// Kopfhoehe — die Falle, die man nicht erraten kann.
+//   Diese App fuehrt kopfHoehe als GESAMTMASS (OK Block bis OK Kopf,
+//   Standard 1.00 m). BlockCalcs H_Kopf ist dagegen der UEBERSTAND ueber
+//   Terrain. Die Bruecke schickt deshalb den Ueberstand, BlockCalc rechnet
+//   daraus ue = kopfHoehe - Ueberstand. Falsch zugeordnet waere jeder
+//   Hebelarm um ue daneben.
+//   Ueberstand = fundkopf_mueM - (gelaende_swisstopo ?? pair.gelaendehoehe).
+//   Fehlen die Hoehenkoten, greift der Erwartungswert der Neigungsklasse:
+//   0.60 m bei <= 14 Grad, 0.40 m bei 14-33 Grad — dieselben Werte, gegen
+//   die loadHoehenkoten() das Delta Terrain schon plausibilisiert.
+//
+// Standardlasten — einmalig je Arbeitsstation importieren.
+//   Lastschluessel ist bp.refFamilie ("Referenztyp (Standardlasten)"), das
+//   Feld erscheint ohnehin nur bei Spezialfundamenten. Die Lastwerte stehen
+//   NICHT im Code, sondern in
+//   blockcalc/Lastniveaus_SBB_0161.1011.0002_a.json (8 Niveaus:
+//   DP1a/DP2a/HP1a/HP2a mal V=0/V=150).
+//   Einzuspielen ueber: BlockCalc oeffnen, Optionen, Datenaustausch,
+//   Import, diese Datei waehlen. Ohne sie meldet BlockCalc "Lastniveau
+//   nicht gefunden" — und zwar auf jedem Rechner neu.
+//   Dass es zwei Faelle je Position sind, gibt die Norm vor: Nachweise mit
+//   V_min = 0 kN und V_max = 150 kN. V=0 ist fuer den Steckner-GZT
+//   massgebend, V=150 fuer Grundbruch und Setzung. Die Bruecke schickt
+//   derzeit vFall:'max'; den zweiten Fall bei Bedarf als zweiten Durchgang.
+//
+// Neigungsklasse 14-33 Grad — Modellgrenze, kein Versagen.
+//   Die konservative Klassenobergrenze 33 Grad treibt den Block-GZG in
+//   seinen Modellgrenzfall: Steckners Gl. 4 mindert C1 mit (1 + beta/40),
+//   bei -33 Grad bleibt kaum Bettung uebrig. Gemessen liefert derselbe Fall
+//   eta_GZT 0.81, aber eta_GZG 0.012. Ohne Hinweis kaeme jede Position
+//   dieser Klasse als "nicht erfuellt" zurueck. Die Bruecke haengt darum
+//   einen Hinweis an: tatsaechlichen Boeschungswinkel erfassen und, bei
+//   endlicher Boeschung, die Boeschungshoehe h_beta.
+//
+// Nicht gefuehrt.
+//   Torsionsmoment T (3.3-5.0 kNm nach 0161.1011.0002_a) rechnet BlockCalc
+//   nicht. Es wird mitgetragen und als Hinweis ausgewiesen, nicht
+//   stillschweigend weggelassen. Ebenfalls nicht abgedeckt: Verankerung im
+//   Fels ueber Anker (0161.1011.0601) und Befestigung an einer Mauer —
+//   beide erscheinen mit Infotext statt Knopf.
+// ============================================================
 // Öffnet BlockCalc für EINE Position, übergibt Geometrie/Baugrund/Lasten und schreibt die
 // dimensionierten Abmessungen zurück. Bewusst kein Stapellauf: jede Berechnung wird vom
 // Ingenieur gesichtet — der Nutzen liegt im schnellen Hin und Her je Position.
