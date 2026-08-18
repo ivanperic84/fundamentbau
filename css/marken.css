@@ -1,0 +1,92 @@
+/* ============================================================
+   MARKEN — die Gestaltungswerte der App, sonst nichts.
+
+   Diese Datei enthaelt ausschliesslich Variablen. Wer eine Farbe, einen
+   Abstand, einen Radius oder eine Dauer braucht, holt sie hier heraus
+   und schreibt keinen festen Wert in einen Baustein oder in eine
+   JS-Zeichenkette.
+
+   Ladefolge, festgelegt in index.html:
+       marken -> bausteine -> ansichten
+
+   Sie entspricht der frueheren Quelltextfolge im <style>-Block von
+   index.html. Das Herausloesen hat an der Kaskade nichts geaendert.
+   ============================================================ */
+
+/* ============================================================
+   DESIGN-TOKENS — zentrale Gestaltungswerte.
+   Neue Features verwenden ausschliesslich diese Variablen und
+   die UI-Utility-Klassen darunter; Altbestand wird opportunistisch
+   migriert (Boy-Scout-Regel).
+   ============================================================ */
+:root {
+  /* Primärfarbe (monochromes Schema) */
+  --c-primary:        #1a3a5c;
+  --c-primary-hover:  #1e4976;
+  /* Text */
+  --c-text-strong:    #1a1a2e;
+  --c-text:           #374151;
+  --c-text-muted:     #6b7280;
+  --c-text-faint:     #9ca3af;
+  /* Flächen */
+  --c-bg:             #f0f2f5;
+  --c-surface:        #ffffff;
+  --c-surface-alt:    #f9fafb;
+  --c-surface-inset:  #f3f4f6;
+  /* Linien */
+  --c-border:         #e5e7eb;
+  --c-border-strong:  #d1d5db;
+  /* Status — je Rolle genau ein Satz aus Fläche / Linie / Schrift.
+     Im Bestand existieren dafür 8–22 verschiedene Hex-Werte; neue UI
+     verwendet ausschliesslich diese Tokens. */
+  --c-success:        #16a34a;
+  --c-success-bg:     #f0fdf4;
+  --c-success-border: #bbf7d0;
+  --c-warning:        #d97706;
+  --c-warning-bg:     #fffbeb;
+  --c-warning-border: #fde68a;
+  --c-warning-fg:     #92400e;
+  --c-danger:         #dc2626;
+  --c-danger-bg:      #fef2f2;
+  --c-danger-border:  #fca5a5;
+  --c-info:           #2563eb;
+  --c-info-bg:        #eff6ff;
+  --c-info-border:    #bfdbfe;
+  --c-focus:          #3b82f6;
+  /* Diagramm-Akzente: nur für Balken/Marken im Gantt, nie für Bedienelemente */
+  --c-accent-ms:      #7c3aed;   /* Meilenstein */
+  --c-accent-va:      #f59e0b;   /* Vorarbeiten */
+  /* Abstände */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  /* Radien — --r-input ist der Feldradius; Felder sind im Bestand
+     durchgängig 1px runder als Knöpfe, das bleibt so. */
+  --r-sm: 5px; --r-input: 6px; --r-md: 7px; --r-lg: 10px; --r-pill: 20px;
+  /* Schriftgrössen */
+  --fs-xs: 10px; --fs-sm: 11px; --fs-md: 12px; --fs-base: 13px; --fs-lg: 14px;
+  /* Schatten */
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.12);
+  --shadow-md:    0 4px 16px rgba(0,0,0,0.15);
+  --shadow-modal: 0 20px 60px rgba(0,0,0,0.3);
+  /* Mindest-Touch-Höhe: Desktop kompakt, Touch-Geräte 44px */
+  --tap-min: 30px;
+  /* Bewegung — Dauer und Kurve als Marke, damit nicht jeder Baustein
+     seine eigene erfindet. Der Bestand verwendet 0.15s / 0.2s / 0.25s;
+     die drei Stufen bilden das ab, ohne Bestehendes zu veraendern. */
+  --mo-schnell: 150ms;   /* Farbwechsel, Umrandung, Schwebezustand */
+  --mo-mittel:  250ms;   /* Auf- und Zuklappen, Ein- und Ausblenden */
+  --mo-ruhig:   400ms;   /* Ansichtswechsel */
+  /* Standardkurve: zuegig heraus, weich hinein. */
+  --mo-kurve:   cubic-bezier(0.2, 0, 0, 1);
+}
+@media (pointer: coarse) {
+  :root { --tap-min: 44px; }
+}
+
+/* Wer im Betriebssystem weniger Bewegung eingestellt hat, bekommt keine.
+   Die Marken auf 0 zu setzen genuegt — vorausgesetzt, jede Animation holt
+   ihre Dauer von hier und schreibt sie nicht selbst hin. Genau dafuer sind
+   die Marken da. Android, iOS und Windows geben die Einstellung durch. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --mo-schnell: 0ms; --mo-mittel: 0ms; --mo-ruhig: 0ms; }
+}

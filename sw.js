@@ -65,6 +65,10 @@ const STATISCH = [
   'icon-192.png',
   'icon-512.png',
   'icon-512-maskable.png',
+  // Gestaltung — Reihenfolge wie in index.html: marken, bausteine, ansichten.
+  'css/marken.css',
+  'css/bausteine.css',
+  'css/ansichten.css',
   'lib/leaflet.css',
   'lib/leaflet.js',
   'lib/leaflet-rotate.js',

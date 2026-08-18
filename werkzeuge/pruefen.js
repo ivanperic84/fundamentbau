@@ -21,9 +21,13 @@
                oder doppelt eingefuegte Bloecke nach Skript-Umbauten.
      attribute Zweimal class= oder style= im selben Tag. Der Browser nimmt
                das erste, alles Weitere verschwindet lautlos.
-     css       Mehrfach definierte Utility-Klassen. Die spaetere Definition
-               gewinnt und ueberschreibt die Tokens — so geschehen bei
-               .modal-close (16px statt 20px) und .modal-input.
+     css       Mehrfach definierte Utility-Klassen in css/*.css. Die
+               spaetere Definition gewinnt und ueberschreibt die Marken — so
+               geschehen bei .modal-close (16px statt 20px) und .modal-input.
+               Seit der Aufteilung ueber alle Dateien hinweg gezaehlt.
+     stil      Gestaltungsdateien unter css/ sind in index.html verlinkt, in
+               sw.js gecacht und in der Reihenfolge marken → bausteine →
+               ansichten eingebunden. Diese Reihenfolge ist die Kaskade.
      handler   onclick/onchange verweist auf eine Funktion, die es nirgends
                gibt. Faellt erst beim Klick auf, dann als ReferenceError.
      module    Die Modulliste in sw.js weicht von js/ ab. Folge: der
@@ -59,6 +63,7 @@ const zeileVon = idx => html.slice(0, idx).split('\n').length;
 // damit JS-Zeichenketten wie '<div>' nicht mitgezaehlt werden.
 const ohneSkripte = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, m => ' '.repeat(m.length));
 const skriptQuellen = () => fs.readdirSync(P('js')).filter(f => f.endsWith('.js')).map(f => ['js/' + f, lies(P('js', f))]);
+const stilQuellen   = () => fs.readdirSync(P('css')).filter(f => f.endsWith('.css')).map(f => ['css/' + f, lies(P('css', f))]);
 
 /* ── ids ──────────────────────────────────────────────────── */
 if (aktiv('ids')) {
@@ -103,46 +108,91 @@ if (aktiv('attribute')) {
   if (!treffer) ok('attribute', 'kein Tag mit doppeltem class/style/id/onclick');
 }
 
-/* ── css ──────────────────────────────────────────────────── */
+/* ── css ──────────────────────────────────────── */
 if (aktiv('css')) {
   // Nur Utility-Klassen: einfache Klassenselektoren ohne Kombinator.
-  // Regeln innerhalb von @media/@supports sind bewusste Überschreibungen und
-  // zählen nicht als Doppeldefinition — sonst meldet die Prüfung jede
-  // Anpassung für kleine Bildschirme als Fehler.
-  const inAtBlock = (() => {
+  // Regeln innerhalb von @media/@supports sind bewusste Ueberschreibungen und
+  // zaehlen nicht als Doppeldefinition - sonst meldet die Pruefung jede
+  // Anpassung fuer kleine Bildschirme als Fehler.
+  const atBereiche = text => {
     const bereiche = [];
-    for (const m of html.matchAll(/@(?:media|supports)\b[^{]*\{/g)) {
+    for (const m of text.matchAll(/@(?:media|supports)\b[^{]*\{/g)) {
       let i = m.index + m[0].length, tiefe = 1;
-      while (i < html.length && tiefe > 0) {
-        if (html[i] === '{') tiefe++;
-        else if (html[i] === '}') tiefe--;
+      while (i < text.length && tiefe > 0) {
+        if (text[i] === '{') tiefe++;
+        else if (text[i] === '}') tiefe--;
         i++;
       }
       bereiche.push([m.index, i]);
     }
     return idx => bereiche.some(([a, b]) => idx >= a && idx < b);
-  })();
+  };
 
+  // Ueber alle Dateien hinweg gezaehlt. Seit der Aufteilung ist die zweite
+  // Fassung einer Klasse leichter zu uebersehen als vorher im einen Block -
+  // sie gewinnt aber genauso lautlos.
   const zaehler = new Map();
-  for (const m of html.matchAll(/(^|[\n{}])\s*(\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)\s*\{/gi)) {
-    if (inAtBlock(m.index)) continue;
-    const sel = m[2];
-    if (!zaehler.has(sel)) zaehler.set(sel, []);
-    // + m[1].length: der Treffer beginnt am vorangehenden Umbruch bzw. Klammerzeichen
-    zaehler.get(sel).push(zeileVon(m.index + m[1].length));
+  for (const [datei, css] of stilQuellen()) {
+    const inAtBlock = atBereiche(css);
+    const zeileIn = idx => css.slice(0, idx).split('\n').length;
+    for (const m of css.matchAll(/(^|[\n{}])\s*(\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)\s*\{/gi)) {
+      if (inAtBlock(m.index)) continue;
+      const sel = m[2];
+      if (!zaehler.has(sel)) zaehler.set(sel, []);
+      // + m[1].length: der Treffer beginnt am vorangehenden Umbruch bzw. Klammerzeichen
+      zaehler.get(sel).push(datei + ':' + zeileIn(m.index + m[1].length));
+    }
   }
   const doppelt = [...zaehler].filter(([, z]) => z.length > 1);
   if (doppelt.length) {
-    // Bewusst ein Fehler, kein Hinweis: die spätere Definition gewinnt lautlos.
-    // So überschrieb eine alte .modal-close-Regel die Token-Fassung (16px statt
-    // 20px), und .modal-input hätte die zusammengeführte Felddefinition gekippt.
-    for (const [sel, zeilen] of doppelt) {
-      fehler('css', sel + ' ' + zeilen.length + '× definiert — Zeilen ' + zeilen.join(', ')
+    // Bewusst ein Fehler, kein Hinweis: die spaetere Definition gewinnt lautlos.
+    // So ueberschrieb eine alte .modal-close-Regel die Marken-Fassung (16px
+    // statt 20px), und .modal-input haette die Felddefinition gekippt.
+    for (const [sel, stellen] of doppelt) {
+      fehler('css', sel + ' ' + stellen.length + '× definiert — ' + stellen.join(', ')
         + '. Die spätere Definition gewinnt; zusammenführen.');
     }
   } else {
     ok('css', zaehler.size + ' einfache Klassenselektoren, keiner doppelt');
   }
+}
+
+/* ── stil ─────────────────────────────────────── */
+if (aktiv('stil')) {
+  const vorhanden = fs.readdirSync(P('css')).filter(f => f.endsWith('.css')).map(f => 'css/' + f);
+  const sw     = lies(P('sw.js'));
+  const imSw   = [...sw.matchAll(/'(css\/[^']+)'/g)].map(m => m[1]);
+  const imHtml = [...html.matchAll(/<link[^>]+href="(css\/[^"]+)"/g)].map(m => m[1]);
+  let sauber = true;
+
+  for (const d of vorhanden) {
+    if (!imHtml.includes(d)) {
+      fehler('stil', d + ' ist in index.html nicht verlinkt — die Regeln greifen nirgends'); sauber = false;
+    }
+    if (!imSw.includes(d)) {
+      fehler('stil', d + ' fehlt in der STATISCH-Liste von sw.js — offline ohne Gestaltung'); sauber = false;
+    }
+  }
+  for (const d of imHtml) {
+    if (!vorhanden.includes(d)) {
+      fehler('stil', 'index.html verlinkt ' + d + ' — Datei existiert nicht'); sauber = false;
+    }
+  }
+
+  // Die Reihenfolge der Verweise IST die Kaskade: Marken muessen gesetzt sein,
+  // bevor ein Baustein sie ausliest, und eine Ansicht muss den Baustein
+  // ueberschreiben koennen, nicht umgekehrt. Deshalb steht sie hier fest.
+  // Kommt eine vierte Datei dazu, gehoert sie in diese Liste.
+  const soll = ['css/marken.css', 'css/bausteine.css', 'css/ansichten.css'];
+  const ist  = imHtml.filter(d => soll.includes(d));
+  if (JSON.stringify(ist) !== JSON.stringify(soll)) {
+    fehler('stil', 'Reihenfolge in index.html ist ' + (ist.join(' → ') || '(leer)')
+      + ', erwartet ' + soll.join(' → ')); sauber = false;
+  }
+  const unbekannt = vorhanden.filter(d => !soll.includes(d));
+  unbekannt.forEach(d => warnung('stil', d + ' steht in keiner Reihenfolgeangabe von pruefen.js — Kaskade ungeprueft'));
+
+  if (sauber) ok('stil', vorhanden.length + ' Gestaltungsdateien, in index.html und sw.js vollständig und in richtiger Folge');
 }
 
 /* ── handler ──────────────────────────────────────────────── */

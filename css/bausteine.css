@@ -1,0 +1,217 @@
+/* ============================================================
+   BAUSTEINE — wiederverwendbare Bauteile der Oberflaeche.
+
+   Knopf, Eingabefeld, Kennzeichen, Werkzeugleiste, segmentierter
+   Umschalter, Reiter, Hinweis. Ein Baustein verwendet ausschliesslich
+   Marken aus css/marken.css und weiss nichts von einer Ansicht.
+
+   Wird ein Bauteil an zwei Stellen gebraucht, gehoert es hierher — nicht
+   als zweite, leicht abweichende Fassung in css/ansichten.css und schon
+   gar nicht als style="..." in einer JS-Zeichenkette.
+   ============================================================ */
+
+/* ── UI-UTILITIES ─────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--tap-min);
+  padding: 6px 14px; border-radius: var(--r-md);
+  font-size: var(--fs-md); font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.btn-primary { background: var(--c-primary); color: white; }
+.btn.btn-primary:hover:not(:disabled) { background: var(--c-primary-hover); }
+.btn.btn-secondary { background: var(--c-surface); color: var(--c-text); border-color: var(--c-border-strong); }
+.btn.btn-secondary:hover:not(:disabled) { background: var(--c-surface-inset); }
+.btn.btn-danger { background: var(--c-surface); color: var(--c-danger); border-color: var(--c-danger); }
+.btn.btn-danger:hover:not(:disabled) { background: #fee2e2; }
+/* Gefüllt rot nur für den bestätigenden Knopf eines Löschdialogs — der
+   zurückhaltende .btn-danger bleibt für Löschen-Knöpfe in Formularfusszeilen. */
+.btn.btn-danger-solid { background: var(--c-danger); color: white; border-color: var(--c-danger); }
+.btn.btn-danger-solid:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+.btn.btn-ghost { background: transparent; color: var(--c-text-muted); }
+.btn.btn-ghost:hover:not(:disabled) { background: var(--c-surface-inset); color: var(--c-text); }
+.btn.btn-sm { padding: 4px 10px; font-size: var(--fs-sm); border-radius: var(--r-sm); }
+/* Grösse der Aktionsknöpfe in Modal-Fusszeilen. Der Bestand verwendet dort
+   durchgängig 13px / 8px 18-20px — als Stufe abgebildet, damit die Umstellung
+   die Geometrie nicht verändert. */
+.btn.btn-lg { padding: 8px 18px; font-size: var(--fs-base); }
+
+/* Schliessen-Knopf im Modalkopf. Kam im Bestand in elf leicht
+   abweichenden Inline-Varianten vor (18/20px, mit und ohne line-height). */
+.modal-close {
+  background: none; border: none; padding: 0 2px;
+  color: var(--c-text-faint); font-size: 20px; line-height: 1;
+  cursor: pointer; flex-shrink: 0;
+  min-width: var(--tap-min); min-height: var(--tap-min);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 0.15s;
+}
+.modal-close:hover { color: var(--c-text); }
+/* Variante für Modalköpfe mit dunkler Fläche (Sperrmuster, Schicht) */
+.modal-close.on-dark {
+  color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.12);
+  border-radius: var(--r-md); font-size: 16px;
+}
+.modal-close.on-dark:hover { color: white; background: rgba(255,255,255,0.22); }
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--sp-2); }
+.field-label { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.field-hint  { font-size: var(--fs-xs); color: var(--c-text-faint); }
+/* Eingabefeld — EINE Definition für beide Klassennamen. `.modal-input` gab es
+   im Bestand schon (184 Felder), `.field-input` kam mit den Tokens dazu; die
+   beiden waren bis auf 1px identisch. Übernommen sind die Werte von
+   `.modal-input` — 13px bleibt bewusst stehen: die App wird auf dem Tablet
+   im Feld bedient, dort ist die grössere Feldschrift die lesbarere. */
+.field-input, .modal-input {
+  width: 100%; min-height: var(--tap-min);
+  padding: 6px 9px;
+  border: 1px solid var(--c-border); border-radius: var(--r-input);
+  font-size: var(--fs-base); font-family: inherit; outline: none;
+  background: var(--c-surface); color: var(--c-text-strong);
+}
+.field-input:focus, .modal-input:focus { border-color: var(--c-focus); }
+textarea.field-input, textarea.modal-input { resize: vertical; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); font-weight: 700;
+  padding: 1px 7px; border-radius: 3px;
+  background: var(--c-surface-inset); color: var(--c-text-muted);
+}
+.badge.badge-success { background: var(--c-success-bg); color: var(--c-success); }
+.badge.badge-warning { background: var(--c-warning-bg); color: var(--c-warning-fg); }
+.badge.badge-danger  { background: var(--c-danger-bg);  color: var(--c-danger); }
+.badge.badge-info    { background: var(--c-info-bg);    color: var(--c-info); }
+
+/* ── WERKZEUGLEISTE ───────────────────────────────────────────
+   Monochrom: Aktionen tragen keine Eigenfarbe. Farbe bleibt der
+   Statusaussage vorbehalten (Warnung, Gefahr, Erfolg) — nur so
+   bleibt sie im Gantt als Signal lesbar. */
+.toolbar-group {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px; border-radius: var(--r-md);
+  background: var(--c-surface-alt); border: 1px solid var(--c-border);
+}
+.toolbar-label {
+  font-size: 9px; font-weight: 700; color: var(--c-text-faint);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px;
+  white-space: nowrap;
+}
+/* Beschriftungen, die auf schmalen Schirmen weichen. Die Segmentknoepfe
+   darunter sagen selbst, worum es geht — die Grossbuchstaben-Etiketten
+   kosten dort nur Platz und erzwingen einen Umbruch. */
+@media (max-width: 1000px) { .nur-breit { display: none; } }
+/* Höhe 22px: so war der Bestandswert der zweiten, später im Stylesheet
+   stehenden Definition — die hat gewonnen. Beide sind hier zusammengeführt. */
+.toolbar-sep { width: 1px; height: 22px; background: var(--c-border); margin: 0 2px; flex-shrink: 0; }
+
+/* Symbolknopf ohne Beschriftung (Undo, Neu laden …) */
+.btn.btn-icon { padding: 5px 8px; min-height: var(--tap-min); }
+
+/* ── SEGMENTIERTE UMSCHALTER (Zoom, Sortierung) ───────────── */
+.seg { display: inline-flex; border: 1px solid var(--c-border); border-radius: var(--r-sm); overflow: hidden; }
+.seg > button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 4px 12px; min-height: var(--tap-min);
+  border: none; border-right: 1px solid var(--c-border);
+  background: var(--c-surface); color: var(--c-text-muted);
+  font-size: var(--fs-sm); font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.seg > button:last-child { border-right: none; }
+.seg > button:hover:not(.aktiv) { background: var(--c-surface-inset); color: var(--c-text); }
+.seg > button.aktiv { background: var(--c-primary); color: #fff; }
+/* Kompakte Segmentleiste für Regler, die selten umgestellt werden
+   (Zeitraster, Sortierung). Sie standen in voller Knopfgroesse da und
+   zogen mehr Aufmerksamkeit auf sich als das Diagramm darunter. Die Hoehe
+   bleibt bei 28 px — die App wird auf der Baustelle mit dem Finger bedient,
+   unter diese Marke will ich nicht. */
+.seg.seg-kompakt > button {
+  padding: 3px 9px; min-height: 28px; font-size: 11px; font-weight: 600;
+}
+/* Volle Breite: Umschalter, der eine Zeile ausfüllt (Phase, Briefansicht) */
+.seg.seg-full { display: flex; width: 100%; }
+.seg.seg-full > button { flex: 1; justify-content: center; }
+.seg.seg-md > button { padding: 7px 12px; font-size: var(--fs-md); font-weight: 700; }
+
+/* ── REITER ───────────────────────────────────────────────────
+   Zwei Bauformen im Bestand, beide hier abgebildet:
+   · .tabs / .tab               — Unterstreichung (Datenbank-Tabellen)
+   · .tabs-folder / .tab-folder — Karteikarte auf der Trennlinie (Modale)
+   Der aktive Reiter trägt .aktiv — wie bei .seg. Vorher setzten die
+   JS-Funktionen Farben inline; das überschrieb jede Klasse. */
+.tabs        { display: flex; border-bottom: 1px solid var(--c-border); }
+.tabs-folder { display: flex; gap: 2px; border-bottom: 1px solid var(--c-border); }
+
+.tab {
+  padding: 8px 16px; min-height: var(--tap-min);
+  border: none; border-bottom: 2px solid transparent; background: transparent;
+  font-size: var(--fs-md); font-weight: 600; font-family: inherit;
+  color: var(--c-text-muted); cursor: pointer; white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover:not(.aktiv) { color: var(--c-text); }
+.tab.aktiv    { color: var(--c-primary); border-bottom-color: var(--c-primary); font-weight: 700; }
+.tab.tab-sm   { padding: 7px 14px; font-size: var(--fs-sm); }
+
+.tab-folder {
+  padding: 8px 14px; min-height: var(--tap-min);
+  border: 1px solid transparent; border-radius: var(--r-md) var(--r-md) 0 0;
+  background: transparent;
+  font-size: var(--fs-md); font-weight: 500; font-family: inherit;
+  color: var(--c-text-muted); cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.tab-folder:hover:not(.aktiv) { color: var(--c-text); }
+.tab-folder.aktiv {
+  background: var(--c-surface); color: var(--c-primary); font-weight: 700;
+  border-color: var(--c-border) var(--c-border) var(--c-surface);
+  margin-bottom: -1px; position: relative; z-index: 1;
+}
+.tab-folder.tab-sm { padding: 5px 14px; }
+
+/* Toast-Meldungen (nicht-blockierender alert-Ersatz) */
+/* Projekttitel im Kopf platzsparend einklappen. !important schlägt die
+   inline-Angabe padding-right aus dem Markup; die Rasterspalte bleibt
+   erhalten und schrumpft auf null, damit die mittlere Spalte wächst. */
+/* Der eingeklappte Titel behaelt seine Hoehe und haelt damit das Kopfband in
+   Detail- und Erfassungsansicht auf demselben Mass wie in der Uebersicht.
+   nowrap ist dafuer noetig: bei Breite null bricht der Text sonst um und
+   machte das Band 39 px hoeher. display:none scheidet aus — der Kopf ist ein
+   Raster «auto 1fr auto», die Spalten wuerden nachruecken. */
+#header-projekt.eingeklappt {
+  visibility: hidden; width: 0; overflow: hidden; padding: 0 !important;
+  white-space: nowrap;
+}
+
+/* Ziehbare Elemente im Bauprogramm-Gantt. Ohne touch-action gewinnt auf
+   Touchgeräten das Scrollen und die Zeigergeste wird abgebrochen — der
+   Balken liess sich mit dem Finger nicht verschieben. */
+[data-fp-move], [data-fp-abbruch-move],
+[data-bp-move], [data-bp-resize], [data-ms-id] { touch-action: none; }
+
+/* Über allen Modals (höchstes davon: 10000). Bei 6000 verschwanden
+   Meldungen, die aus einem offenen Modal heraus ausgelöst wurden. */
+#ui-toast-wrap {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 10050; display: flex; flex-direction: column; gap: 8px;
+  align-items: center; pointer-events: none;
+}
+.ui-toast {
+  background: var(--c-primary); color: white;
+  padding: 10px 18px; border-radius: var(--r-md);
+  font-size: var(--fs-md); font-weight: 600; box-shadow: var(--shadow-md);
+  max-width: 90vw;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.ui-toast.zeigen { opacity: 1; transform: none; }
+.ui-toast.fehler { background: var(--c-danger); }
+.ui-toast.erfolg { background: var(--c-success); }
+/* Toasts mit Aktionsknopf muessen Klicks annehmen — der Wrapper ist
+   bewusst pointer-events:none, damit normale Toasts nicht stoeren. */
+.ui-toast.mit-aktion { pointer-events: auto; display: flex; align-items: center; }
+.ui-toast.mit-aktion button:hover { background: rgba(255,255,255,.18); }
