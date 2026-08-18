@@ -107,7 +107,15 @@ function showDetail(pairId) {
           ${pair.bemerkung ? `<tr><td style="color:#9ca3af;padding:4px 0;font-size:11px;vertical-align:top;">Bemerkung</td><td style="white-space:pre-wrap;color:#374151;font-size:12px;">${pair.bemerkung}</td></tr>` : ''}
           ${pair.instBestellLink ? `<tr><td style="color:#9ca3af;padding:4px 0;font-size:11px;vertical-align:top;">Bestelllink</td><td style="font-size:12px;"><a href="${pair.instBestellLink}" target="_blank" rel="noopener" style="color:#1a3a5c;font-weight:600;text-decoration:none;word-break:break-all;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Öffnen <svg style="vertical-align:middle" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></td></tr>` : ''}
         </table>
-        <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px;">Status</div>
+        ${(pair.instAbschaltung || pair.instErdung || pair.instGleisAbstand)
+          ? `<div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.05em;text-transform:uppercase;margin:10px 0 4px;">Fahrleitung</div>
+             <div style="font-size:12px;color:#374151;line-height:1.8;">
+               ${pair.instAbschaltung ? '<div>Abschaltung erforderlich</div>' : ''}
+               ${pair.instErdung ? '<div>Erdung erforderlich</div>' : ''}
+               ${pair.instGleisAbstand ? `<div>Abstand Gleisachse ${pair.instGleisAbstand} m</div>` : ''}
+             </div>`
+          : ''}
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.05em;text-transform:uppercase;margin:10px 0 4px;">Status</div>
         ${_cbRow('instBestellt',     'Bestellt')}
         <div id="inst-bestellt-datum-row" style="padding:4px 0 6px 23px;border-bottom:1px solid #f3f4f6;${pair.instBestellt ? '' : 'display:none;'}">
           <label style="font-size:10px;color:#9ca3af;display:block;margin-bottom:3px;">Bestelldatum</label>
@@ -117,9 +125,26 @@ function showDetail(pairId) {
         </div>
         ${_cbRow('instRueckmeldung', 'Rückmeldung pendent')}
         ${_cbRow('instBestaetigt',   'Bestätigt')}
-        <div style="margin-top:10px;">
+        ${pair.instFrist ? `<div style="padding:5px 0 0 23px;font-size:11px;color:${
+            (typeof instFristStand === 'function' && instFristStand(pair)) ? instFristStand(pair).farbe : '#9ca3af'};">
+            Bestellfrist ${_instDatum(pair.instFrist)}${
+              (typeof instFristStand === 'function' && instFristStand(pair)) ? ' · ' + instFristStand(pair).text : ''}</div>` : ''}
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.05em;text-transform:uppercase;margin:12px 0 4px;">Rückgabe</div>
+        ${_cbRow('instRueckgabeOk', 'Fläche zurückgegeben')}
+        <div id="inst-rueckgabe-datum-row" style="padding:4px 0 6px 23px;border-bottom:1px solid #f3f4f6;${pair.instRueckgabeOk ? '' : 'display:none;'}">
+          <label style="font-size:10px;color:#9ca3af;display:block;margin-bottom:3px;">Rückgabedatum</label>
+          <input type="date" id="inst-rueckgabe-datum" value="${pair.instRueckgabeDatum || ''}"
+            onchange="saveInstFeld(${pair.id},'instRueckgabeDatum',this.value)"
+            style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:11px;font-family:inherit;color:#374151;background:white;cursor:pointer;">
+        </div>
+        <div style="font-size:10px;color:#9ca3af;padding:6px 0 0;line-height:1.6;">
+          Zustand vor und nach der Nutzung mit Fotos belegen — in der Foto-Sektion
+          unter «Rückgabe» ablegen.</div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
           <button onclick="openCreateInstallation(${pair.id})"
             style="padding:4px 12px;border-radius:6px;border:1px solid #1a3a5c;background:white;color:#1a3a5c;font-size:11px;font-weight:600;cursor:pointer;">Bearbeiten</button>
+          <button onclick="instFlaecheAusMessung(${pair.id})" title="Die zuletzt auf der Karte gemessene Fläche als Installationsfläche übernehmen"
+            style="padding:4px 12px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;cursor:pointer;">Fläche aus Messung</button>
         </div>`;
     }
   }

@@ -228,7 +228,9 @@ function compressImage(dataUrl) {
   });
 }
 
-function addFotos(input) {
+// kategorie (optional) legt das Foto in einen eigenen Topf — 'rueckgabe' fuer
+// den Zustand einer Installationsflaeche bei der Rueckgabe.
+function addFotos(input, kategorie) {
   const files = Array.from(input.files);
   if (!files.length) return;
   let loaded = 0;
@@ -239,6 +241,7 @@ function addFotos(input) {
       const compressed = await compressImage(e.target.result);
       const blobId = await fotoBlobs.speichern(compressed);
       results[i] = { blobId, ts: new Date().toLocaleString('de-CH'), phase: _activePhase };
+      if (kategorie) results[i].kategorie = kategorie;
       if (++loaded === files.length) {
         const pd = getPairData(currentPairId);
         const allFotos = (pd.fotos || []).concat(results);
@@ -378,6 +381,9 @@ function renderFotos() {
   const regular  = allFotos.filter(f => (f.phase || 'baugrund') === _activePhase && !f.kategorie);
   const begehung = allFotos.filter(f => (f.phase || 'baugrund') === _activePhase && f.kategorie === 'begehung');
   const abnahme  = allFotos.filter(f => (f.phase || 'baugrund') === _activePhase && f.kategorie === 'abnahme');
+  // Rueckgabezustand einer Installationsflaeche. Ohne eigenen Topf fiel ein
+  // Foto mit unbekannter Kategorie durch alle Filter und war unsichtbar.
+  const rueckgabe = allFotos.filter(f => (f.phase || 'baugrund') === _activePhase && f.kategorie === 'rueckgabe');
   inner.innerHTML = '';
 
   const mkThumb = (f) => {
@@ -432,6 +438,22 @@ function renderFotos() {
   if (abnahme.length > 0) {
     inner.appendChild(mkDivider('Abnahme'));
     abnahme.forEach(f => inner.appendChild(mkThumb(f)));
+  }
+
+  // Rueckgabezustand — nur bei Installationsflaechen. Sie werden gemietet und
+  // im vereinbarten Zustand zurueckgegeben; die Fotos davon sind der Beleg.
+  const istInst = PAIRS.find(p => p.id === currentPairId)?._objType === 'installation';
+  if (istInst || rueckgabe.length > 0) {
+    inner.appendChild(mkDivider('Rückgabezustand'));
+    rueckgabe.forEach(f => inner.appendChild(mkThumb(f)));
+    const rueckBtn = document.createElement('label');
+    rueckBtn.style.cssText = 'display:inline-block;margin:4px;vertical-align:top;cursor:pointer;';
+    rueckBtn.title = 'Foto zum Rückgabezustand aufnehmen';
+    rueckBtn.innerHTML =
+      '<div style="width:72px;height:56px;border-radius:6px;border:2px dashed #d1d5db;background:#f9fafb;'
+      + 'color:#9ca3af;font-size:20px;display:flex;align-items:center;justify-content:center;">+</div>'
+      + '<input type="file" accept="image/*" multiple style="display:none;" onchange="addFotos(this,&quot;rueckgabe&quot;)">';
+    inner.appendChild(rueckBtn);
   }
 }
 

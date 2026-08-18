@@ -1795,6 +1795,18 @@ function redrawSketch() {
 
 let currentMode = 'pan'; // pan | draw | measure
 
+// Escape fuehrt zurueck auf «Karte». Wer im Mess- oder Zeichenmodus haengt,
+// kommt damit heraus, ohne den richtigen Knopf suchen zu muessen.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || currentMode === 'pan') return;
+  const a = document.activeElement;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+  // Offene Fenster haben Vorrang — sie schliessen sich selbst mit Escape
+  if (document.querySelector('.modal-overlay[style*="flex"]')) return;
+  if (document.getElementById('detail-view')?.style.display === 'none') return;
+  setMode('pan');
+});
+
 function setMode(mode) {
   // Stop measure if switching away
   if (currentMode === 'measure' && mode !== 'measure') stopMeasure();

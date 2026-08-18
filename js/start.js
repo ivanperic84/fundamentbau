@@ -26,6 +26,10 @@ _migrateFtProfilId();
 // Wiederherstellung der zuletzt aktiven Ansicht (aus init-phasen.js)
 initApp();
 
+// Beschriftung der Werkzeugleiste nach der Einstellung — sie steht global,
+// gilt also ab dem ersten Aufbau und nicht erst nach einem Kartenwechsel.
+if (typeof messToolbarBeschriftung === 'function') messToolbarBeschriftung();
+
 // Phasenbindung der Bereichsreiter setzen. Muss auch beim Erststart laufen —
 // setPhase() wird nur beim Wechsel aufgerufen, nicht beim Laden.
 _navTabsAktualisieren();

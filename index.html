@@ -3939,9 +3939,9 @@
       <div class="sketch-toolbar">
         <!-- Immer sichtbar: Modus-Buttons -->
         <div class="tool-group">
-          <button class="tool-btn active" id="btn-mode-pan" onclick="setMode('pan')" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg> Karte</button>
-          <button class="tool-btn" id="btn-mode-draw" onclick="setMode('draw')" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Kommentieren</button>
-          <button class="tool-btn" id="btn-mode-measure" onclick="setMode('measure')" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M2 12l4-4M2 12l4 4M22 12l-4-4M22 12l-4 4"/></svg> Messen</button>
+          <button class="tool-btn active" id="btn-mode-pan" onclick="setMode('pan')" title="Karte bewegen (Escape)" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span class="tool-wort">Karte</span></button>
+          <button class="tool-btn" id="btn-mode-draw" onclick="setMode('draw')" title="Kommentieren" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span class="tool-wort">Kommentieren</span></button>
+          <button class="tool-btn" id="btn-mode-measure" onclick="setMode('measure')" title="Messen" style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M2 12l4-4M2 12l4 4M22 12l-4-4M22 12l-4 4"/></svg><span class="tool-wort">Messen</span></button>
         </div>
 
         <!-- Zeichnen-Unterfunktionen -->
@@ -4022,9 +4022,8 @@
         <!-- Messen-Unterfunktionen -->
         <div class="tool-group toolbar-measure-tools" id="measure-tools" style="display:none;">
           <div class="toolbar-sep"></div>
-          <span class="tool-label">Typ:</span>
-          <button class="tool-btn active" id="btn-measure-dist" onclick="setMeasureType('dist')" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="22" y2="12"/><line x1="5" y1="12" x2="5" y2="8"/><line x1="10" y1="12" x2="10" y2="9"/><line x1="15" y1="12" x2="15" y2="8"/><line x1="20" y1="12" x2="20" y2="9"/></svg> Distanz</button>
-          <button class="tool-btn" id="btn-measure-area" onclick="setMeasureType('area')" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 20 9 17 21 7 21 4 9 12 2"/></svg> Fläche</button>
+                    <button class="tool-btn active" id="btn-measure-dist" onclick="setMeasureType('dist')" title="Distanz messen" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="22" y2="12"/><line x1="5" y1="12" x2="5" y2="8"/><line x1="10" y1="12" x2="10" y2="9"/><line x1="15" y1="12" x2="15" y2="8"/><line x1="20" y1="12" x2="20" y2="9"/></svg><span class="tool-wort">Distanz</span></button>
+          <button class="tool-btn" id="btn-measure-area" onclick="setMeasureType('area')" title="Fläche messen" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 20 9 17 21 7 21 4 9 12 2"/></svg><span class="tool-wort">Fläche</span></button>
           <div class="toolbar-sep"></div>
           <!-- Layer ein/ausblenden -->
           <button class="tool-btn active" id="btn-measure-layer" onclick="toggleMeasureLayer()" title="Bemassungen ein-/ausblenden" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;gap:4px;">
@@ -4851,6 +4850,27 @@ function _ladeScript(pfad) {
           <div class="create-field">
             <label class="create-lbl">Bis</label>
             <input class="create-input" id="c-inst-bis" type="date">
+          </div>
+        </div>
+        <div class="create-row" style="margin-bottom:8px;">
+          <div class="create-field">
+            <!-- Der Vorlauf ist im Gleistiefbau der Engpass: Bestellung bei der
+                 Immobilienstelle, Zufahrtsvereinbarung, allenfalls Rodung. -->
+            <label class="create-lbl">Bestellfrist</label>
+            <input class="create-input" id="c-inst-frist" type="date" title="Bis wann die Fläche bestellt sein muss">
+          </div>
+          <div class="create-field">
+            <label class="create-lbl">Abstand Gleisachse (m)</label>
+            <input class="create-input" id="c-inst-gleisabstand" type="number" min="0" step="0.5" placeholder="z.B. 4.5">
+          </div>
+        </div>
+        <div class="create-field" style="margin-bottom:8px;">
+          <label class="create-lbl">Fahrleitung</label>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;padding:2px 0;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;cursor:pointer;">
+              <input type="checkbox" id="c-inst-abschaltung"> Abschaltung erforderlich</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;cursor:pointer;">
+              <input type="checkbox" id="c-inst-erdung"> Erdung erforderlich</label>
           </div>
         </div>
         <div class="create-field" style="margin-bottom:8px;">
@@ -7404,7 +7424,28 @@ function _ladeScript(pfad) {
       <!-- ══ TAB: Allgemein ══ -->
       <!-- Kartendarstellung: gilt für Übersichts-, Detail- und Erfassungskarte -->
       <div class="app-settings-panel" data-panel="karte" style="display:none;">
-        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Bahnlinien</div>
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Messen &amp; Werkzeugleiste</div>
+        <label class="karten-opt">
+          <input type="checkbox" id="ko-toolbar-symbole" onchange="onMessOptionChange()">
+          <span>Nur Symbole in der Werkzeugleiste<small>Ohne Beschriftung — auf schmalen Geräten passt die Leiste damit in eine Zeile.</small></span>
+        </label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;padding:8px 0 4px;">
+          <label style="font-size:12px;color:#374151;">
+            <span style="display:block;font-size:10px;color:#9ca3af;margin-bottom:3px;">Farbe Distanz</span>
+            <input type="color" id="ko-mess-farbe-dist" onchange="onMessOptionChange()"
+                   style="width:52px;height:28px;padding:2px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;">
+          </label>
+          <label style="font-size:12px;color:#374151;">
+            <span style="display:block;font-size:10px;color:#9ca3af;margin-bottom:3px;">Farbe Fläche</span>
+            <input type="color" id="ko-mess-farbe-area" onchange="onMessOptionChange()"
+                   style="width:52px;height:28px;padding:2px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;">
+          </label>
+          <label style="font-size:12px;color:#374151;flex:1 1 160px;min-width:140px;">
+            <span style="display:block;font-size:10px;color:#9ca3af;margin-bottom:3px;">Deckkraft <span id="ko-mess-deckkraft-wert">70 %</span></span>
+            <input type="range" id="ko-mess-deckkraft" min="20" max="100" step="5" oninput="onMessOptionChange()" style="width:100%;">
+          </label>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin:16px 0 10px;">Bahnlinien</div>
         <label class="karten-opt">
           <input type="checkbox" id="ko-bahn" onchange="onKartenOptionChange()">
           <span><strong>Bahnlinien anzeigen</strong><small>Linienachsen aus den Kilometrierungspunkten der SBB. Beim Verschieben der Karte wird der sichtbare Ausschnitt einmalig nachgeladen.</small></span>

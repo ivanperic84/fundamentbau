@@ -60,11 +60,60 @@ const _instZahl = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toLoc
 // Auf der Kachel steht das kurze Wort — «Rückmeldung pendent» brach dort um
 // und lief aus dem Kennzeichen heraus. Die volle Formulierung steht in der
 // Detailansicht, wo Platz dafuer ist.
+//
+// Dieser Stand ersetzt auf der Installationskachel den allgemeinen Status
+// (Geplant / In Ausführung / Abgenommen): der gehoert zu Standorten und
+// Sondagen, wird oben im Band gezaehlt und sagt ueber eine bestellte Flaeche
+// nichts aus.
+const INST_STAENDE = [
+  { key: '',                 text: 'Nicht bestellt', lang: 'Noch nicht bestellt',  farbe: '#6b7280', grund: '#f9fafb', rand: '#e5e7eb' },
+  { key: 'instBestellt',     text: 'Bestellt',       lang: 'Bestellt',             farbe: '#0369a1', grund: '#f0f9ff', rand: '#bae6fd' },
+  { key: 'instRueckmeldung', text: 'Rückmeldung',    lang: 'Rückmeldung pendent',  farbe: '#b45309', grund: '#fffbeb', rand: '#fde68a' },
+  { key: 'instBestaetigt',   text: 'Bestätigt',      lang: 'Bestätigt',            farbe: '#15803d', grund: '#f0fdf4', rand: '#bbf7d0' },
+];
+
 function instBestellStand(p) {
-  if (p.instBestaetigt)   return { text: 'Bestätigt',   lang: 'Bestätigt',           farbe: '#15803d', grund: '#f0fdf4', rand: '#bbf7d0' };
-  if (p.instRueckmeldung) return { text: 'Rückmeldung', lang: 'Rückmeldung pendent', farbe: '#b45309', grund: '#fffbeb', rand: '#fde68a' };
-  if (p.instBestellt)     return { text: 'Bestellt',    lang: 'Bestellt',            farbe: '#0369a1', grund: '#f0f9ff', rand: '#bae6fd' };
-  return null;   // nicht bestellt: kein Chip, die Kachel bleibt ruhig
+  if (p.instBestaetigt)   return INST_STAENDE[3];
+  if (p.instRueckmeldung) return INST_STAENDE[2];
+  if (p.instBestellt)     return INST_STAENDE[1];
+  return INST_STAENDE[0];
+}
+
+// Bestellfrist: sie ist im Gleistiefbau der Engpass. Gemeldet wird nur, was
+// noch NICHT bestaetigt ist — eine abgelaufene Frist an einer bestaetigten
+// Flaeche ist keine Nachricht mehr.
+function instFristStand(p) {
+  if (!p.instFrist || p.instBestaetigt) return null;
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const frist = new Date(p.instFrist + 'T00:00:00');
+  if (isNaN(frist)) return null;
+  const tage = Math.round((frist - heute) / 86400000);
+  if (tage < 0)   return { text: 'Frist überschritten', tage, farbe: '#b91c1c' };
+  if (tage <= 14) return { text: 'Frist in ' + tage + ' Tagen', tage, farbe: '#b45309' };
+  return null;
+}
+
+// Stand setzen: die Kette ist geordnet, also setzt eine Stufe alle darunter
+// mit — «bestätigt» heisst, dass bestellt und rueckgemeldet wurde.
+function instStandSetzen(pairId, stufe) {
+  const p = PAIRS.find(x => x.id === pairId);
+  if (!p) return;
+  p.instBestellt     = stufe >= 1;
+  p.instRueckmeldung = stufe === 2;
+  p.instBestaetigt   = stufe >= 3;
+  savePairs();
+  document.querySelectorAll('.qs-picker').forEach(el => el.classList.remove('open'));
+  renderInstallationen();
+  if (typeof renderCards === 'function') renderCards();
+  if (typeof currentPairId !== 'undefined' && currentPairId === pairId && typeof showDetail === 'function') showDetail(pairId);
+}
+
+function instStandPicker(pairId, el) {
+  const picker = document.getElementById('inst-picker-' + pairId);
+  if (!picker) return;
+  const offen = picker.classList.contains('open');
+  document.querySelectorAll('.qs-picker').forEach(x => x.classList.remove('open'));
+  if (!offen) picker.classList.add('open');
 }
 
 function instKachel(p) {
@@ -75,6 +124,7 @@ function instKachel(p) {
   const notizen = ((typeof loadAllNotizen === 'function' ? loadAllNotizen()[p.id] : null) || []).length;
   const hatOrt = !!(p.rs && p.rs.e && p.rs.n);
   const stand = instBestellStand(p);
+  const frist = instFristStand(p);
 
   const card = document.createElement('div');
   card.className = 'card';
@@ -94,21 +144,25 @@ function instKachel(p) {
     +   '<div class="card-id">' + escHtml(p.bezeichnung || ('Installation ' + p.id)) + '</div>'
     +   '<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">'
     +     '<div class="card-tag" style="background:white;color:#6b7280;border:1px solid #e5e7eb;">' + escHtml(typLabel) + '</div>'
-    +     (stand
-        ? '<div class="card-tag" title="' + stand.lang + '" style="background:' + stand.grund + ';color:' + stand.farbe
-          + ';border:1px solid ' + stand.rand + ';font-weight:600;white-space:nowrap;">' + stand.text + '</div>'
-        : '')
     +   '</div>'
     + '</div>'
     + '<div class="card-km">' + (fl.m2 ? _instZahl(fl.m2) + ' m²' : '—')
     +   ((p.von || p.bis) ? ' · ' + (_instDatum(p.von) || '?') + ' – ' + (_instDatum(p.bis) || '?') : '') + '</div>'
     + '<div class="card-footer">'
     +   '<div class="qs-wrap" onclick="event.stopPropagation()">'
-    +     '<button class="qs-badge" style="' + qsBadgeStyle(pd.status) + '" onclick="toggleQsPicker(' + p.id + ',this)">'
-    +       statusLabel(pd.status) + '<span class="qs-chevron">▾</span></button>'
-    +     '<div class="qs-picker" id="qs-picker-' + p.id + '">' + buildQsOpts(p.id, pd.status) + '</div>'
+    +     '<button class="qs-badge" title="' + stand.lang + '" style="background:' + stand.grund
+    +       ';color:' + stand.farbe + ';border:1px solid ' + stand.rand + ';font-weight:600;" '
+    +       'onclick="instStandPicker(' + p.id + ',this)">' + stand.text + '<span class="qs-chevron">▾</span></button>'
+    +     '<div class="qs-picker" id="inst-picker-' + p.id + '">'
+    +       INST_STAENDE.map((st, i) =>
+            '<div class="qs-opt" onclick="instStandSetzen(' + p.id + ',' + i + ')" style="color:' + st.farbe + ';">'
+            + st.text + (stand === st ? ' ✓' : '') + '</div>').join('')
+    +     '</div>'
     +   '</div>'
     +   '<div class="card-metas">'
+    +     (frist ? '<span title="' + frist.text + '" style="color:' + frist.farbe + ';">'
+            + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>' : '')
+    +     (p.instAbschaltung ? sym('Abschaltung Fahrleitung erforderlich', '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>') : '')
     +     (hatOrt ? '' : sym('Keine Koordinaten — erscheint nicht auf der Karte', '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'))
     +     (p.instBestellLink ? sym('Bestelllink hinterlegt', '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>') : '')
     +     (fotos ? sym('Fotos', '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>') : '')

@@ -35,6 +35,55 @@ let _measAuswahlId       = null;   // ausgewaehlte Messung — ihre Ecken sind G
 
 const MEASURE_KEY = () => 'sp_measure__' + _activeId;
 
+// ── Darstellung der Messungen ────────────────────────────────
+// Farbe und Deckkraft sind Geschmack und haengen am Kartenbild: auf einem
+// hellen Luftbild traegt ein kraeftiges Gruen, auf einer Graukarte stoert es.
+// Darum einstellbar statt fest verdrahtet (App-Einstellungen › Kartendarstellung).
+const MESS_CFG_KEY = 'sp_mess_cfg';
+const MESS_CFG_VORGABE = { farbeDist: '#1a3a5c', farbeArea: '#059669', deckkraft: 70, nurSymbole: false };
+
+function ladeMessCfg() {
+  try { return { ...MESS_CFG_VORGABE, ...(jsonParse(store.getItem(MESS_CFG_KEY)) || {}) }; }
+  catch { return { ...MESS_CFG_VORGABE }; }
+}
+function speichereMessCfg(cfg) { store.setItem(MESS_CFG_KEY, JSON.stringify(cfg)); }
+
+const _messFarbe = typ => (typ === 'area' ? ladeMessCfg().farbeArea : ladeMessCfg().farbeDist);
+const _messAlpha = () => Math.max(0.2, Math.min(1, (ladeMessCfg().deckkraft || 70) / 100));
+
+function initAppTabMessen() {
+  const cfg = ladeMessCfg();
+  const setz = (id, wert, feld) => { const e = document.getElementById(id); if (e) e[feld] = wert; };
+  setz('ko-mess-farbe-dist', cfg.farbeDist, 'value');
+  setz('ko-mess-farbe-area', cfg.farbeArea, 'value');
+  setz('ko-mess-deckkraft', cfg.deckkraft, 'value');
+  setz('ko-toolbar-symbole', cfg.nurSymbole, 'checked');
+  const w = document.getElementById('ko-mess-deckkraft-wert');
+  if (w) w.textContent = cfg.deckkraft + ' %';
+}
+
+function onMessOptionChange() {
+  const wert = (id, feld) => document.getElementById(id)?.[feld];
+  const cfg = ladeMessCfg();
+  cfg.farbeDist  = wert('ko-mess-farbe-dist', 'value') || cfg.farbeDist;
+  cfg.farbeArea  = wert('ko-mess-farbe-area', 'value') || cfg.farbeArea;
+  cfg.deckkraft  = parseInt(wert('ko-mess-deckkraft', 'value')) || cfg.deckkraft;
+  cfg.nurSymbole = !!wert('ko-toolbar-symbole', 'checked');
+  speichereMessCfg(cfg);
+  const w = document.getElementById('ko-mess-deckkraft-wert');
+  if (w) w.textContent = cfg.deckkraft + ' %';
+  messToolbarBeschriftung();
+  renderMeasureLayer();
+}
+
+// Beschriftung der Werkzeugleiste ein- oder ausblenden. Die Woerter stehen im
+// Markup als eigenes Element, damit sie sich schalten lassen, ohne dass die
+// Symbole ihre Bedeutung verlieren — der Titel bleibt in jedem Fall.
+function messToolbarBeschriftung() {
+  const nur = ladeMessCfg().nurSymbole;
+  document.querySelectorAll('.tool-wort').forEach(el => { el.style.display = nur ? 'none' : ''; });
+}
+
 function loadMeasureLayer(pairId) {
   try {
     const all = jsonParse(store.getItem(MEASURE_KEY())) || {};
@@ -70,12 +119,16 @@ function measErgebnis(type, pts) {
 // Dasselbe Etikett fuer die laufende und die gespeicherte Messung. Vorher
 // waren es zwei Bauarten — andere Groesse, anderer Rand, anderer Aufhaengepunkt
 // —, und das Etikett sprang beim Speichern sichtbar um.
+// iconSize [0,0] hiess: das Element ist null Pixel gross — der Inhalt lief
+// darueber hinaus und wurde beschnitten, die Kaestchen umschlossen ihre Zahl
+// nicht. Ohne iconSize bemisst Leaflet das Element am Inhalt; die Verschiebung
+// um die halbe Breite und Hoehe setzt es mittig auf seinen Punkt.
 function _measEtikett(text, farbe) {
   return L.divIcon({
-    html: '<div style="transform:translate(-50%,-50%);background:' + farbe + ';color:white;padding:5px 12px;border-radius:9px;'
-        + 'font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.28);'
-        + 'text-align:center;">' + text + '</div>',
-    className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+    html: '<div style="transform:translate(-50%,-50%);display:inline-block;background:' + farbe + ';'
+        + 'color:white;padding:5px 12px;border-radius:9px;font-size:12px;font-weight:700;'
+        + 'white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.28);">' + text + '</div>',
+    className: 'meas-label', iconSize: null
   });
 }
 
@@ -94,10 +147,10 @@ function _measSegmentEtiketten(pts, farbe, geschlossen) {
     marker.push(L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
       interactive: false,
       icon: L.divIcon({
-        html: '<div style="transform:translate(-50%,-50%);background:rgba(255,255,255,0.72);color:' + farbe + ';padding:1px 5px;'
-            + 'border-radius:5px;font-size:10px;font-weight:600;white-space:nowrap;'
-            + 'border:1px solid rgba(255,255,255,0.9);">' + formatDist(d) + '</div>',
-        className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+        html: '<div style="transform:translate(-50%,-50%);display:inline-block;background:rgba(255,255,255,0.82);'
+            + 'color:' + farbe + ';padding:1px 6px;border-radius:5px;font-size:10px;font-weight:600;'
+            + 'white-space:nowrap;border:1px solid rgba(255,255,255,0.95);">' + formatDist(d) + '</div>',
+        className: 'meas-label', iconSize: null
       })
     }));
   }
@@ -114,7 +167,7 @@ function saveMeasureLayer() {
     type: measureType,
     points: pts,
     result,
-    color: measureType === 'area' ? '#059669' : '#1a3a5c',
+    color: _messFarbe(measureType),
   });
   _measSpeichern();
   clearCurrentMeasure();
@@ -124,7 +177,7 @@ function saveMeasureLayer() {
   // Die Rueckmeldung steht jetzt dort, wo auch sonst der Messhinweis steht.
   showMeasureLabel('Messung gespeichert · ' + result);
   setTimeout(() => {
-    if (mode === 'measure') showMeasureLabel(measureType === 'area'
+    if (currentMode === 'measure') showMeasureLabel(measureType === 'area'
       ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen');
   }, 1600);
 }
@@ -143,15 +196,39 @@ function renderMeasureLayer() {
       renderMeasureLayer();
     };
 
+    // Die gespeicherte Farbe bleibt die des Eintrags; die Deckkraft kommt aus
+    // den Optionen, damit sich bestehende Messungen mitregeln lassen.
+    const alpha = _messAlpha();
     let form = null;
     if (item.type === 'dist' && pts.length >= 2) {
-      form = L.polyline(pts, { color: item.color, weight: ausgewaehlt ? 4 : 2, dashArray: '6,4' });
+      form = L.polyline(pts, { color: item.color, opacity: alpha,
+                               weight: ausgewaehlt ? 4 : 2, dashArray: '6,4' });
     } else if (item.type === 'area' && pts.length >= 3) {
-      form = L.polygon(pts, { color: item.color, fillColor: item.color,
-                              fillOpacity: ausgewaehlt ? 0.2 : 0.1, weight: ausgewaehlt ? 4 : 2 });
+      form = L.polygon(pts, { color: item.color, opacity: alpha, fillColor: item.color,
+                              fillOpacity: (ausgewaehlt ? 0.2 : 0.1) * alpha,
+                              weight: ausgewaehlt ? 4 : 2 });
     }
     if (form) {
       form.addTo(leafletMap).on('click', ev => { L.DomEvent.stop(ev); klick(); });
+      // Rechtsklick auf die Linie setzt dort einen Punkt — eingehaengt in die
+      // Seite, der er am naechsten liegt, damit die Form nicht springt.
+      form.on('contextmenu', ev => {
+        L.DomEvent.stop(ev);
+        const p = { lat: ev.latlng.lat, lng: ev.latlng.lng };
+        const n = item.points.length;
+        const bis = item.type === 'area' ? n : n - 1;
+        let besteI = 0, besteD = Infinity;
+        for (let i = 0; i < bis; i++) {
+          const a = item.points[i], b = item.points[(i + 1) % n];
+          const d = _measAbstandZurStrecke(p, a, b);
+          if (d < besteD) { besteD = d; besteI = i; }
+        }
+        item.points.splice(besteI + 1, 0, p);
+        item.result = measErgebnis(item.type, item.points);
+        _measAuswahlId = item.id;
+        _measSpeichern();
+        renderMeasureLayer();
+      });
       _measureLeafletGroup.push(form);
     }
 
@@ -176,6 +253,20 @@ function renderMeasureLayer() {
           if (form) form.setLatLngs(item.points.map(q => [q.lat, q.lng]));
         });
         griff.on('dragend', () => {
+          item.result = measErgebnis(item.type, item.points);
+          _measSpeichern();
+          renderMeasureLayer();
+        });
+        // Rechtsklick auf eine Ecke nimmt sie weg. Die Untergrenze bleibt
+        // gewahrt: zwei Punkte fuer eine Strecke, drei fuer eine Flaeche.
+        griff.on('contextmenu', ev => {
+          L.DomEvent.stop(ev);
+          const min = item.type === 'area' ? 3 : 2;
+          if (item.points.length <= min) {
+            ui.toast('Eine ' + (item.type === 'area' ? 'Fläche braucht mindestens 3' : 'Strecke braucht mindestens 2') + ' Punkte.', 'fehler');
+            return;
+          }
+          item.points.splice(idx, 1);
           item.result = measErgebnis(item.type, item.points);
           _measSpeichern();
           renderMeasureLayer();
@@ -217,6 +308,18 @@ function renderMeasureLayer() {
   });
 }
 
+// Abstand eines Punktes zur Strecke a–b, in Gradmass genaehert. Fuer die
+// Frage «an welche Seite gehoert der neue Punkt» reicht das: verglichen
+// werden nur Abstaende untereinander.
+function _measAbstandZurStrecke(p, a, b) {
+  const vx = b.lng - a.lng, vy = b.lat - a.lat;
+  const wx = p.lng - a.lng, wy = p.lat - a.lat;
+  const len2 = vx * vx + vy * vy;
+  const t = len2 ? Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2)) : 0;
+  const dx = wx - t * vx, dy = wy - t * vy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 // Eine einzelne Messung loeschen — der Radierer, den es bisher nicht gab:
 // «Zuruecksetzen» warf den ganzen Layer weg.
 function measLoeschen(id) {
@@ -225,7 +328,7 @@ function measLoeschen(id) {
   _measSpeichern();
   renderMeasureLayer();
   showMeasureLabel('Messung gelöscht');
-  setTimeout(() => { if (mode === 'measure' && !_measRadierer) hideMeasureLabel(); }, 1200);
+  setTimeout(() => { if (currentMode === 'measure' && !_measRadierer) hideMeasureLabel(); }, 1200);
 }
 
 function toggleMeasRadierer() {
@@ -355,7 +458,7 @@ function onMeasureClick(e) {
   }).addTo(leafletMap);
   measureMarkers.push(dot);
 
-  const farbe = measureType === 'area' ? '#059669' : '#1a3a5c';
+  const farbe = _messFarbe(measureType);
   _measSegGruppeLeeren();
 
   if (measureType === 'dist') {
@@ -363,7 +466,7 @@ function onMeasureClick(e) {
       showMeasureLabel('Zweiten Punkt antippen');
     } else {
       if (measurePolyline) measurePolyline.remove();
-      measurePolyline = L.polyline(measurePoints, { color: farbe, weight: 2, dashArray: '6,4' }).addTo(leafletMap);
+      measurePolyline = L.polyline(measurePoints, { color: farbe, opacity: _messAlpha(), weight: 2, dashArray: '6,4' }).addTo(leafletMap);
       const ergebnis = measErgebnis('dist', measurePoints);
       if (measureLabel) measureLabel.remove();
       measureLabel = L.marker(measurePoints[measurePoints.length-1], {
@@ -379,13 +482,13 @@ function onMeasureClick(e) {
     }
     if (measurePoints.length >= 2) {
       if (measurePolyline) measurePolyline.remove();
-      measurePolyline = L.polyline([...measurePoints, measurePoints[0]], { color: farbe, weight: 2, dashArray: '6,4' }).addTo(leafletMap);
+      measurePolyline = L.polyline([...measurePoints, measurePoints[0]], { color: farbe, opacity: _messAlpha(), weight: 2, dashArray: '6,4' }).addTo(leafletMap);
       _measSegGruppe = _measSegmentEtiketten(measurePoints, farbe, measurePoints.length >= 3);
       _measSegGruppe.forEach(m => m.addTo(leafletMap));
     }
     if (measurePoints.length >= 3) {
       if (measurePolygon) measurePolygon.remove();
-      measurePolygon = L.polygon(measurePoints, { color: farbe, fillColor: farbe, fillOpacity: 0.12, weight: 2 }).addTo(leafletMap);
+      measurePolygon = L.polygon(measurePoints, { color: farbe, opacity: _messAlpha(), fillColor: farbe, fillOpacity: 0.12 * _messAlpha(), weight: 2 }).addTo(leafletMap);
       const ergebnis = measErgebnis('area', measurePoints);
       if (measureLabel) measureLabel.remove();
       measureLabel = L.marker(measurePolygon.getBounds().getCenter(), {
@@ -401,7 +504,9 @@ function showMeasureLabel(text) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'measure-hint';
-    el.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(26,58,92,0.92);color:white;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;pointer-events:none;white-space:nowrap;';
+    // 52 px statt 10: darueber steht die Standort-Auswahl mit ihren Pfeilen,
+    // und die Hinweiszeile legte sich mitten darauf.
+    el.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(26,58,92,0.92);color:white;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;pointer-events:none;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;';
     document.querySelector('.map-container').appendChild(el);
   }
   el.textContent = text;
@@ -624,7 +729,46 @@ function toggleInstStatus(pairId, key) {
       const _row = document.getElementById('inst-bestellt-datum-row');
       if (_row) _row.style.display = p.instBestellt ? '' : 'none';
     }
+    if (key === 'instRueckgabeOk') {
+      const _row = document.getElementById('inst-rueckgabe-datum-row');
+      if (_row) _row.style.display = p.instRueckgabeOk ? '' : 'none';
+    }
   }
+}
+
+// Die auf der Karte gemessene Flaeche als Installationsflaeche uebernehmen.
+// Genommen wird die zuletzt gespeicherte Flaechenmessung dieses Standorts —
+// gemessen wird ohnehin auf der Karte dieser Installationsflaeche.
+function instFlaecheAusMessung(pairId) {
+  const flaechen = (_measureLayerItems || []).filter(it => it.type === 'area');
+  if (!flaechen.length) {
+    ui.toast('Keine Flächenmessung auf dieser Karte. Unter «Messen» eine Fläche aufnehmen und speichern.', 'fehler');
+    return;
+  }
+  const letzte = flaechen[flaechen.length - 1];
+  const m2 = calcArea(letzte.points);
+  if (!(m2 > 0)) { ui.toast('Die Messung ergibt keine Fläche.', 'fehler'); return;
+
+  }
+  const p = PAIRS.find(x => x.id === pairId);
+  if (!p) return;
+  p.flaeche  = Math.round(m2 * 10) / 10;
+  p.flaecheL = null;              // die Masse passen nicht mehr zur Flaeche
+  p.flaecheB = null;
+  savePairs();
+  if (typeof logChange === 'function')
+    logChange(pairId, 'Fläche aus Kartenmessung', p.flaeche + ' m²', 'sonstig');
+  showDetail(pairId);
+  if (typeof renderInstallationen === 'function') renderInstallationen();
+  ui.toast('Fläche übernommen: ' + p.flaeche + ' m²', 'erfolg');
+}
+
+// Ein einzelnes Feld der Installation sichern (Datumsfelder der Seitenleiste)
+function saveInstFeld(pairId, feld, wert) {
+  const p = PAIRS.find(x => x.id === pairId);
+  if (!p) return;
+  p[feld] = wert || '';
+  savePairs();
 }
 
 function saveInstBestelltDatum(pairId, value) {
@@ -697,7 +841,7 @@ function openCreateView(id) {
     // Installations-Felder füllen (wenn Installation)
     if (p._objType === 'installation') {
       const _ib = id => { const el = document.getElementById(id); if (el) el.value = ''; };
-      _ib('c-inst-bezeichnung'); _ib('c-inst-typ'); _ib('c-inst-flaeche-l'); _ib('c-inst-flaeche-b'); _ib('c-inst-flaeche'); _ib('c-inst-von'); _ib('c-inst-bis'); _ib('c-inst-bestelllink'); _ib('c-inst-bemerkung');
+      _ib('c-inst-bezeichnung'); _ib('c-inst-typ'); _ib('c-inst-flaeche-l'); _ib('c-inst-flaeche-b'); _ib('c-inst-flaeche'); _ib('c-inst-von'); _ib('c-inst-bis'); _ib('c-inst-bestelllink'); _ib('c-inst-bemerkung'); _ib('c-inst-frist'); _ib('c-inst-gleisabstand');
       const _is = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
       _is('c-inst-bezeichnung', p.bezeichnung);
       _is('c-inst-typ', p.installTyp);
@@ -708,6 +852,10 @@ function openCreateView(id) {
       _is('c-inst-bis', p.bis);
       _is('c-inst-bestelllink', p.instBestellLink);
       _is('c-inst-bemerkung', p.bemerkung);
+      _is('c-inst-frist', p.instFrist);
+      _is('c-inst-gleisabstand', p.instGleisAbstand);
+      const _cab = document.getElementById('c-inst-abschaltung'); if (_cab) _cab.checked = !!p.instAbschaltung;
+      const _cer = document.getElementById('c-inst-erdung');      if (_cer) _cer.checked = !!p.instErdung;
     }
     // Koordinaten
     document.getElementById('c-rs-e').value  = p.rs?.e || '';
@@ -1334,6 +1482,10 @@ function saveCreate() {
       von:           v('c-inst-von') || null,
       bis:           v('c-inst-bis') || null,
       instBestellLink: v('c-inst-bestelllink').trim() || null,
+      instFrist:       v('c-inst-frist') || null,
+      instGleisAbstand: v('c-inst-gleisabstand') || null,
+      instAbschaltung: !!document.getElementById('c-inst-abschaltung')?.checked,
+      instErdung:      !!document.getElementById('c-inst-erdung')?.checked,
       bemerkung:     v('c-inst-bemerkung').trim(),
       rs:            { e: instE, n: instN },
     };

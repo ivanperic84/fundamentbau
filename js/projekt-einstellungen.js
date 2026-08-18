@@ -1018,7 +1018,7 @@ function openAppSettingsTab(tab) {
   if (inner) inner.style.width = tab === 'paramdb' ? 'min(98vw,820px)' : '520px';
   // Panel-spezifische Initialisierung
   if (tab === 'allgemein')   initAppTabAllgemein();
-  if (tab === 'karte')       initAppTabKarte();
+  if (tab === 'karte')     { initAppTabKarte(); if (typeof initAppTabMessen === 'function') initAppTabMessen(); }
   if (tab === 'sidebar')     initAppTabSidebar();
   if (tab === 'phasen')      initAppTabPhasen();
   if (tab === 'vorlage')     renderAppSettingsModal();
