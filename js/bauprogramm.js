@@ -619,6 +619,31 @@ function _resolvePfahlLeistung(ft) {
   return null;
 }
 
+// Ausfuehrungsdauer je Fundament, in dieser Rangfolge: das Leistungsprofil,
+// sonst der Typ selbst, sonst der Referenztyp, von dem ein Spezialtyp
+// abgeleitet ist. Dieselbe Rangfolge, mit der die Kachel im
+// Fundamenttyp-Modul die Dauer anschreibt (_ftDauerZeile).
+//
+// Die beiden hinteren Stufen fuellen nur, wo vorher nichts stand — ein Typ
+// mit Dauer aus dem Profil behaelt seine Zahl. Ohne sie lieferte
+// getFtLeistung null, sobald ein Leistungsprofil OHNE Dauer gewaehlt war
+// (dann verdeckte es die Dauer am Typ) oder die Dauer allein am Referenztyp
+// stand: die Kachel zeigte eine Dauer, das Bauprogramm rechnete mit keiner
+// und fiel still auf ein Fundament je Schicht zurueck.
+function ftAusfuehrungsdauer(ft, tiefe) {
+  if (!ft) return null;
+  const lp = ft.leistungsprofilId
+    ? loadLeistungsprofile().find(p => p.id === ft.leistungsprofilId) : null;
+  const n = parseFloat(lp?.ftIntervall ?? ft.ftIntervall);
+  if (Number.isFinite(n) && n > 0) return n;
+  // Die Begrenzung schuetzt vor einer Kette, die sich im Kreis dreht
+  if ((tiefe || 0) < 3 && ft.referenzTypId) {
+    const ref = loadFtProfile().find(t => t.id === ft.referenzTypId);
+    if (ref && ref.id !== ft.id) return ftAusfuehrungsdauer(ref, (tiefe || 0) + 1);
+  }
+  return null;
+}
+
 function getFtLeistung(ft, nettoH, abzugMin) {
   if (!ft || !nettoH) return null;
   const h = Math.round(nettoH);
@@ -642,9 +667,10 @@ function getFtLeistung(ft, nettoH, abzugMin) {
     }
   }
   // Auto-Berechnung aus Ausführungsdauer
-  if (!src.ftIntervall) return null;
+  const dauer = ftAusfuehrungsdauer(ft);
+  if (!dauer) return null;
   const effMin = Math.max(0, nettoH * 60 - (abzugMin || 0));
-  const raw = effMin / (src.ftIntervall * 60);
+  const raw = effMin / (dauer * 60);
   return raw >= 1 ? Math.floor(raw) : Math.round(raw * 10) / 10;
 }
 
@@ -916,10 +942,7 @@ function _calcPfahlSchichten(ft, nettoH, abzugMin) {
   // gleiche Rangfolge wie in getFtLeistung(). Hier stand nur ft.ftIntervall —
   // bei einem Pfahltyp, dessen Dauer aus dem Profil kommt (so sind die
   // Standardtypen ausgeliefert), fiel die Betonierschicht ganz weg.
-  const lpIntv = ft.leistungsprofilId
-    ? loadLeistungsprofile().find(p => p.id === ft.leistungsprofilId)?.ftIntervall
-    : null;
-  const intv = lpIntv ?? ft.ftIntervall;
+  const intv = ftAusfuehrungsdauer(ft);
   const betonShifts = intv ? Math.ceil(intv / nettoH) : 0;
   return { bohrShifts, betonShifts, pilesPerShift, total: bohrShifts + betonShifts };
 }

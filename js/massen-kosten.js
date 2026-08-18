@@ -1286,23 +1286,8 @@ function lwAufwand(ftId) {
 // Leistungsprofil aufgeloest, mit derselben Rangfolge wie in getFtLeistung:
 // das Profil fuehrt, sonst der Typ selbst. Sie ist der Rueckfall fuer alle
 // Typen, die der Katalog nicht kennt, allen voran die Spezialtypen.
-function _lwTypAufwand(ft, tiefe) {
-  if (!ft) return null;
-  let src = ft;
-  if (ft.leistungsprofilId && typeof loadLeistungsprofile === 'function') {
-    const lp = loadLeistungsprofile().find(p => p.id === ft.leistungsprofilId);
-    if (lp?.ftIntervall) src = lp;
-  }
-  const n = parseFloat(src.ftIntervall);
-  if (Number.isFinite(n) && n > 0) return n;
-  // Ein Spezialtyp ist von einem Standardtyp abgeleitet und traegt dessen
-  // Dauer, wenn er keine eigene hat. Die Begrenzung der Tiefe schuetzt vor
-  // einer Kette, die sich im Kreis dreht.
-  if ((tiefe || 0) < 3 && ft.referenzTypId && typeof loadFtProfile === 'function') {
-    const ref = loadFtProfile().find(t => t.id === ft.referenzTypId);
-    if (ref && ref.id !== ft.id) return _lwTypAufwand(ref, (tiefe || 0) + 1);
-  }
-  return null;
+function _lwTypAufwand(ft) {
+  return typeof ftAusfuehrungsdauer === 'function' ? ftAusfuehrungsdauer(ft) : null;
 }
 
 function mkAbzugStunden() {
@@ -1358,16 +1343,9 @@ function lkVergleich() {
     const typH    = _lwTypAufwand(z.ft);
     const aufwand = eintrag.eigenH ?? eintrag.vorschlagH ?? typH;
 
-    // Die zweite Zeile faengt den Spezialtyp ab, dessen Dauer erst ueber den
-    // Referenztyp zusammenkommt: gerechnet wird dann mit derselben Funktion,
-    // nur mit der aufgeloesten Dauer statt der fehlenden am Typ.
     const lwKatalog = ftId ? lkLeistungswert(ftId, stunden) : null;
-    const lwTyp = (lwKatalog != null || !z.ft || typeof getFtLeistung !== 'function') ? null
-      : (getFtLeistung(z.ft, stunden, abzug * 60)
-         ?? (typH != null
-              ? getFtLeistung({ ...z.ft, leistungsprofilId: null, ftLeistungen: null, ftIntervall: typH },
-                              stunden, abzug * 60)
-              : null));
+    const lwTyp = (lwKatalog != null || !z.ft || typeof getFtLeistung !== 'function')
+      ? null : getFtLeistung(z.ft, stunden, abzug * 60);
     const lw = lwKatalog ?? lwTyp;
 
     const netto = (aufwand != null) ? stunden - abzug : null;
