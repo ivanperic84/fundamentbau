@@ -91,13 +91,20 @@ function onMessOptionChange() {
 function toolbarBeschriftungPruefen() {
   const leiste = document.querySelector('.sketch-toolbar');
   if (!leiste) return;
-  // Der Handschalter aus den Optionen geht vor: wer nur Symbole will, bekommt
-  // nur Symbole, auch wenn Platz da waere.
-  if (ladeMessCfg().nurSymbole) { leiste.classList.add('ohne-wort'); return; }
-  // Immer zuerst mit Woertern messen — sonst kaemen sie nicht zurueck, wenn
-  // wieder Platz da ist (Karte im Vollbild, Seitenleiste eingeklappt).
-  leiste.classList.remove('ohne-wort');
-  if (leiste.scrollWidth > leiste.clientWidth) leiste.classList.add('ohne-wort');
+  const passt = () => leiste.scrollWidth <= leiste.clientWidth;
+
+  // Immer von weit nach eng: erst alles zuruecknehmen, sonst kaeme nichts
+  // zurueck, wenn wieder Platz da ist (Karte im Vollbild).
+  leiste.classList.remove('ohne-wort', 'eng');
+
+  // Stufe 1 — die Beschriftung. Der Handschalter aus den Optionen nimmt sie
+  // ohnehin weg; sonst nur, wenn es sonst nicht reicht.
+  if (ladeMessCfg().nurSymbole || !passt()) leiste.classList.add('ohne-wort');
+
+  // Stufe 2 — die Abstaende. Erst wenn auch das nicht reicht. Der Preis sind
+  // enger stehende Knoepfe; dafuer bleibt jedes Werkzeug erreichbar, ohne die
+  // Leiste seitwaerts schieben zu muessen.
+  if (!passt()) leiste.classList.add('eng');
 }
 
 function loadMeasureLayer(pairId) {

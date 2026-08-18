@@ -520,6 +520,13 @@ select.feld-input { cursor: pointer; }
    die Karte — wer sie setzt, misst nach (toolbarBeschriftungPruefen in
    js/modals.js). Die Symbole behalten in jedem Fall ihren Titel. */
 .sketch-toolbar.ohne-wort .tool-wort { display: none; }
+/* Zweite Stufe: reicht es auch ohne Beschriftung nicht — im Zeichenmodus
+   stehen vierzehn Werkzeuge nebeneinander —, ruecken die Gruppen zusammen.
+   Angetastet werden nur Abstaende: Polsterung der Leiste, Luft zwischen den
+   Gruppen, Raender der Trenner. Die Knopfflaechen bleiben, wie sie sind. Mit
+   Handschuhen zaehlt die Flaeche, die man trifft, nicht der Zwischenraum. */
+.sketch-toolbar.eng { padding: 6px 6px; gap: 5px; }
+.sketch-toolbar.eng .toolbar-sep { margin: 0 1px; }
 
 /* Schnellzugriff in der Detailansicht — über der Werkzeugleiste, rechts */
 /* Über der Werkzeugleiste: diese ist mittig, die Knöpfe rechts — auf
