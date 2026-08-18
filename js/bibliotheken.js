@@ -24,55 +24,110 @@ function renderBaugrundView() {
 // INSTALLATIONEN-TAB
 // ============================================================
 
+// ── Installationskachel ──────────────────────────────────────
+// EINE Kachel fuer beide Orte: die Installationsansicht und den Abschnitt
+// unten in der Kachelansicht. Vorher gab es zwei Bauarten mit demselben
+// Zweck, die verschieden aussahen und getrennt gepflegt werden mussten.
+//
+// Sie folgt der Standortkachel: .card, Name und Kennzeichen oben, eine
+// Kennzahlzeile, ein Untertitel, unten Status und Symbole. Alles Weitere —
+// Bestellkette, Dauer, Bemerkung, Bestelllink — steht in der Detailansicht,
+// wo Platz dafuer ist. Auf der Kachel zaehlt der Ueberblick.
+
+// Flaeche: gerechnet, wenn Laenge und Breite dastehen. Vorher stand da
+// «25×12 m» — die Zahl, auf die es ankommt, musste man im Kopf bilden.
+function instFlaeche(p) {
+  const zahl = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return n > 0 ? n : null; };
+  const l = zahl(p.flaecheL), b = zahl(p.flaecheB);
+  return { m2: zahl(p.flaeche) ?? (l && b ? l * b : null), masse: (l && b) ? l + ' × ' + b + ' m' : null };
+}
+
+// Dauer in Tagen, beide Enden gezaehlt — eine Flaeche, die einen Tag steht,
+// steht einen Tag und nicht null.
+function instTage(p) {
+  if (!p.von || !p.bis) return null;
+  const a = new Date(p.von + 'T00:00:00'), b = new Date(p.bis + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return null;
+  const t = Math.round((b - a) / 86400000) + 1;
+  return t > 0 ? t : null;
+}
+
+const _instDatum = d => d ? d.split('-').reverse().join('.') : null;
+const _instZahl = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString('de-CH');
+
+// Die Bestellkette ist die eigentliche Arbeit an einer Installationsflaeche:
+// bestellen, auf Rueckmeldung warten, bestaetigt bekommen.
+// Auf der Kachel steht das kurze Wort — «Rückmeldung pendent» brach dort um
+// und lief aus dem Kennzeichen heraus. Die volle Formulierung steht in der
+// Detailansicht, wo Platz dafuer ist.
+function instBestellStand(p) {
+  if (p.instBestaetigt)   return { text: 'Bestätigt',   lang: 'Bestätigt',           farbe: '#15803d', grund: '#f0fdf4', rand: '#bbf7d0' };
+  if (p.instRueckmeldung) return { text: 'Rückmeldung', lang: 'Rückmeldung pendent', farbe: '#b45309', grund: '#fffbeb', rand: '#fde68a' };
+  if (p.instBestellt)     return { text: 'Bestellt',    lang: 'Bestellt',            farbe: '#0369a1', grund: '#f0f9ff', rand: '#bae6fd' };
+  return null;   // nicht bestellt: kein Chip, die Kachel bleibt ruhig
+}
+
+function instKachel(p) {
+  const typLabel = INST_TYP_LABELS[p.installTyp] || p.installTyp || '—';
+  const fl = instFlaeche(p);
+  const pd = getPairData(p.id);
+  const fotos = (pd.fotos || []).length;
+  const notizen = ((typeof loadAllNotizen === 'function' ? loadAllNotizen()[p.id] : null) || []).length;
+  const hatOrt = !!(p.rs && p.rs.e && p.rs.n);
+  const stand = instBestellStand(p);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.backgroundImage = hatOrt ? 'url(' + cardTileUrl(p) + ')' : '';
+  card.style.backgroundColor = getCardBg(pd.status);
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.qs-wrap') || e.target.closest('.qs-picker') || e.target.closest('.card-actions')) return;
+    showDetail(p.id);
+  });
+
+  const sym = (titel, pfad) =>
+    '<span title="' + titel + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + pfad + '</svg></span>';
+
+  card.innerHTML =
+    '<div class="card-top">'
+    +   '<div class="card-id">' + escHtml(p.bezeichnung || ('Installation ' + p.id)) + '</div>'
+    +   '<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">'
+    +     '<div class="card-tag" style="background:white;color:#6b7280;border:1px solid #e5e7eb;">' + escHtml(typLabel) + '</div>'
+    +     (stand
+        ? '<div class="card-tag" title="' + stand.lang + '" style="background:' + stand.grund + ';color:' + stand.farbe
+          + ';border:1px solid ' + stand.rand + ';font-weight:600;white-space:nowrap;">' + stand.text + '</div>'
+        : '')
+    +   '</div>'
+    + '</div>'
+    + '<div class="card-km">' + (fl.m2 ? _instZahl(fl.m2) + ' m²' : '—')
+    +   ((p.von || p.bis) ? ' · ' + (_instDatum(p.von) || '?') + ' – ' + (_instDatum(p.bis) || '?') : '') + '</div>'
+    + '<div class="card-footer">'
+    +   '<div class="qs-wrap" onclick="event.stopPropagation()">'
+    +     '<button class="qs-badge" style="' + qsBadgeStyle(pd.status) + '" onclick="toggleQsPicker(' + p.id + ',this)">'
+    +       statusLabel(pd.status) + '<span class="qs-chevron">▾</span></button>'
+    +     '<div class="qs-picker" id="qs-picker-' + p.id + '">' + buildQsOpts(p.id, pd.status) + '</div>'
+    +   '</div>'
+    +   '<div class="card-metas">'
+    +     (hatOrt ? '' : sym('Keine Koordinaten — erscheint nicht auf der Karte', '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'))
+    +     (p.instBestellLink ? sym('Bestelllink hinterlegt', '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>') : '')
+    +     (fotos ? sym('Fotos', '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>') : '')
+    +     (notizen ? sym(notizen + ' Notiz' + (notizen > 1 ? 'en' : ''), '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>') : '')
+    +   '</div>'
+    + '</div>';
+  return card;
+}
+
 function renderInstallationen() {
   const container = document.getElementById('installationen-cards');
   if (!container) return;
   const list = getInstallationen();
+  container.innerHTML = '';
   if (!list.length) {
-    container.innerHTML = `<div style="color:#9ca3af;font-size:13px;padding:24px 0;">Noch keine Installationsflächen erfasst. Klicken Sie auf «+ Installation» um eine neue anzulegen.</div>`;
+    container.innerHTML = '<div style="color:#9ca3af;font-size:13px;padding:24px 0;">Noch keine Installationsflächen erfasst. Klicken Sie auf «+ Installation» um eine neue anzulegen.</div>';
     return;
   }
-  container.innerHTML = '';
-  list.forEach(p => {
-    const typLabel = INST_TYP_LABELS[p.installTyp] || p.installTyp || '—';
-    const flaecheStr = p.flaeche ? `${p.flaeche} m²` : (p.flaecheL && p.flaecheB ? `${p.flaecheL}×${p.flaecheB} m` : '—');
-    const zeitraum = (p.von || p.bis)
-      ? `${p.von ? p.von.split('-').reverse().join('.') : '?'} – ${p.bis ? p.bis.split('-').reverse().join('.') : '?'}`
-      : '';
-    const card = document.createElement('div');
-    card.style.cssText = 'background:white;border-radius:10px;border:1px solid #e5e7eb;padding:14px 15px;cursor:pointer;transition:box-shadow .15s;';
-    card.onmouseover = () => card.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-    card.onmouseout  = () => card.style.boxShadow = '';
-    card.onclick = (e) => {
-      if (e.target.closest('.qs-wrap') || e.target.closest('.qs-picker') || e.target.closest('button') || e.target.closest('a')) return;
-      showDetail(p.id);
-    };
-    const _ipd = getPairData(p.id);
-    card.innerHTML = `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:700;color:#1a3a5c;">${p.bezeichnung || 'Installation ' + p.id}</div>
-        <div style="background:#0891b2;color:white;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;border-radius:4px;">I</div>
-      </div>
-      <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">
-        <span style="font-weight:600;color:#374151;">${typLabel}</span> · ${flaecheStr}
-      </div>
-      ${zeitraum ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">${zeitraum}</div>` : ''}
-      ${p.instBestellLink ? `<div style="margin-bottom:4px;"><a href="${p.instBestellLink}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;color:#1a3a5c;font-weight:600;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Bestelllink <svg style="vertical-align:middle" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></div>` : ''}
-      ${p.bemerkung ? `<div style="font-size:11px;color:#9ca3af;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.bemerkung}</div>` : ''}
-      <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
-        <div class="qs-wrap" onclick="event.stopPropagation()">
-          <button class="qs-badge" style="${qsBadgeStyle(_ipd.status)}" onclick="toggleQsPicker(${p.id},this)">${statusLabel(_ipd.status)}<span class="qs-chevron">▾</span></button>
-          <div class="qs-picker" id="qs-picker-${p.id}">${buildQsOpts(p.id, _ipd.status)}</div>
-        </div>
-        <div style="display:flex;gap:5px;">
-          <button onclick="event.stopPropagation();openCreateInstallation(${p.id})"
-            style="padding:3px 8px;border-radius:5px;border:1px solid #d1d5db;background:white;color:#374151;font-size:10px;font-weight:600;cursor:pointer;">Bearbeiten</button>
-          <button onclick="event.stopPropagation();deleteInstallation(${p.id})"
-            style="padding:3px 8px;border-radius:5px;border:1px solid #fca5a5;background:#fff5f5;color:#dc2626;font-size:10px;font-weight:600;cursor:pointer;">Löschen</button>
-        </div>
-      </div>`;
-    container.appendChild(card);
-  });
+  list.forEach(p => container.appendChild(instKachel(p)));
 }
 
 async function deleteInstallation(id) {

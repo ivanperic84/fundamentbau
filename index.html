@@ -1762,13 +1762,18 @@
         </div>
         <!-- Reihenfolge und Inhalt der Kacheln — nur in der Kachelansicht -->
         <div id="kachel-steuerung" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
-          <select id="kachel-sort" onchange="kachelSortSetzen(this.value)" title="Reihenfolge der Kacheln"
-            style="padding:5px 8px;border-radius:8px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;">
-            <option value="alpha">A–Z / Nummer</option>
-            <option value="km">Kilometer</option>
-            <option value="fundtyp">Fundamenttyp</option>
-            <option value="status">Status</option>
-          </select>
+          <!-- Sieht aus wie «Inhalt» daneben: gleicher Rahmen, gleiche Farbe,
+               eigenes Winkelzeichen statt des systemeigenen Pfeils. -->
+          <div style="position:relative;display:flex;align-items:center;">
+            <select id="kachel-sort" onchange="kachelSortSetzen(this.value)" title="Reihenfolge der Kacheln"
+              style="appearance:none;-webkit-appearance:none;padding:5px 24px 5px 8px;border-radius:8px;border:1px solid #d1d5db;background:white;color:#6b7280;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;outline:none;">
+              <option value="alpha">A–Z / Nummer</option>
+              <option value="km">Kilometer</option>
+              <option value="fundtyp">Fundamenttyp</option>
+              <option value="status">Status</option>
+            </select>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:7px;pointer-events:none;"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
           <div style="position:relative;">
             <button id="kachel-inhalt-btn" onclick="kachelInhaltPanelUmschalten(event)" title="Welche Angaben die Kachel zeigt"
               style="padding:5px 8px;border-radius:8px;border:1px solid #d1d5db;background:white;cursor:pointer;color:#6b7280;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;">
@@ -4028,6 +4033,10 @@
           <!-- Aktuelle Messung speichern -->
           <button class="tool-btn" onclick="saveMeasureLayer()" title="Messung speichern" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+          <!-- Radierer: eine einzelne gespeicherte Messung antippen und weg -->
+          <button class="tool-btn" id="btn-measure-radierer" onclick="toggleMeasRadierer()" title="Radierer — einzelne Messung antippen zum Löschen" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8.5L3 14.5a2 2 0 0 1 0-2.8l7.7-7.7a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L13 20"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>
           </button>
           <!-- Nur aktuelle Messung löschen -->
           <button class="tool-btn danger" onclick="clearCurrentMeasure()" title="Aktuelle Messung löschen" style="font-size:11px;padding:4px 9px;display:flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>

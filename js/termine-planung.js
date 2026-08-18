@@ -1165,11 +1165,23 @@ function renderPaarNotizen(pairId) {
     const card = document.createElement('div');
     card.style.cssText = 'position:relative;width:calc(50% - 3px);min-height:60px;background:#f8fafc;' +
       'border:1px solid #e5e7eb;border-radius:7px;padding:7px 8px;cursor:default;box-sizing:border-box;';
+    // Bearbeiten war nur ueber das Notizen-Modal erreichbar; in der Seitenleiste
+    // liess sich eine Notiz bisher nur loeschen und neu schreiben.
     card.innerHTML = `
       <div style="font-size:9px;font-weight:600;color:#9ca3af;margin-bottom:3px;">${n.ts}</div>
       <div style="font-size:11px;color:#374151;white-space:pre-wrap;word-break:break-word;overflow:hidden;max-height:42px;">${n.text.replace(/</g,'&lt;')}</div>
-      <button onclick="notizLoeschen('${pairId}','${n.id}')"
-        style="position:absolute;top:4px;right:4px;font-size:9px;color:#ef4444;background:none;border:none;cursor:pointer;padding:2px;opacity:0.6;" title="Löschen">✕</button>`;
+      <div style="position:absolute;top:3px;right:3px;display:flex;gap:1px;">
+        <button onclick="event.stopPropagation();notizBearbeiten('${pairId}','${n.id}')" title="Bearbeiten"
+          style="background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;display:flex;"
+          onmouseover="this.style.color='#1a3a5c'" onmouseout="this.style.color='#9ca3af'">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button onclick="event.stopPropagation();notizLoeschen('${pairId}','${n.id}')" title="Löschen"
+          style="background:none;border:none;cursor:pointer;padding:2px;color:#c7cdd4;display:flex;"
+          onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#c7cdd4'">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
     grid.appendChild(card);
   });
 
@@ -1290,8 +1302,9 @@ function renderAlleNotizenList(phase) {
   if (!wrap) return;
   const rows = [];
   PAIRS.forEach(p => {
-    const pPhase = p._phase || 'baugrund';
-    if (phase !== 'alle' && pPhase !== phase) return;
+    // Installationen tragen kein _phase und galten damit als Baugrund
+    const pPhase = p._objType === 'installation' ? null : (p._phase || 'baugrund');
+    if (phase !== 'alle' && (pPhase ? pPhase !== phase : phase === 'baugrund')) return;
     (all[p.id] || []).slice().reverse().forEach(n => rows.push({ p, n, isGlobal: false }));
   });
   // Mastunabhängige Notizen bei "Alle"

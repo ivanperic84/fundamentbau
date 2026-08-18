@@ -700,43 +700,7 @@ function renderCards() {
     const instGrid = document.createElement('div');
     instGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:8px;';
 
-    instList.forEach(p => {
-      const typLabel   = INST_TYP_LABELS[p.installTyp] || p.installTyp || '—';
-      const flaecheStr = p.flaeche ? `${p.flaeche} m²` : (p.flaecheL && p.flaecheB ? `${p.flaecheL}×${p.flaecheB} m` : '—');
-      const zeitraum   = (p.von || p.bis)
-        ? `${p.von ? p.von.split('-').reverse().join('.') : '?'} – ${p.bis ? p.bis.split('-').reverse().join('.') : '?'}`
-        : '';
-      const instCard = document.createElement('div');
-      instCard.className = 'card';
-      instCard.style.backgroundImage = (p.rs?.e && p.rs?.n) ? `url(${cardTileUrl(p)})` : '';
-      instCard.style.backgroundColor = 'white';
-      instCard.style.borderColor = '#e5e7eb';
-      instCard.addEventListener('click', (e) => {
-        if (e.target.closest('.card-actions') || e.target.closest('.qs-wrap') || e.target.closest('.qs-picker')) return;
-        showDetail(p.id);
-      });
-      const _instPd = getPairData(p.id);
-      instCard.innerHTML = `
-        <div class="card-top">
-          <div class="card-id">${p.bezeichnung || ('Installation ' + p.id)}</div>
-          <div style="background:#f3f4f6;color:#374151;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;">${typLabel}</div>
-        </div>
-        <div class="card-km">${flaecheStr}</div>
-        ${zeitraum ? `<div class="card-zugang" style="font-size:11px;color:#4b5563;">${zeitraum}</div>` : ''}
-        <div class="card-footer" style="margin-top:auto;">
-          <div class="qs-wrap" onclick="event.stopPropagation()">
-            <button class="qs-badge" style="${qsBadgeStyle(_instPd.status)}" onclick="toggleQsPicker(${p.id},this)">${statusLabel(_instPd.status)}<span class="qs-chevron">▾</span></button>
-            <div class="qs-picker" id="qs-picker-${p.id}">${buildQsOpts(p.id, _instPd.status)}</div>
-          </div>
-          <div class="card-actions" style="display:flex;gap:5px;">
-            <button onclick="event.stopPropagation();openCreateInstallation(${p.id})"
-              style="padding:3px 8px;border-radius:5px;border:1px solid #d1d5db;background:white;color:#374151;font-size:10px;font-weight:600;cursor:pointer;">Bearbeiten</button>
-            <button onclick="event.stopPropagation();deleteInstallation(${p.id})"
-              style="padding:3px 8px;border-radius:5px;border:1px solid #fca5a5;background:#fff5f5;color:#dc2626;font-size:10px;font-weight:600;cursor:pointer;">Löschen</button>
-          </div>
-        </div>`;
-      instGrid.appendChild(instCard);
-    });
+    instList.forEach(p => instGrid.appendChild(instKachel(p)));
 
     const instAddCard = document.createElement('div');
     instAddCard.className = 'card card-add';
@@ -795,7 +759,12 @@ function renderNotizSection() {
   // Alle Notizen sammeln (mastgebunden + mastunabhängig)
   const notAll   = loadAllNotizen();
   let   allNotes = [];
-  getFilteredSorted().forEach(p => {
+  // Installationen gehoeren dazu. getFilteredSorted() liefert je nach Phase nur
+  // Sondagen oder Fundamente — eine Notiz an einer Installationsflaeche tauchte
+  // deshalb in dieser Uebersicht nirgends auf, obwohl sie gespeichert war.
+  const quellen = getFilteredSorted().concat(
+    _activePhase === 'baugrund' ? [] : getInstallationen());
+  quellen.forEach(p => {
     (notAll[p.id] || []).slice().reverse().forEach(n => allNotes.push({ p, n, isGlobal: false }));
   });
   (notAll['_global'] || []).slice().reverse().forEach(n => allNotes.push({ p: null, n, isGlobal: true }));
@@ -807,7 +776,12 @@ function renderNotizSection() {
       allNotes = allNotes.filter(x => x.isGlobal);
     } else {
       allNotes = allNotes.filter(x => {
-        if (!x.isGlobal) return (x.p._phase || 'baugrund') === _notizFilterPhase;
+        // Eine Installationsflaeche traegt kein _phase — sie gehoert zu Bauprojekt
+        // und Ausfuehrung, nicht zum Baugrund.
+        if (!x.isGlobal) {
+          if (x.p._objType === 'installation') return _notizFilterPhase !== 'baugrund';
+          return (x.p._phase || 'baugrund') === _notizFilterPhase;
+        }
         // Globale Notizen nach gespeicherter Phase filtern
         return (x.n.phase || 'baugrund') === _notizFilterPhase;
       });

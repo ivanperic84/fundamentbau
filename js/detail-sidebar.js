@@ -75,10 +75,19 @@ function showDetail(pairId) {
     const _si = document.getElementById('sec-inst-content');
     if (_si) {
       const typLabel = INST_TYP_LABELS[pair.installTyp] || pair.installTyp || '—';
-      const fStr = pair.flaeche ? `${pair.flaeche} m²` : (pair.flaecheL && pair.flaecheB ? `${pair.flaecheL} × ${pair.flaecheB} m` : '—');
+      // Gerechnete Flaeche mit den Massen daneben — dieselbe Rechnung wie auf
+      // der Kachel (instFlaeche), damit beide dasselbe anschreiben.
+      const _fl = typeof instFlaeche === 'function' ? instFlaeche(pair) : { m2: null, masse: null };
+      const fStr = _fl.m2
+        ? `<b>${_fl.m2 >= 10 ? Math.round(_fl.m2) : Math.round(_fl.m2 * 10) / 10} m²</b>`
+          + (_fl.masse ? ` <span style="color:#9ca3af;">${_fl.masse}</span>` : '')
+        : '—';
+      const _tage = typeof instTage === 'function' ? instTage(pair) : null;
       const vonStr = pair.von ? pair.von.split('-').reverse().join('.') : null;
       const bisStr = pair.bis ? pair.bis.split('-').reverse().join('.') : null;
-      const zeitraum = (vonStr || bisStr) ? `${vonStr || '?'} – ${bisStr || '?'}` : '—';
+      const zeitraum = (vonStr || bisStr)
+        ? `${vonStr || '?'} – ${bisStr || '?'}` + (_tage ? ` <span style="color:#9ca3af;">· ${_tage} Tage</span>` : '')
+        : '—';
       const _cbRow = (key, label) => {
         const checked = !!pair[key];
         const col = checked ? '#1a3a5c' : '#6b7280';

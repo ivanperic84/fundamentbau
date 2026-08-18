@@ -27,9 +27,11 @@ let measureLabel    = null;
 let measureType     = 'dist'; // 'dist' | 'area'
 
 // Gespeicherter Messlayer — bleibt beim Wechsel erhalten
-let _measureLayerItems  = [];   // [{type:'dist'|'area', points:[{lat,lng}], result, color}]
+let _measureLayerItems  = [];   // [{id,type:'dist'|'area',points:[{lat,lng}],result,color}]
 let _measureLayerVisible = true;
 let _measureLeafletGroup = [];  // Leaflet-Objekte des gespeicherten Layers
+let _measRadierer        = false;  // Radiermodus: ein Klick loescht eine Messung
+let _measAuswahlId       = null;   // ausgewaehlte Messung — ihre Ecken sind Griffe
 
 const MEASURE_KEY = () => 'sp_measure__' + _activeId;
 
@@ -38,77 +40,204 @@ function loadMeasureLayer(pairId) {
     const all = jsonParse(store.getItem(MEASURE_KEY())) || {};
     _measureLayerItems = all[pairId] || [];
   } catch { _measureLayerItems = []; }
+  // Altbestand ohne Kennung nachruesten — Auswahl und Loeschen brauchen sie
+  _measureLayerItems.forEach((it, i) => { if (!it.id) it.id = 'm' + Date.now() + '_' + i; });
+  _measAuswahlId = null;
   renderMeasureLayer();
 }
 
-function saveMeasureLayer() {
-  // Aktuelle Messung in Layer übernehmen
-  if (measurePoints.length >= 2) {
-    const color = measureType === 'area' ? '#059669' : '#1a3a5c';
-    let result = '';
-    if (measureType === 'dist') {
-      let total = 0;
-      for (let i = 1; i < measurePoints.length; i++)
-        total += haversine(measurePoints[i-1].lat, measurePoints[i-1].lng, measurePoints[i].lat, measurePoints[i].lng);
-      result = formatDist(total);
-    } else if (measurePoints.length >= 3) {
-      result = formatArea(calcArea(measurePoints));
-    }
-    if (result) {
-      _measureLayerItems.push({
-        type: measureType,
-        points: measurePoints.map(p => ({ lat: p.lat, lng: p.lng })),
-        result,
-        color,
-      });
-      // Speichern
-      try {
-        const all = jsonParse(store.getItem(MEASURE_KEY())) || {};
-        all[currentPairId] = _measureLayerItems;
-        store.setItem(MEASURE_KEY(), JSON.stringify(all));
-      } catch {}
-      // Aktuelle Messung zurücksetzen
-      clearCurrentMeasure();
-      renderMeasureLayer();
-      // Visuelles Feedback
-      const btn = document.querySelector('[onclick="saveMeasureLayer()"]');
-      if (btn) { const orig = btn.innerHTML; btn.innerHTML = '✓'; setTimeout(() => btn.innerHTML = orig, 1200); }
-    }
+function _measSpeichern() {
+  try {
+    const all = jsonParse(store.getItem(MEASURE_KEY())) || {};
+    all[currentPairId] = _measureLayerItems;
+    store.setItem(MEASURE_KEY(), JSON.stringify(all));
+  } catch {}
+}
+
+// ── Eine Formel, ein Etikett ─────────────────────────────────
+// Ergebnis einer Messung aus ihren Punkten. Frueher stand die Rechnung an
+// drei Stellen — beim Messen, beim Speichern und nirgends beim Verschieben,
+// weshalb eine verschobene Messung ihr altes Ergebnis behalten haette.
+function measErgebnis(type, pts) {
+  if (type === 'area') return pts.length >= 3 ? formatArea(calcArea(pts)) : '';
+  if (pts.length < 2) return '';
+  let total = 0;
+  for (let i = 1; i < pts.length; i++)
+    total += haversine(pts[i-1].lat, pts[i-1].lng, pts[i].lat, pts[i].lng);
+  return formatDist(total);
+}
+
+// Dasselbe Etikett fuer die laufende und die gespeicherte Messung. Vorher
+// waren es zwei Bauarten — andere Groesse, anderer Rand, anderer Aufhaengepunkt
+// —, und das Etikett sprang beim Speichern sichtbar um.
+function _measEtikett(text, farbe) {
+  return L.divIcon({
+    html: '<div style="transform:translate(-50%,-50%);background:' + farbe + ';color:white;padding:5px 12px;border-radius:9px;'
+        + 'font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.28);'
+        + 'text-align:center;">' + text + '</div>',
+    className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
+
+// Teilstrecken anschreiben — halbtransparent, damit sie die Karte nicht
+// zudecken. Bei der Flaeche werden die Umfangsseiten beschriftet, die
+// letzte Seite schliesst zum ersten Punkt.
+function _measSegmentEtiketten(pts, farbe, geschlossen) {
+  const marker = [];
+  const n = pts.length;
+  if (n < 2) return marker;
+  const bis = geschlossen ? n : n - 1;
+  for (let i = 0; i < bis; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    const d = haversine(a.lat, a.lng, b.lat, b.lng);
+    if (d < 0.5) continue;                     // zu kurz zum Anschreiben
+    marker.push(L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
+      interactive: false,
+      icon: L.divIcon({
+        html: '<div style="transform:translate(-50%,-50%);background:rgba(255,255,255,0.72);color:' + farbe + ';padding:1px 5px;'
+            + 'border-radius:5px;font-size:10px;font-weight:600;white-space:nowrap;'
+            + 'border:1px solid rgba(255,255,255,0.9);">' + formatDist(d) + '</div>',
+        className: '', iconSize: [0, 0], iconAnchor: [0, 0]
+      })
+    }));
   }
+  return marker;
+}
+
+function saveMeasureLayer() {
+  if (measurePoints.length < 2) return;
+  const pts = measurePoints.map(p => ({ lat: p.lat, lng: p.lng }));
+  const result = measErgebnis(measureType, pts);
+  if (!result) return;
+  _measureLayerItems.push({
+    id: 'm' + Date.now(),
+    type: measureType,
+    points: pts,
+    result,
+    color: measureType === 'area' ? '#059669' : '#1a3a5c',
+  });
+  _measSpeichern();
+  clearCurrentMeasure();
+  renderMeasureLayer();
+  // Vorher wurde das Symbol des Knopfes durch ein Hakenzeichen ersetzt und
+  // nach einer Sekunde zurueckgetauscht — der Knopf sprang in der Breite.
+  // Die Rueckmeldung steht jetzt dort, wo auch sonst der Messhinweis steht.
+  showMeasureLabel('Messung gespeichert · ' + result);
+  setTimeout(() => {
+    if (mode === 'measure') showMeasureLabel(measureType === 'area'
+      ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen');
+  }, 1600);
 }
 
 function renderMeasureLayer() {
-  // Vorherige Leaflet-Objekte entfernen
   _measureLeafletGroup.forEach(obj => { try { obj.remove(); } catch {} });
   _measureLeafletGroup = [];
   if (!leafletMap || !_measureLayerVisible) return;
 
   _measureLayerItems.forEach(item => {
     const pts = item.points.map(p => [p.lat, p.lng]);
+    const ausgewaehlt = item.id === _measAuswahlId;
+    const klick = () => {
+      if (_measRadierer) { measLoeschen(item.id); return; }
+      _measAuswahlId = ausgewaehlt ? null : item.id;
+      renderMeasureLayer();
+    };
+
+    let form = null;
     if (item.type === 'dist' && pts.length >= 2) {
-      const line = L.polyline(pts, { color: item.color, weight: 2, dashArray: '6,4' }).addTo(leafletMap);
-      _measureLeafletGroup.push(line);
+      form = L.polyline(pts, { color: item.color, weight: ausgewaehlt ? 4 : 2, dashArray: '6,4' });
     } else if (item.type === 'area' && pts.length >= 3) {
-      const poly = L.polygon(pts, { color: item.color, fillColor: item.color, fillOpacity: 0.1, weight: 2 }).addTo(leafletMap);
-      _measureLeafletGroup.push(poly);
+      form = L.polygon(pts, { color: item.color, fillColor: item.color,
+                              fillOpacity: ausgewaehlt ? 0.2 : 0.1, weight: ausgewaehlt ? 4 : 2 });
     }
-    // Dots
-    item.points.forEach(p => {
-      const dot = L.circleMarker([p.lat, p.lng], { radius: 4, color: item.color, fillColor: 'white', fillOpacity: 1, weight: 2 }).addTo(leafletMap);
-      _measureLeafletGroup.push(dot);
+    if (form) {
+      form.addTo(leafletMap).on('click', ev => { L.DomEvent.stop(ev); klick(); });
+      _measureLeafletGroup.push(form);
+    }
+
+    // Teilstrecken
+    _measSegmentEtiketten(item.points, item.color, item.type === 'area')
+      .forEach(m => { m.addTo(leafletMap); _measureLeafletGroup.push(m); });
+
+    // Eckpunkte: ausgewaehlt als ziehbare Griffe, sonst nur als Punkt
+    item.points.forEach((p, idx) => {
+      if (ausgewaehlt) {
+        const griff = L.marker([p.lat, p.lng], {
+          draggable: true,
+          icon: L.divIcon({
+            html: '<div style="width:13px;height:13px;border-radius:50%;background:white;border:3px solid '
+                + item.color + ';box-shadow:0 1px 4px rgba(0,0,0,0.35);"></div>',
+            className: '', iconSize: [13, 13], iconAnchor: [6.5, 6.5]
+          })
+        }).addTo(leafletMap);
+        griff.on('drag', ev => {
+          const ll = ev.target.getLatLng();
+          item.points[idx] = { lat: ll.lat, lng: ll.lng };
+          if (form) form.setLatLngs(item.points.map(q => [q.lat, q.lng]));
+        });
+        griff.on('dragend', () => {
+          item.result = measErgebnis(item.type, item.points);
+          _measSpeichern();
+          renderMeasureLayer();
+        });
+        _measureLeafletGroup.push(griff);
+      } else {
+        const dot = L.circleMarker([p.lat, p.lng], { radius: 4, color: item.color,
+          fillColor: 'white', fillOpacity: 1, weight: 2 }).addTo(leafletMap);
+        dot.on('click', ev => { L.DomEvent.stop(ev); klick(); });
+        _measureLeafletGroup.push(dot);
+      }
     });
-    // Label
-    const labelPt = item.type === 'area'
-      ? item.points.reduce((acc, p) => ({ lat: acc.lat + p.lat / item.points.length, lng: acc.lng + p.lng / item.points.length }), { lat: 0, lng: 0 })
+
+    // Etikett — ziehbar, wenn die Messung ausgewaehlt ist: dann wandert die
+    // ganze Messung mit, waehrend die Griffe einzelne Ecken versetzen.
+    const mittel = item.type === 'area'
+      ? item.points.reduce((a, p) => ({ lat: a.lat + p.lat / item.points.length,
+                                        lng: a.lng + p.lng / item.points.length }), { lat: 0, lng: 0 })
       : item.points[item.points.length - 1];
-    const label = L.marker([labelPt.lat, labelPt.lng], {
-      icon: L.divIcon({
-        html: `<div style="background:${item.color};color:white;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);">${item.result}</div>`,
-        className: '', iconAnchor: item.type === 'area' ? [0, 0] : [-8, 16]
-      })
+    const label = L.marker([mittel.lat, mittel.lng], {
+      draggable: ausgewaehlt,
+      icon: _measEtikett(item.result + (ausgewaehlt ? ' ·' : ''), item.color)
     }).addTo(leafletMap);
+    if (ausgewaehlt) {
+      let vorher = null;
+      label.on('dragstart', ev => { vorher = ev.target.getLatLng(); });
+      label.on('drag', ev => {
+        const jetzt = ev.target.getLatLng();
+        const dLat = jetzt.lat - vorher.lat, dLng = jetzt.lng - vorher.lng;
+        vorher = jetzt;
+        item.points = item.points.map(p => ({ lat: p.lat + dLat, lng: p.lng + dLng }));
+        if (form) form.setLatLngs(item.points.map(q => [q.lat, q.lng]));
+      });
+      label.on('dragend', () => { _measSpeichern(); renderMeasureLayer(); });
+    } else {
+      label.on('click', ev => { L.DomEvent.stop(ev); klick(); });
+    }
     _measureLeafletGroup.push(label);
   });
+}
+
+// Eine einzelne Messung loeschen — der Radierer, den es bisher nicht gab:
+// «Zuruecksetzen» warf den ganzen Layer weg.
+function measLoeschen(id) {
+  _measureLayerItems = _measureLayerItems.filter(it => it.id !== id);
+  if (_measAuswahlId === id) _measAuswahlId = null;
+  _measSpeichern();
+  renderMeasureLayer();
+  showMeasureLabel('Messung gelöscht');
+  setTimeout(() => { if (mode === 'measure' && !_measRadierer) hideMeasureLabel(); }, 1200);
+}
+
+function toggleMeasRadierer() {
+  _measRadierer = !_measRadierer;
+  if (_measRadierer) _measAuswahlId = null;
+  const btn = document.getElementById('btn-measure-radierer');
+  if (btn) btn.classList.toggle('active', _measRadierer);
+  if (leafletMap) leafletMap.getContainer().style.cursor = _measRadierer ? 'not-allowed' : 'crosshair';
+  showMeasureLabel(_measRadierer
+    ? 'Radierer: Messung antippen zum Löschen'
+    : (measureType === 'area' ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen'));
+  renderMeasureLayer();
 }
 
 function toggleMeasureLayer() {
@@ -121,6 +250,16 @@ function toggleMeasureLayer() {
       : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
     btn.title = _measureLayerVisible ? 'Bemassungen ausblenden' : 'Bemassungen einblenden';
   }
+  // Auch die LAUFENDE Messung ausblenden. Vorher betraf der Schalter nur die
+  // gespeicherten — auf der Karte blieben Linie, Punkte und Etikett stehen,
+  // obwohl «ausgeblendet» angeschrieben war.
+  const anzeigen = _measureLayerVisible ? '' : 'none';
+  [measurePolyline, measurePolygon, measureLabel].forEach(o => {
+    if (o && o._path) o._path.style.display = anzeigen;
+    else if (o && o._icon) o._icon.style.display = anzeigen;
+  });
+  measureMarkers.forEach(m => { if (m._path) m._path.style.display = anzeigen; });
+  _measSegGruppe.forEach(m => { if (m._icon) m._icon.style.display = anzeigen; });
   renderMeasureLayer();
 }
 
@@ -131,12 +270,20 @@ function setMeasureType(type) {
   clearCurrentMeasure();
 }
 
+// Segment-Etiketten der laufenden Messung
+let _measSegGruppe = [];
+function _measSegGruppeLeeren() {
+  _measSegGruppe.forEach(m => { try { m.remove(); } catch {} });
+  _measSegGruppe = [];
+}
+
 // Nur aktuelle (noch nicht gespeicherte) Messung löschen
 function clearCurrentMeasure() {
   if (measurePolyline) { measurePolyline.remove(); measurePolyline = null; }
   if (measurePolygon)  { measurePolygon.remove();  measurePolygon  = null; }
   measureMarkers.forEach(m => m.remove()); measureMarkers = [];
   if (measureLabel)    { measureLabel.remove();    measureLabel    = null; }
+  _measSegGruppeLeeren();
   measurePoints = [];
   showMeasureLabel(measureType === 'area' ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen');
 }
@@ -145,6 +292,7 @@ function clearCurrentMeasure() {
 function resetMeasure() {
   clearCurrentMeasure();
   _measureLayerItems = [];
+  _measAuswahlId = null;
   try {
     const all = jsonParse(store.getItem(MEASURE_KEY())) || {};
     delete all[currentPairId];
@@ -176,8 +324,7 @@ function formatArea(m2) {
 
 function startMeasure() {
   measurePoints = [];
-  // Show instruction
-  showMeasureLabel('Ersten Punkt antippen');
+  showMeasureLabel(measureType === 'area' ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen');
   if (!leafletMap) return;
   leafletMap.getContainer().style.cursor = 'crosshair';
   leafletMap.on('click', onMeasureClick);
@@ -191,59 +338,60 @@ function stopMeasure() {
   if (measurePolygon)  { measurePolygon.remove();  measurePolygon  = null; }
   measureMarkers.forEach(m => m.remove()); measureMarkers = [];
   if (measureLabel) { measureLabel.remove(); measureLabel = null; }
+  _measSegGruppeLeeren();
   measurePoints = [];
+  _measRadierer = false;
+  _measAuswahlId = null;
+  document.getElementById('btn-measure-radierer')?.classList.remove('active');
+  renderMeasureLayer();
   hideMeasureLabel();
 }
 
 function onMeasureClick(e) {
+  if (_measRadierer) return;                 // im Radiermodus wird nicht gemessen
   measurePoints.push(e.latlng);
   const dot = L.circleMarker(e.latlng, {
     radius: 5, color: '#1a3a5c', fillColor: 'white', fillOpacity: 1, weight: 2
   }).addTo(leafletMap);
   measureMarkers.push(dot);
 
+  const farbe = measureType === 'area' ? '#059669' : '#1a3a5c';
+  _measSegGruppeLeeren();
+
   if (measureType === 'dist') {
-    // Distanzmessung
     if (measurePoints.length === 1) {
       showMeasureLabel('Zweiten Punkt antippen');
     } else {
       if (measurePolyline) measurePolyline.remove();
-      measurePolyline = L.polyline(measurePoints, { color:'#1a3a5c', weight:2, dashArray:'6,4' }).addTo(leafletMap);
-      let total = 0;
-      for (let i = 1; i < measurePoints.length; i++) {
-        total += haversine(measurePoints[i-1].lat, measurePoints[i-1].lng, measurePoints[i].lat, measurePoints[i].lng);
-      }
+      measurePolyline = L.polyline(measurePoints, { color: farbe, weight: 2, dashArray: '6,4' }).addTo(leafletMap);
+      const ergebnis = measErgebnis('dist', measurePoints);
       if (measureLabel) measureLabel.remove();
       measureLabel = L.marker(measurePoints[measurePoints.length-1], {
-        icon: L.divIcon({
-          html: `<div style="background:#1a3a5c;color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.3);min-width:60px;text-align:center;">${formatDist(total)}</div>`,
-          className: '', iconAnchor: [-8, 16]
-        })
+        icon: _measEtikett(ergebnis, farbe)
       }).addTo(leafletMap);
-      showMeasureLabel(formatDist(total) + ' · Weiteren Punkt oder Messen beenden');
+      _measSegGruppe = _measSegmentEtiketten(measurePoints, farbe, false);
+      _measSegGruppe.forEach(m => m.addTo(leafletMap));
+      showMeasureLabel(ergebnis + ' · Weiteren Punkt oder Messen beenden');
     }
   } else {
-    // Flächenmessung
     if (measurePoints.length < 3) {
-      showMeasureLabel(`${measurePoints.length} Punkt(e) · mind. 3 für Fläche`);
+      showMeasureLabel(measurePoints.length + ' Punkt(e) · mind. 3 für Fläche');
     }
     if (measurePoints.length >= 2) {
       if (measurePolyline) measurePolyline.remove();
-      measurePolyline = L.polyline([...measurePoints, measurePoints[0]], { color:'#059669', weight:2, dashArray:'6,4' }).addTo(leafletMap);
+      measurePolyline = L.polyline([...measurePoints, measurePoints[0]], { color: farbe, weight: 2, dashArray: '6,4' }).addTo(leafletMap);
+      _measSegGruppe = _measSegmentEtiketten(measurePoints, farbe, measurePoints.length >= 3);
+      _measSegGruppe.forEach(m => m.addTo(leafletMap));
     }
     if (measurePoints.length >= 3) {
       if (measurePolygon) measurePolygon.remove();
-      measurePolygon = L.polygon(measurePoints, { color:'#059669', fillColor:'#059669', fillOpacity:0.12, weight:2 }).addTo(leafletMap);
-      const area = calcArea(measurePoints);
+      measurePolygon = L.polygon(measurePoints, { color: farbe, fillColor: farbe, fillOpacity: 0.12, weight: 2 }).addTo(leafletMap);
+      const ergebnis = measErgebnis('area', measurePoints);
       if (measureLabel) measureLabel.remove();
-      const center = measurePolygon.getBounds().getCenter();
-      measureLabel = L.marker(center, {
-        icon: L.divIcon({
-          html: `<div style="background:#059669;color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.3);min-width:60px;text-align:center;">${formatArea(area)}</div>`,
-          className: '', iconAnchor: [0, 0]
-        })
+      measureLabel = L.marker(measurePolygon.getBounds().getCenter(), {
+        icon: _measEtikett(ergebnis, farbe)
       }).addTo(leafletMap);
-      showMeasureLabel(formatArea(area) + ' · Weiteren Punkt oder Messen beenden');
+      showMeasureLabel(ergebnis + ' · Weiteren Punkt oder Messen beenden');
     }
   }
 }
