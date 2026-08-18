@@ -322,7 +322,7 @@
       <h1>Benutzerhandbuch</h1>
       <p>Fundamentbau App — Planung, Bauprojekt &amp; Ausführung</p>
     </div>
-    <span class="header-badge">v2.0</span>
+    <span class="header-badge">v2.1</span>
   </div>
 </div>
 
@@ -340,15 +340,18 @@
       <a href="#termine">Termine<span class="nav-num">6</span></a>
       <a href="#zugang">Zugang &amp; Abklärung<span class="nav-num">7</span></a>
       <a href="#bauprojekt">Bauprojekt<span class="nav-num">8</span></a>
-      <a href="#baugrund">Baugrundphase<span class="nav-num">9</span></a>
-      <a href="#ausfplanung">Ausführungsplanung<span class="nav-num">10</span></a>
-      <a href="#bauprogramm">Bauprogramm / Gantt<span class="nav-num">11</span></a>
-      <a href="#fundamenttypen">Fundamenttypen<span class="nav-num">12</span></a>
-      <a href="#karte">Karte<span class="nav-num">13</span></a>
-      <a href="#projekte">Projekte<span class="nav-num">14</span></a>
-      <a href="#export">Export &amp; Backup<span class="nav-num">15</span></a>
-      <a href="#einstellungen">Einstellungen<span class="nav-num">16</span></a>
-      <a href="#daten">Datenspeicherung<span class="nav-num">17</span></a>
+      <a href="#blockcalc">Fundamente dimensionieren<span class="nav-num">9</span></a>
+      <a href="#baugrund">Baugrundphase<span class="nav-num">10</span></a>
+      <a href="#ausfplanung">Ausführungsplanung<span class="nav-num">11</span></a>
+      <a href="#installationen">Baustelleninstallationen<span class="nav-num">12</span></a>
+      <a href="#bauprogramm">Bauprogramm / Gantt<span class="nav-num">13</span></a>
+      <a href="#kosten">Massen &amp; Kosten<span class="nav-num">14</span></a>
+      <a href="#fundamenttypen">Fundamenttypen<span class="nav-num">15</span></a>
+      <a href="#karte">Karte<span class="nav-num">16</span></a>
+      <a href="#projekte">Projekte<span class="nav-num">17</span></a>
+      <a href="#export">Export &amp; Backup<span class="nav-num">18</span></a>
+      <a href="#einstellungen">Einstellungen<span class="nav-num">19</span></a>
+      <a href="#daten">Datenspeicherung<span class="nav-num">20</span></a>
     </nav>
   </div>
 
@@ -548,7 +551,25 @@
 
         <div class="sub">
           <h3>Sektionen anpassen</h3>
-          <p>Über den Button ganz links in der Navigationsleiste der Sidebar können Sektionen ein- und ausgeblendet und per Drag-and-drop neu angeordnet werden. Die Reihenfolge wird pro Gerät gespeichert und kann jederzeit zurückgesetzt werden.</p>
+          <p>Über das <strong>Zahnrad</strong> in der Navigationsleiste der Sidebar können Sektionen ein- und ausgeblendet und per Drag-and-drop neu angeordnet werden. Die Reihenfolge wird pro Gerät gespeichert und kann jederzeit zurückgesetzt werden.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Gruppen-Vorlagen</h3>
+          <p>Die Sidebar trägt je nach Phase bis zu zwanzig Gruppen. Wer gerade eine Begehung macht, braucht davon vier. Eine <strong>Vorlage</strong> blendet den Rest aus — die Auswahl steht zuoberst in der Sidebar.</p>
+          <table class="data-table">
+            <thead><tr><th>Mitgeliefert</th><th>Zeigt</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Alle Gruppen</strong></td><td>keine Einschränkung</td></tr>
+              <tr><td><strong>Begehung</strong></td><td>Metadaten, Begehung, Zugang, Fotos, Skizzen, Notizen</td></tr>
+              <tr><td><strong>Bilder &amp; Notizen</strong></td><td>Metadaten, Fotos, Skizzen, Notizen</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;"><strong>Eigene Vorlagen</strong> legt man dort an, wo ohnehin die Sichtbarkeit eingestellt wird: Zahnrad → Reiter «Sidebar». Die Häkchen der Liste <em>sind</em> die Auswahl — anhaken, unten benennen, sichern. Notizen sind in jeder Vorlage dabei.</p>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span>Eine Vorlage kann nur ausblenden, nie zusätzlich einblenden: was die Phase ohnehin verbirgt, bleibt verborgen. Eigene Vorlagen gelten projektübergreifend — sie bilden die Arbeitsweise ab, nicht das Projekt.</span>
+          </div>
         </div>
 
         <div class="sub">
@@ -695,10 +716,117 @@
       </div>
     </div>
 
-    <!-- 9 · BAUGRUNDPHASE -->
-    <div class="section" id="baugrund">
+    <!-- 9 · FUNDAMENTE DIMENSIONIEREN -->
+    <div class="section" id="blockcalc">
       <div class="section-header">
         <div class="section-num">9</div>
+        <div><h2>Fundamente dimensionieren</h2><p>Statischer Nachweis mit BlockCalc (SIA 267)</p></div>
+      </div>
+      <div class="section-body">
+        <p><strong>BlockCalc</strong> rechnet den statischen Nachweis für Blockfundamente nach SIA 267 und ist in die App eingebettet. Die App übergibt einen fertigen Rechenfall, BlockCalc dimensioniert, und die Abmessungen kommen auf Knopfdruck in den Standort zurück. Es wird bewusst <strong>eine Position nach der anderen</strong> gerechnet — kein Stapellauf: jede Berechnung wird gesichtet.</p>
+
+        <div class="info-box info-tip">
+          <span class="ib-icon">i</span>
+          <span><strong>Der eigentliche Zweck ist der Bauart-Wechsel.</strong> Reicht das gewählte Standardfundament am konkreten Standort nicht, sagt die Rechnung nicht nur «nicht erfüllt», sondern welche Bauweise trägt. Die übernommene Bauart schreibt sich in den Standort zurück und wirkt von dort auf Massenauszug, Leistungswerte und Bauprogramm.</span>
+        </div>
+
+        <div class="mockup">
+          <div class="mockup-bar">
+            <div>
+              <div class="mockup-bar-title">Statischer Nachweis — Mast 14</div>
+              <div class="mockup-bar-sub">BlockCalc · SIA 267</div>
+            </div>
+            <div class="mockup-btn">Schliessen</div>
+          </div>
+          <div class="mockup-body">
+            <div style="background:white;border:1px solid var(--border);border-radius:7px;padding:9px 11px;margin-bottom:8px;">
+              <div style="font-size:10px;color:#9ca3af;margin-bottom:5px;">ERGEBNIS</div>
+              <div style="display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;">
+                <div style="font-size:15px;font-weight:700;color:#374151;">1.60 × 1.60 × 2.20 m</div>
+                <div style="font-size:11px;color:#6b7280;">Bauweise: Blockfundament</div>
+                <span class="badge" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;">Nachweis erfüllt</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:white;border:1px solid var(--border);border-radius:7px;padding:8px 11px;">
+              <div style="flex:1;font-size:10px;color:#9ca3af;">Böschung 14–33°: tatsächlichen Winkel erfassen</div>
+              <div style="background:#374151;color:white;padding:4px 12px;border-radius:5px;font-size:10px;font-weight:600;">Ergebnis übernehmen</div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:-2px;">Die Hauptaktion steht rechts aussen, wie «Schliessen» im Kopf. «Schliessen» verwirft, «Ergebnis übernehmen» schreibt zurück.</p>
+
+        <div class="sub">
+          <h3>Ablauf</h3>
+          <ol class="steps">
+            <li><strong>Phase Bauprojekt wählen</strong>Der Nachweis hängt an den Bauprojekt-Feldern; in Baugrund oder Ausführung erscheint er nicht.</li>
+            <li><strong>Standort öffnen</strong>In der Detailansicht zur Sektion mit dem statischen Nachweis blättern.</li>
+            <li><strong>Voraussetzungen prüfen</strong>Fundamenttyp, Baugrundprofil und — bei Spezialfundamenten — der Referenztyp (Standardlasten) müssen gesetzt sein. Fehlt eines, bleibt der Knopf aus und die Statuszeile sagt, was fehlt.</li>
+            <li><strong>«Nachweis rechnen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
+            <li><strong>Rechnen und sichten</strong>Abmessungen, Ausnutzungsgrade und Hinweise prüfen. Bei Bedarf in BlockCalc die Bauweise wechseln und neu rechnen.</li>
+            <li><strong>«Ergebnis übernehmen»</strong>Abmessungen und Bauweise gehen in den Standort. Die Statuszeile in der Sidebar zeigt danach Ergebnis und Datum.</li>
+          </ol>
+        </div>
+
+        <div class="sub">
+          <h3>Was übergeben wird und was zurückkommt</h3>
+          <table class="data-table">
+            <thead><tr><th>Richtung</th><th>Inhalt</th><th>Herkunft / Ziel</th></tr></thead>
+            <tbody>
+              <tr><td><strong>hin</strong></td><td>Bauweise und Geometrie</td><td>Fundamenttyp des Standorts</td></tr>
+              <tr><td><strong>hin</strong></td><td>Kopfüberstand über Terrain</td><td>Fundamentkopf m ü. M. minus Geländehöhe</td></tr>
+              <tr><td><strong>hin</strong></td><td>Baugrundkennwerte</td><td>Baugrundprofil (USCS, ME, Reibungswinkel, Raumlast, Kohäsion, Grundwasser)</td></tr>
+              <tr><td><strong>hin</strong></td><td>Lastniveau</td><td>Referenztyp (Standardlasten) des Standorts</td></tr>
+              <tr><td><strong>hin</strong></td><td>Neigungsklasse / Böschung</td><td>Höhenkoten bzw. Erwartungswert der Klasse</td></tr>
+              <tr><td><strong>zurück</strong></td><td>Abmessungen L × B × T</td><td>Fundamentmasse des Standorts</td></tr>
+              <tr><td><strong>zurück</strong></td><td>Bauweise</td><td>Bauart des Standorts (Bauart-Wechsel)</td></tr>
+              <tr><td><strong>zurück</strong></td><td>Nachweisstatus und Hinweise</td><td>Statuszeile in der Sidebar</td></tr>
+            </tbody>
+          </table>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span><strong>Kopfhöhe wird umgerechnet.</strong> Diese App führt die Kopfhöhe als Gesamtmass von OK Block bis OK Kopf (Standard 1.00 m). BlockCalc rechnet mit dem <em>Überstand über Terrain</em>. Die Umrechnung macht die App; die beiden Zahlen sind deshalb absichtlich verschieden.</span>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Standardlasten — einmalig je Arbeitsstation</h3>
+          <p>Die Lastwerte stecken nicht in der App, sondern in einer eigenen Datei mit acht Lastniveaus (DP1a / DP2a / HP1a / HP2a, je für V = 0 und V = 150 kN). Sie muss in BlockCalc <strong>auf jedem Rechner einmal</strong> eingelesen werden.</p>
+          <ol class="steps">
+            <li><strong>BlockCalc öffnen</strong>Über «Nachweis rechnen» an einem beliebigen Standort.</li>
+            <li><strong>Optionen → Datenaustausch → Import</strong>Im Menü von BlockCalc, nicht in der App.</li>
+            <li><strong>Datei wählen</strong><code>blockcalc/Lastniveaus_SBB_0161.1011.0002_a.json</code> aus dem App-Verzeichnis.</li>
+          </ol>
+          <div class="info-box info-warn" style="margin-top:8px;">
+            <span class="ib-icon">!</span>
+            <span>Ohne diesen Import meldet BlockCalc <em>«Lastniveau nicht gefunden»</em> und rechnet nicht. Der Import gilt pro Gerät und Browser — ein neues Tablet braucht ihn erneut.</span>
+          </div>
+          <p style="margin-top:8px;">Dass je Position <strong>zwei</strong> Fälle vorgesehen sind, gibt die Norm vor: die Nachweise sind mit V<sub>min</sub> = 0 kN und V<sub>max</sub> = 150 kN zu führen. V = 0 ist für den Steckner-Nachweis im GZT massgebend, V = 150 für Grundbruch und Setzung. Die Brücke schickt derzeit den Fall V<sub>max</sub>; der zweite ist bei Bedarf als zweiter Durchgang zu rechnen.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Grenzen der Rechnung</h3>
+          <div class="info-box info-warn">
+            <span class="ib-icon">!</span>
+            <span><strong>Neigungsklasse 14–33°.</strong> Die konservative Klassenobergrenze von 33° treibt den Nachweis im Gebrauchszustand in seinen Modellgrenzfall — die Bettung fällt rechnerisch fast weg. Derselbe Fall liefert dann im GZT einen Ausnutzungsgrad von 0.81, im GZG aber 0.012. Das ist eine <em>Modellgrenze, kein reales Versagen</em>: ohne genauere Angabe käme jede Position dieser Klasse als «nicht erfüllt» zurück. Abhilfe: den tatsächlichen Böschungswinkel erfassen und, bei endlicher Böschung, die Böschungshöhe.</span>
+          </div>
+          <div class="two-col" style="margin-top:10px;">
+            <div class="feat-card">
+              <h4>Wird mitgetragen, aber nicht gerechnet</h4>
+              <p>Das Torsionsmoment (3.3–5.0 kNm) führt BlockCalc nicht. Es wird als Hinweis ausgewiesen statt stillschweigend weggelassen.</p>
+            </div>
+            <div class="feat-card">
+              <h4>Nicht abgedeckt</h4>
+              <p>Verankerung im Fels über Anker und Befestigung an einer Mauer. Beide erscheinen mit Infotext statt Knopf — dort ist ein separater Nachweis zu führen.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 · BAUGRUNDPHASE -->
+    <div class="section" id="baugrund">
+      <div class="section-header">
+        <div class="section-num">10</div>
         <div><h2>Baugrundphase</h2><p>RS / RKS / BS Felddaten erfassen</p></div>
       </div>
       <div class="section-body">
@@ -733,10 +861,10 @@
       </div>
     </div>
 
-    <!-- 10 · AUSFÜHRUNGSPLANUNG -->
+    <!-- 11 · AUSFÜHRUNGSPLANUNG -->
     <div class="section" id="ausfplanung">
       <div class="section-header">
-        <div class="section-num">10</div>
+        <div class="section-num">11</div>
         <div><h2>Ausführungsplanung</h2><p>Schicht-Zuweisung und Betriebsplanung</p></div>
       </div>
       <div class="section-body">
@@ -766,16 +894,85 @@
         </div>
 
         <div class="sub">
+          <h3>Zuweisung über die Karte</h3>
+          <p>Neben der Tabelle lassen sich Standorte auch direkt auf der Karte zuweisen — hilfreich, wenn die Reihenfolge sich aus der Lage ergibt und nicht aus der Nummer.</p>
+          <ol class="steps">
+            <li><strong>Zuweisemodus einschalten</strong>Die Karte wächst, darüber erscheint die Schichtleiste.</li>
+            <li><strong>Schicht wählen</strong>Jede Schicht in der Leiste zeigt ihre Auslastung: wie viele Standorte ihr schon zugewiesen sind und wie viele sie fasst.</li>
+            <li><strong>Marker antippen</strong>Der Standort geht an die aktive Schicht. Ist sie voll, rückt die Leiste auf die nächste.</li>
+            <li><strong>Prüfen</strong>Marker zeigen die Schichtnummer. Ein Gleiskonflikt am selben Datum wird gemeldet.</li>
+          </ol>
+          <p>Ein Klick auf einen Marker oder eine Schicht <strong>hebt sie hervor</strong> und blendet das Übrige zurück. Die Hervorhebung endet mit <code>Escape</code> oder einem Klick auf eine leere Stelle der Karte. Ein <strong>Schritt zurück</strong> nimmt die letzte Zuweisung wieder heraus.</p>
+        </div>
+
+        <div class="sub">
           <h3>Auto-Zuweisung</h3>
           <p>Der Button <strong>Auto-Pakete</strong> verteilt alle Standorte automatisch auf Pakete und Schichten basierend auf Kapazität, Sperrmuster und Vorarbeiten. Manuelle Zuweisungen bleiben erhalten.</p>
         </div>
       </div>
     </div>
 
-    <!-- 11 · BAUPROGRAMM / GANTT -->
+    <!-- 12 · BAUSTELLENINSTALLATIONEN -->
+    <div class="section" id="installationen">
+      <div class="section-header">
+        <div class="section-num">12</div>
+        <div><h2>Baustelleninstallationen</h2><p>Installationsflächen bestellen, belegen, zurückgeben</p></div>
+      </div>
+      <div class="section-body">
+        <p>Installationsflächen sind eigene Objekte neben den Fundamentstandorten. Sie erscheinen in der Kachelansicht in einem eigenen Block unter den Standorten und haben ihre eigene Detailansicht mit Karte, Fotos und Notizen.</p>
+
+        <div class="info-box info-tip">
+          <span class="ib-icon">i</span>
+          <span>Installationen zählen <strong>nicht</strong> in den Fortschrittsbalken der Kopfzeile — der bezieht sich auf Fundamentstandorte und Sondierungen. Der Bestellstand der Fläche steht stattdessen unten links auf der Kachel.</span>
+        </div>
+
+        <div class="sub">
+          <h3>Fläche erfassen</h3>
+          <p>Die Fläche lässt sich auf drei Wegen bestimmen:</p>
+          <div class="three-col">
+            <div class="feat-card"><h4>Länge × Breite</h4><p>Für rechteckige Flächen. Das Produkt wird gerechnet und angezeigt.</p></div>
+            <div class="feat-card"><h4>Direkt in m²</h4><p>Wenn die Fläche aus einer Vereinbarung stammt.</p></div>
+            <div class="feat-card"><h4>Aus der Karte</h4><p>Eine Flächenmessung auf der Karte übernehmen — der gemessene Wert wandert ins Feld.</p></div>
+          </div>
+        </div>
+
+        <div class="sub">
+          <h3>Bestellstand und Frist</h3>
+          <p>Der Bestellstand hat vier Stufen und wird direkt auf der Kachel gesetzt: <strong>Nicht bestellt · Angefragt · Bestätigt · Zurückgegeben</strong>.</p>
+          <p>Zur Bestellfrist gehört ein Datum. Gemeldet wird nur, was noch <em>nicht bestätigt</em> ist — eine abgelaufene Frist an einer bestätigten Fläche ist keine Nachricht mehr:</p>
+          <table class="data-table">
+            <thead><tr><th>Lage</th><th>Anzeige auf der Kachel</th></tr></thead>
+            <tbody>
+              <tr><td>Frist in mehr als 14 Tagen</td><td>keine Meldung</td></tr>
+              <tr><td>Frist innerhalb 14 Tagen</td><td>Uhrzeichen</td></tr>
+              <tr><td>Frist überschritten</td><td>Uhrzeichen in Rot</td></tr>
+              <tr><td>Fläche bestätigt</td><td>keine Meldung, unabhängig vom Datum</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;">Die Detailansicht schreibt Datum und Stand im Klartext aus.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Fahrleitungsspezifische Angaben</h3>
+          <p>Für Flächen im Bereich der Fahrleitung sind die betrieblichen Bedingungen erfassbar: <strong>Abschaltung erforderlich</strong>, <strong>Erdung erforderlich</strong> und der <strong>Abstand zum nächsten Gleis</strong>. Sie gehören zur Fläche, nicht zum Fundament — die Fläche wird oft früher und länger gebraucht als die Arbeitsstelle selbst.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Rückgabezustand</h3>
+          <p>Zur Rückgabe gehören der beschriebene Zustand und Fotos. Die Fotos liegen in einem <strong>eigenen Bereich</strong> neben den übrigen Bildern der Fläche, damit der Zustand bei der Übergabe belegbar bleibt und nicht zwischen Baustellenbildern verschwindet.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Notizen</h3>
+          <p>Notizen an einer Installationsfläche lassen sich in der Sidebar bearbeiten und erscheinen in der Notizenübersicht des Projekts — gleichberechtigt neben den Notizen an Standorten.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13 · BAUPROGRAMM / GANTT -->
     <div class="section" id="bauprogramm">
       <div class="section-header">
-        <div class="section-num">11</div>
+        <div class="section-num">13</div>
         <div><h2>Bauprogramm / Gantt</h2><p>Zeitplanung und Terminübersicht</p></div>
       </div>
       <div class="section-body">
@@ -836,10 +1033,66 @@
       </div>
     </div>
 
-    <!-- 12 · FUNDAMENTTYPEN -->
+    <!-- 14 · MASSEN & KOSTEN -->
+    <div class="section" id="kosten">
+      <div class="section-header">
+        <div class="section-num">14</div>
+        <div><h2>Massen &amp; Kosten</h2><p>Massenauszug und schichtbasierte Kostenschätzung</p></div>
+      </div>
+      <div class="section-body">
+        <p>Der Bereich <strong>Massen &amp; Kosten</strong> zieht die Mengen aus den Fundamenttypen und den zugewiesenen Standorten und rechnet daraus eine Kostenschätzung. Er erfindet keine Werte: was in Fundamenttypen, Leistungsprofilen, Sperrmustern und im Bauprogramm steht, wird übernommen.</p>
+
+        <div class="info-box info-tip">
+          <span class="ib-icon">i</span>
+          <span><strong>Die Schicht ist die Recheneinheit, nicht die Stunde.</strong> Im Gleistiefbau verrechnet der Baumeister jede Schicht zu acht Stunden, auch wenn das Sperrintervall nur zwei Stunden lang ist. Für Maschinen und Geräte gilt dasselbe. Die Materialkosten sind selten der Kostentreiber — die Anzahl Schichten ist es.</span>
+        </div>
+
+        <div class="sub">
+          <h3>Massenauszug</h3>
+          <p>Je Fundamenttyp und Standort werden Aushub, Beton, Bewehrung und Abtransport ausgewiesen. Grundlage sind die Abmessungen des Fundamenttyps — auch die aus BlockCalc übernommenen.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Mannschaft und Gerätschaft je Arbeitsgruppe</h3>
+          <p>Zu jeder Arbeitsgruppe lässt sich die <strong>Besetzung</strong> hinterlegen — Personal und Geräte mit Einheitspreisen. Aus der Anzahl Schichten der Gruppe und ihrer Besetzung ergeben sich die Kosten. Eine Position, die bereits in einer Besetzung steckt, wird nicht ein zweites Mal über eine Menge gerechnet.</p>
+          <table class="data-table">
+            <thead><tr><th>Herkunft einer Position</th><th>Bezugsgrösse</th></tr></thead>
+            <tbody>
+              <tr><td>Schicht (Tag / Nacht / Sonntag)</td><td>Anzahl Schichten der Gruppe</td></tr>
+              <tr><td>Stunden (Tag / Nacht / Sonntag)</td><td>Anzahl Schichten × Stunden je Schicht (Vorgabe 8)</td></tr>
+              <tr><td>Installation</td><td>Prozentsatz der massgebenden Bausumme</td></tr>
+              <tr><td>Menge</td><td>Massenauszug (m³, m², Stück)</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;">Nacht- und Sonntagszuschläge sind eigene Positionen mit eigenen Einheitspreisen, so wie sie in der Vorlage hinterlegt sind.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Sicherheit und Bahnersatz</h3>
+          <p>Sicherheitspersonal ist zu bezahlen und wird als Schichtposition geführt. Ebenso Bahnersatzmassnahmen, mit denen sich das Sperrintervall verlängern lässt — sie sind nicht kostenlos und gehören in die Schätzung, sobald mit ihnen geplant wird.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Vor- und Nacharbeiten</h3>
+          <p>Was sich nicht aus Massen und Schichten ergibt — Vor- und Nacharbeiten von Hand —, wird als Position aus einem <strong>vordefinierten Katalog</strong> eingetragen. Der Katalog stammt aus der Vorlage, damit Bezeichnung und Einheit über die Projekte gleich bleiben.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Installationskosten</h3>
+          <p>Die Installationskosten hängen von der Bausumme ab. Statt eines festen Betrags zwischen zwei Grenzen wird ein <strong>Prozentsatz</strong> auf die massgebende Bausumme gerechnet. Welche Abschnitte des Leistungsverzeichnisses in diese Bausumme zählen, ist einstellbar; die Installationspositionen selbst zählen nicht mit, sonst läge der Betrag in seiner eigenen Grundlage.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Kosten je Fundament</h3>
+          <p>Zum Schluss werden die Baukosten durch die Anzahl Fundamente geteilt. Diese Zahl ist keine Position, sondern eine <strong>Kontrollgrösse</strong>: sie lässt sich mit Erfahrungswerten vergleichen und deckt Fehler in Mengen oder Schichtzahlen schneller auf als die Endsumme.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15 · FUNDAMENTTYPEN -->
     <div class="section" id="fundamenttypen">
       <div class="section-header">
-        <div class="section-num">12</div>
+        <div class="section-num">15</div>
         <div><h2>Fundamenttypen</h2><p>FT-Profile und Leistungsprofile</p></div>
       </div>
       <div class="section-body">
@@ -885,10 +1138,10 @@
       </div>
     </div>
 
-    <!-- 13 · KARTE -->
+    <!-- 16 · KARTE -->
     <div class="section" id="karte">
       <div class="section-header">
-        <div class="section-num">13</div>
+        <div class="section-num">16</div>
         <div><h2>Karte</h2><p>Übersichtskarte und Standortmarker</p></div>
       </div>
       <div class="section-body">
@@ -926,16 +1179,94 @@
         </div>
 
         <div class="sub">
+          <h3>Messen &amp; Vermassung</h3>
+          <p>Die Karte misst <strong>Distanzen</strong> und <strong>Flächen</strong>. Beim Zeichnen wird jede Teilstrecke angeschrieben, am Ende Gesamtlänge beziehungsweise Fläche und Umfang.</p>
+          <table class="data-table">
+            <thead><tr><th>Handgriff</th><th>Wirkung</th></tr></thead>
+            <tbody>
+              <tr><td>Punkt ziehen</td><td>Eckpunkt einer gespeicherten Vermassung verschieben, Werte rechnen neu</td></tr>
+              <tr><td>Vermassung ziehen</td><td>ganze Messung verschieben, Masse bleiben gleich</td></tr>
+              <tr><td>Rechtsklick auf Punkt</td><td>Punkt löschen oder einen neuen einfügen</td></tr>
+              <tr><td>Radierer</td><td>einzelne Vermassung entfernen</td></tr>
+              <tr><td>Auge</td><td>alle Vermassungen aus- und einblenden</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;"><strong>Farbe und Deckkraft</strong> für Distanz und Fläche stehen in den App-Einstellungen unter «Kartendarstellung» — halbdurchsichtig gezeichnet bleibt das Luftbild darunter lesbar. Eine gemessene Fläche lässt sich als Grösse einer Baustelleninstallation übernehmen.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Werkzeugleiste</h3>
+          <p>Die Leiste unten auf der Karte richtet sich nach dem Platz, den die Karte <em>tatsächlich</em> hat — in der geteilten Detailansicht ist das deutlich weniger als im Kartenvollbild. Sie misst nach und gibt in drei Stufen nach:</p>
+          <ol class="steps">
+            <li><strong>Beschriftung weicht</strong>Die Symbole bleiben, die Wörter gehen. Der Titel eines Werkzeugs erscheint weiterhin beim Verweilen.</li>
+            <li><strong>Gruppen rücken zusammen</strong>Nur die Abstände werden enger — die Knopfflächen bleiben, damit sie sich mit Handschuhen treffen lassen.</li>
+            <li><strong>Strichstärken klappen zusammen</strong>Sichtbar bleibt die gewählte Stärke. Ein Tipp darauf klappt die vier auf, die Wahl klappt sie wieder zu; ein kleiner Winkel am Knopf weist darauf hin.</li>
+          </ol>
+          <div class="mockup" style="background:white;">
+            <div class="mockup-body" style="padding:12px 13px;">
+              <div style="display:grid;grid-template-columns:88px 1fr;gap:9px 12px;align-items:center;font-size:11px;">
+
+                <div style="color:#9ca3af;font-size:10px;font-weight:700;">breite Karte</div>
+                <div style="display:flex;gap:5px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 8px;">
+                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 9px;font-size:10px;font-weight:600;">▲ Karte</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 9px;font-size:10px;">✎ Kommentieren</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 9px;font-size:10px;">↔ Messen</span>
+                  <span style="width:1px;height:15px;background:var(--border);"></span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
+                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
+                </div>
+
+                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 1</div>
+                <div style="display:flex;gap:5px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 8px;width:max-content;">
+                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
+                  <span style="width:1px;height:15px;background:var(--border);"></span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
+                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
+                </div>
+
+                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 2</div>
+                <div style="display:flex;gap:3px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 5px;width:max-content;">
+                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
+                  <span style="width:1px;height:15px;background:var(--border);"></span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
+                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
+                </div>
+
+                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 3</div>
+                <div style="display:flex;gap:3px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 5px;width:max-content;">
+                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
+                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
+                  <span style="width:1px;height:15px;background:var(--border);"></span>
+                  <span style="position:relative;background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━<span style="position:absolute;right:1px;bottom:1px;width:0;height:0;border:3px solid transparent;border-right-color:white;border-bottom-color:white;opacity:0.5;"></span></span>
+                </div>
+
+              </div>
+              <div style="font-size:10px;color:#9ca3af;margin-top:9px;">Nur die gewählte Strichstärke bleibt stehen — der Winkel unten rechts weist auf die verborgenen hin.</div>
+            </div>
+          </div>
+
+          <p>Wird die Karte wieder breiter, kommen die Stufen von selbst zurück. In den App-Einstellungen lässt sich <strong>«nur Symbole»</strong> dauerhaft erzwingen. <code>Escape</code> bringt die Leiste in die neutrale Stellung «Karte» zurück.</p>
+        </div>
+
+        <div class="sub">
           <h3>Koordinaten map.geo.admin.ch</h3>
           <p>Der Link <strong>→ map.geo.admin.ch öffnen</strong> in den Metadaten öffnet den Standort direkt im offiziellen Geoportal des Bundes.</p>
         </div>
       </div>
     </div>
 
-    <!-- 14 · PROJEKTE -->
+    <!-- 17 · PROJEKTE -->
     <div class="section" id="projekte">
       <div class="section-header">
-        <div class="section-num">14</div>
+        <div class="section-num">17</div>
         <div><h2>Projekte</h2><p>Mehrere Projekte verwalten</p></div>
       </div>
       <div class="section-body">
@@ -966,10 +1297,10 @@
       </div>
     </div>
 
-    <!-- 15 · EXPORT & BACKUP -->
+    <!-- 18 · EXPORT & BACKUP -->
     <div class="section" id="export">
       <div class="section-header">
-        <div class="section-num">15</div>
+        <div class="section-num">18</div>
         <div><h2>Export &amp; Backup</h2><p>Daten sichern und weitergeben</p></div>
       </div>
       <div class="section-body">
@@ -1003,10 +1334,10 @@
       </div>
     </div>
 
-    <!-- 16 · EINSTELLUNGEN -->
+    <!-- 19 · EINSTELLUNGEN -->
     <div class="section" id="einstellungen">
       <div class="section-header">
-        <div class="section-num">16</div>
+        <div class="section-num">19</div>
         <div><h2>App-Einstellungen</h2><p>Projektkonfiguration und Darstellung</p></div>
       </div>
       <div class="section-body">
@@ -1042,10 +1373,10 @@
       </div>
     </div>
 
-    <!-- 17 · DATENSPEICHERUNG -->
+    <!-- 20 · DATENSPEICHERUNG -->
     <div class="section" id="daten">
       <div class="section-header">
-        <div class="section-num">17</div>
+        <div class="section-num">20</div>
         <div><h2>Datenspeicherung</h2><p>Lokale Speicherung und Datensicherheit</p></div>
       </div>
       <div class="section-body">
@@ -1091,7 +1422,7 @@
 </div><!-- /.layout -->
 
 <div class="page-footer">
-  Fundamentbau App &nbsp;·&nbsp; Benutzerhandbuch v2.0 &nbsp;·&nbsp; Alle Daten werden lokal gespeichert
+  Fundamentbau App &nbsp;·&nbsp; Benutzerhandbuch v2.1 &nbsp;·&nbsp; Alle Daten werden lokal gespeichert
 </div>
 
 </body>

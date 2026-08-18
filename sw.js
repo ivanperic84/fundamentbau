@@ -148,8 +148,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Navigation → index.html (SPA); no-cache erzwingt Revalidierung der Shell
-  const anfrage = event.request.mode === 'navigate'
+  // Navigation → index.html (SPA); no-cache erzwingt Revalidierung der Shell.
+  //
+  // Ausgenommen sind eigenstaendige Seiten. manual.html ist eine echte zweite
+  // Seite, die der Handbuch-Knopf in einem neuen Tab oeffnet. Ohne die
+  // Ausnahme beantwortete der Service Worker auch deren Navigation mit
+  // index.html — der Knopf zeigte dann die App statt des Handbuchs, und zwar
+  // nur mit aktivem Service Worker, also nicht beim Entwickeln.
+  const eigeneSeite = url.pathname.endsWith('/manual.html');
+  const anfrage = (event.request.mode === 'navigate' && !eigeneSeite)
     ? new Request('index.html', { cache: 'no-cache' })
     : event.request;
 
