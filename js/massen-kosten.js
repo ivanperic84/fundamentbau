@@ -622,11 +622,13 @@ function _mkLwTabelle() {
     return `<tr>
       ${td(escHtml(z.name))}
       ${td(z.anzahl, true)}
-      ${td(z.lw != null ? grau(z.lw) : grau('—'), true)}
+      ${td(z.lw != null
+            ? `<span title="${z.lwAusTyp ? 'aus der Typenbibliothek' : 'aus dem Katalog'}" style="color:#9ca3af;">${
+                _mkZahl(z.lw, Number.isInteger(z.lw) ? 0 : 1)}${z.lwAusTyp ? '*' : ''}</span>`
+            : grau('—'), true)}
       ${td(z.schichtenKatalog != null ? grau(z.schichtenKatalog) : grau('—'), true)}
       ${td(z.vorschlagH != null ? grau(_mkZahl(z.vorschlagH, 2)) : grau('—'), true)}
-      ${td(z.ftId ? feld(z.ftId, 'eigenH', z.eigenH, z.vorschlagH) : '', true)}
-      ${td(z.ftId ? feld(z.ftId, 'eigenRuest', z.eigenRuest, z.vorschlagRuest) : '', true)}
+      ${td(z.ftId ? feld(z.ftId, 'eigenH', z.eigenH, z.vorschlagH ?? z.typH) : '', true)}
       ${td(z.schichtenAufwand != null ? z.schichtenAufwand : '—', true, 'font-weight:600;')}
     </tr>`;
   }).join('');
@@ -635,24 +637,26 @@ function _mkLwTabelle() {
     `<table style="width:100%;border-collapse:collapse;font-size:12px;">
        <thead><tr style="background:#f9fafb;">
          ${th('Fundamenttyp')}${th('Anzahl', true)}
-         ${th('LE/Schicht', true, 'Schichtleistung aus dem Katalog bei der gewählten Intervalldauer — nur zur Ansicht')}
-         ${th('Schichten daraus', true, 'aufgerundet: Anzahl ÷ Schichtleistung — nur zur Ansicht')}
-         ${th('h/Fund. herg.', true, 'Aus den Schichtleistungen hergeleiteter Aufwandswert (Steigung der Ausgleichsgeraden)')}
-         ${th('h/Fundament', true, 'Eigener Aufwandswert. Leer = hergeleiteter Wert gilt.')}
-         ${th('Rüstzeit h', true, 'Fixe Zeit je Schicht: Sperrpause, Sicherung einrichten, Räumen. Leer = hergeleiteter Wert gilt.')}
-         ${th('Schichten', true, 'aufgerundet: Anzahl × Aufwandswert ÷ (Intervalldauer − Rüstzeit)')}
+         ${th('LE/Schicht', true, 'Fundamente je Schicht bei der gewählten Intervalldauer. Aus dem Katalog, sonst (*) aus der Typenbibliothek — dieselbe Rechnung wie im Bauprogramm.')}
+         ${th('Schichten daraus', true, 'aufgerundet: Anzahl ÷ Fundamente je Schicht — nur zur Ansicht')}
+         ${th('h/Fund. herg.', true, 'Aus den Schichtleistungen des Katalogs hergeleiteter Aufwandswert (Steigung der Ausgleichsgeraden)')}
+         ${th('h/Fundament', true, 'Eigener Aufwandswert. Leer = es gilt der hergeleitete, sonst die Ausführungsdauer des Typs.')}
+         ${th('Schichten', true, 'aufgerundet: Anzahl × Aufwandswert ÷ (Intervalldauer − Abzug für Installation und Anfahrt)')}
        </tr></thead>
        <tbody>${koerper}</tbody>
        <tfoot><tr style="background:#f9fafb;font-weight:700;">
          ${td('Total')}${td(zeilen.reduce((s, z) => s + z.anzahl, 0), true)}
-         ${td('')}${td(grau(sumKatalog), true)}${td('')}${td('')}${td('')}
+         ${td('')}${td(grau(sumKatalog), true)}${td('')}${td('')}
          ${td(sumAufwand, true)}
        </tr></tfoot>
      </table>`
     + _mkSchichtQuelle(sumAufwand)
     + (ohneWert ? `<div style="padding:8px 14px;font-size:11px;color:#b45309;border-top:1px solid #f0f2f5;">`
-        + `${ohneWert} Fundament(e) ohne Leistungswert im Katalog — Spezialtypen sind dort nicht als Position geführt. `
-        + `Aufwandswert von Hand setzen.</div>` : '');
+        + `${ohneWert} Fundament(e) ohne Leistungswert — weder im Katalog noch am Typ steht eine Ausführungsdauer. `
+        + `Wert im Fundamenttyp-Modul hinterlegen oder hier von Hand setzen.</div>` : '')
+    + `<div style="padding:0 14px 8px;font-size:10px;color:#9ca3af;">`
+        + `Mit * bezeichnete Leistungen stammen aus der Typenbibliothek statt aus dem Katalog — `
+        + `gerechnet mit derselben Funktion wie das Bauprogramm, samt Abzug für Installation und Anfahrt.</div>`;
 }
 
 // Woher die Schichten kommen, die das Verzeichnis verrechnet. Der Unterschied
@@ -1278,12 +1282,27 @@ function lwAufwand(ftId) {
   const e = loadFtLeistungswerte()[ftId];
   return e?.eigenH ?? e?.vorschlagH ?? null;
 }
-// Rüstzeit: eigener Wert, sonst der hergeleitete, sonst der Abzug fuer
-// Installation und Anfahrt aus dem Bauprogramm — dieselbe Zeit, hier in
-// Stunden statt Minuten.
-function lwRuestzeit(ftId) {
-  const e = loadFtLeistungswerte()[ftId];
-  return e?.eigenRuest ?? e?.vorschlagRuest ?? mkAbzugStunden();
+// Ausfuehrungsdauer je Fundament, wie sie am Typ steht — ueber das
+// Leistungsprofil aufgeloest, mit derselben Rangfolge wie in getFtLeistung:
+// das Profil fuehrt, sonst der Typ selbst. Sie ist der Rueckfall fuer alle
+// Typen, die der Katalog nicht kennt, allen voran die Spezialtypen.
+function _lwTypAufwand(ft, tiefe) {
+  if (!ft) return null;
+  let src = ft;
+  if (ft.leistungsprofilId && typeof loadLeistungsprofile === 'function') {
+    const lp = loadLeistungsprofile().find(p => p.id === ft.leistungsprofilId);
+    if (lp?.ftIntervall) src = lp;
+  }
+  const n = parseFloat(src.ftIntervall);
+  if (Number.isFinite(n) && n > 0) return n;
+  // Ein Spezialtyp ist von einem Standardtyp abgeleitet und traegt dessen
+  // Dauer, wenn er keine eigene hat. Die Begrenzung der Tiefe schuetzt vor
+  // einer Kette, die sich im Kreis dreht.
+  if ((tiefe || 0) < 3 && ft.referenzTypId && typeof loadFtProfile === 'function') {
+    const ref = loadFtProfile().find(t => t.id === ft.referenzTypId);
+    if (ref && ref.id !== ft.id) return _lwTypAufwand(ref, (tiefe || 0) + 1);
+  }
+  return null;
 }
 
 function mkAbzugStunden() {
@@ -1320,17 +1339,38 @@ function lkVergleich() {
     proTyp.get(schluessel).anzahl++;
   });
 
-  return [...proTyp.values()].map(z => {
-    const ftId = z.ft?.id;
-    const eintrag = ftId ? (loadFtLeistungswerte()[ftId] || {}) : {};
-    const lw      = ftId ? lkLeistungswert(ftId, stunden) : null;
-    const aufwand = ftId ? lwAufwand(ftId)   : null;
-    const ruest   = ftId ? lwRuestzeit(ftId) : null;
+  // Der Abzug fuer Installation und Anfahrt kommt aus dem Bauprogramm und
+  // wird hier wie dort von der Intervalldauer abgezogen. Als eigene Spalte
+  // «Ruestzeit» stand er doppelt: einmal gepflegt, einmal gerechnet.
+  const abzug = mkAbzugStunden() || 0;
 
-    // Schichten aus dem Aufwandswert. Die Ruestzeit faellt in JEDER Schicht
-    // an, nicht einmal je Baustelle — deshalb wird sie von der Intervalldauer
-    // abgezogen und nicht zur Arbeitszeit addiert.
-    const netto = (aufwand != null) ? stunden - (ruest || 0) : null;
+  return [...proTyp.values()].map(z => {
+    const ftId    = z.ft?.id;
+    const eintrag = ftId ? (loadFtLeistungswerte()[ftId] || {}) : {};
+
+    // LE/Schicht: der Katalog zuerst, sonst die Typenbibliothek. Dort rechnet
+    // dieselbe Funktion wie im Bauprogramm — sie loest das Leistungsprofil
+    // auf, kennt die Leistungstabelle und die Pfahlrechnung und zieht den
+    // Abzug bereits ab. Damit stehen auch die Spezialtypen in der Tabelle:
+    // ihre Werte SIND hinterlegt, sie stehen nur nicht im Katalog.
+    // h/Fundament: eigener Wert, sonst der aus dem Katalog hergeleitete,
+    // sonst die Ausfuehrungsdauer des Typs. Keiner davon ist neu erfunden.
+    const typH    = _lwTypAufwand(z.ft);
+    const aufwand = eintrag.eigenH ?? eintrag.vorschlagH ?? typH;
+
+    // Die zweite Zeile faengt den Spezialtyp ab, dessen Dauer erst ueber den
+    // Referenztyp zusammenkommt: gerechnet wird dann mit derselben Funktion,
+    // nur mit der aufgeloesten Dauer statt der fehlenden am Typ.
+    const lwKatalog = ftId ? lkLeistungswert(ftId, stunden) : null;
+    const lwTyp = (lwKatalog != null || !z.ft || typeof getFtLeistung !== 'function') ? null
+      : (getFtLeistung(z.ft, stunden, abzug * 60)
+         ?? (typH != null
+              ? getFtLeistung({ ...z.ft, leistungsprofilId: null, ftLeistungen: null, ftIntervall: typH },
+                              stunden, abzug * 60)
+              : null));
+    const lw = lwKatalog ?? lwTyp;
+
+    const netto = (aufwand != null) ? stunden - abzug : null;
     const schichtenAufwand = (netto && netto > 0)
       ? Math.ceil(z.anzahl * aufwand / netto) : null;
 
@@ -1339,12 +1379,12 @@ function lkVergleich() {
       ftId,
       anzahl: z.anzahl,
       lw,
+      lwAusTyp: lwKatalog == null && lwTyp != null,
       schichtenKatalog: lw ? Math.ceil(z.anzahl / lw) : null,
-      vorschlagH:     eintrag.vorschlagH ?? null,
-      vorschlagRuest: eintrag.vorschlagRuest ?? mkAbzugStunden(),
-      eigenH:         eintrag.eigenH ?? null,
-      eigenRuest:     eintrag.eigenRuest ?? null,
-      aufwand, ruest,
+      vorschlagH: eintrag.vorschlagH ?? null,
+      typH,
+      eigenH:     eintrag.eigenH ?? null,
+      aufwand,
       schichtenAufwand,
     };
   }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
