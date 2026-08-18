@@ -1179,7 +1179,7 @@
       <div class="autosave-toast"><span id="autosave-badge">✓ Gespeichert</span></div>
 
       <!-- Metadaten -->
-      <div class="sidebar-section" id="sec-meta">
+      <div class="sidebar-section section-open" id="sec-meta">
         <h3 onclick="toggleSection('sec-meta')">
           <span>Metadaten</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -1210,7 +1210,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <!-- Ereignis aus Terminen laden -->
           <div style="margin-bottom:10px;">
             <label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:3px;">Aus Termin übernehmen</label>
@@ -1281,7 +1281,7 @@
       </div>
 
       <!-- TERMINE SIDEBAR -->
-      <div class="sidebar-section" id="sec-termine">
+      <div class="sidebar-section section-open" id="sec-termine">
         <h3 onclick="toggleSection('sec-termine')">
           <span>Termine</span>
           <span class="sb-chevron">▾</span>
@@ -1296,7 +1296,7 @@
       </div>
 
       <!-- AUSFÜHRUNGSPLANUNG SIDEBAR -->
-      <div class="sidebar-section" id="sec-ausfplanung">
+      <div class="sidebar-section section-open" id="sec-ausfplanung">
         <h3 onclick="toggleSection('sec-ausfplanung')">
           <span>Ausführungsplanung</span>
           <span class="sb-chevron">▾</span>
@@ -1344,14 +1344,14 @@
       </div>
 
       <!-- Installationsflächen-Info (nur bei _objType === 'installation') -->
-      <div class="sidebar-section" id="sec-inst-info" style="display:none;">
+      <div class="sidebar-section section-open" id="sec-inst-info" style="display:none;">
         <h3 onclick="toggleSection('sec-inst-info')">Installationsfläche<span class="sb-chevron">▾</span></h3>
         <div class="sb-body">
           <div id="sec-inst-content"></div>
         </div>
       </div>
 
-      <div class="sidebar-section" id="sec-zugang">
+      <div class="sidebar-section section-open" id="sec-zugang">
         <h3 onclick="toggleSection('sec-zugang')">Zugang &amp; Abklärung<span class="sb-chevron">▾</span></h3>
         <div class="sb-body">
           <div class="status-buttons" id="sb-status-btns" style="margin-bottom:10px;">
@@ -1405,7 +1405,7 @@
       </div>
 
       <!-- Fotos -->
-      <div class="sidebar-section" id="sec-fotos">
+      <div class="sidebar-section section-open" id="sec-fotos">
         <h3 onclick="toggleSection('sec-fotos')">
           <span id="sec-fotos-title">Fotos</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -1425,7 +1425,7 @@
       </div>
 
       <!-- Skizzen -->
-      <div class="sidebar-section" id="sec-skizzen">
+      <div class="sidebar-section section-open" id="sec-skizzen">
         <h3 onclick="toggleSection('sec-skizzen')">
           <span>Skizzen</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -1447,7 +1447,7 @@
       </div>
 
       <!-- Notizen (alle Phasen) -->
-      <div class="sidebar-section" id="sec-notizen">
+      <div class="sidebar-section section-open" id="sec-notizen">
         <h3 onclick="toggleSection('sec-notizen')">
           <span>Notizen</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -1478,7 +1478,7 @@
       </div>
 
       <!-- Felddaten -->
-      <div class="sidebar-section" id="sec-feld">
+      <div class="sidebar-section section-open" id="sec-feld">
         <h3 onclick="toggleSection('sec-feld')">
           Felddaten
           <span style="display:flex;align-items:center;gap:4px;">
@@ -1663,7 +1663,7 @@
       </div>
 
       <!-- Sicherheit -->
-      <div class="sidebar-section" id="sec-sicher">
+      <div class="sidebar-section section-open" id="sec-sicher">
         <h3 onclick="toggleSection('sec-sicher')">Sicherheit<span class="sb-chevron">▾</span></h3>
         <div class="sb-body">
           <div class="siwa-row">
@@ -1722,7 +1722,7 @@
 
       <!-- Änderungsprotokoll -->
       <!-- DYNAMISCHE PHASEN-SIDEBAR -->
-      <div class="sidebar-section" id="sec-phase-bauprojekt" style="display:none;">
+      <div class="sidebar-section section-open" id="sec-phase-bauprojekt" style="display:none;">
         <h3 onclick="toggleSection('sec-phase-bauprojekt')">
           <span>Bauprojekt</span>
           <span class="sb-chevron">▾</span>
@@ -1853,7 +1853,7 @@
       </div>
 
       <!-- HÖHENKOTEN Sektion (BP/AF) — Fundamentkopf + Sohle m ü.M. -->
-      <div class="sidebar-section" id="sec-hoehenkoten" style="display:none;">
+      <div class="sidebar-section section-open" id="sec-hoehenkoten" style="display:none;">
         <h3 onclick="toggleSection('sec-hoehenkoten')">
           <span>Höhenkoten (m ü. M.)</span>
           <span class="sb-chevron">▾</span>
@@ -1904,7 +1904,7 @@
       </div>
 
       <!-- BODENKENNWERTE Sektion -->
-      <div class="sidebar-section" id="sec-bodenkennwerte" style="display:none;">
+      <div class="sidebar-section section-open" id="sec-bodenkennwerte" style="display:none;">
         <h3 onclick="toggleSection('sec-bodenkennwerte')">
           <span>Bodenkennwerte</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -1957,7 +1957,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
 
           <!-- GIS-Abfrage geo.admin.ch: Naturschutz -->
           <!-- Grundwasser -->
@@ -2112,7 +2112,7 @@
           <span>Referenz Bauprojekt</span>
           <span class="sb-chevron">▾</span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <div id="ausfuehrung-ref-content" style="font-size:12px;color:#374151;line-height:1.8;background:#f8fafc;border-radius:6px;padding:8px 10px;border:1px solid #e5e7eb;">
             — keine Bauprojekt-Daten —
           </div>
@@ -2128,7 +2128,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <!-- Zusammenfassung -->
           <div id="aushub-sidebar-summary" style="margin-bottom:10px;"></div>
 
@@ -2212,7 +2212,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <div>
               <label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:3px;">Fundamenttyp bestätigt</label>
@@ -2268,7 +2268,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <div id="abnahme-summary" style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.6;"></div>
           <button onclick="openCheckliste(currentPairId)"
             style="width:100%;padding:9px;border-radius:7px;border:1px solid #1a3a5c;background:#1a3a5c;color:white;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">
@@ -2298,7 +2298,7 @@
             <span class="sb-chevron">▾</span>
           </span>
         </h3>
-        <div class="sb-body collapsed">
+        <div class="sb-body">
           <div id="changelog-list" style="max-height:150px;overflow-y:auto;"></div>
         </div>
       </div>

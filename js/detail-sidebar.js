@@ -191,53 +191,37 @@ function showDetail(pairId) {
 // ============================================================
 // SIDEBAR ACCORDION
 // ============================================================
+// Nur Abschnitte mit Rumpf lassen sich falten. sec-pdf ist bloss ein Knopf
+// und bleibt aussen vor — sonst faerbte "alle aufklappen" seinen Rand mit.
+const _sbFaltbar = () => Array.from(document.querySelectorAll('.detail-sidebar .sidebar-section'))
+  .filter(s => s.querySelector('.sb-body'));
+
+// Der Zustand steht ausschliesslich in der Klasse .section-open am Abschnitt.
+// Aussehen und Bewegung leitet css/bausteine.css daraus ab; hier wird nichts
+// mehr inline gesetzt (das schlug sonst jede Regel).
 function toggleSection(id) {
   const section = document.getElementById(id);
-  if (!section) return;
-  const body = section.querySelector('.sb-body');
-  const chevron = section.querySelector('.sb-chevron');
-  if (!body) return;
-  const collapsed = body.classList.toggle('collapsed');
-  if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : '';
-  section.classList.toggle('section-open', !collapsed);
-  try { sessionStorage.setItem('sb-' + id, collapsed ? '1' : '0'); } catch(e) {}
+  if (!section || !section.querySelector('.sb-body')) return;
+  const offen = section.classList.toggle('section-open');
+  try { sessionStorage.setItem('sb-' + id, offen ? '0' : '1'); } catch(e) {}
   _updateCollapseAllBtn();
 }
 
 // Alle Sidebar-Sektionen auf- oder zuklappen
 function toggleAllSections() {
-  const sections = document.querySelectorAll('.detail-sidebar .sidebar-section');
-  // Zustand ermitteln: wenn mindestens eine offen ist → alle schliessen; sonst alle öffnen
-  const anyOpen = Array.from(sections).some(s => {
-    const body = s.querySelector('.sb-body');
-    return body && !body.classList.contains('collapsed');
-  });
-  sections.forEach(section => {
-    const body    = section.querySelector('.sb-body');
-    const chevron = section.querySelector('.sb-chevron');
-    if (!body) return;
-    if (anyOpen) {
-      body.classList.add('collapsed');
-      if (chevron) chevron.style.transform = 'rotate(-90deg)';
-      section.classList.remove('section-open');
-      try { sessionStorage.setItem('sb-' + section.id, '1'); } catch(e) {}
-    } else {
-      body.classList.remove('collapsed');
-      if (chevron) chevron.style.transform = '';
-      section.classList.add('section-open');
-      try { sessionStorage.setItem('sb-' + section.id, '0'); } catch(e) {}
-    }
+  // Ist mindestens einer offen → alle schliessen; sonst alle oeffnen.
+  const abschnitte = _sbFaltbar();
+  const anyOpen = abschnitte.some(s => s.classList.contains('section-open'));
+  abschnitte.forEach(section => {
+    section.classList.toggle('section-open', !anyOpen);
+    try { sessionStorage.setItem('sb-' + section.id, anyOpen ? '1' : '0'); } catch(e) {}
   });
   _updateCollapseAllBtn();
 }
 
 // Button-Label + Icon passend aktualisieren
 function _updateCollapseAllBtn() {
-  const sections = document.querySelectorAll('.detail-sidebar .sidebar-section');
-  const anyOpen  = Array.from(sections).some(s => {
-    const body = s.querySelector('.sb-body');
-    return body && !body.classList.contains('collapsed');
-  });
+  const anyOpen = _sbFaltbar().some(s => s.classList.contains('section-open'));
   const lbl  = document.getElementById('sb-collapse-all-label');
   const icon = document.getElementById('sb-collapse-all-icon');
   const btn = document.getElementById('sb-collapse-all-btn');
@@ -343,17 +327,7 @@ function restoreSectionStates() {
     const collapse = saved !== null ? saved === '1' : !SECTION_DEFAULT_OPEN.has(id);
     const section = document.getElementById(id);
     if (!section) return;
-    const body    = section.querySelector('.sb-body');
-    const chevron = section.querySelector('.sb-chevron');
-    if (collapse) {
-      if (body)    body.classList.add('collapsed');
-      if (chevron) chevron.style.transform = 'rotate(-90deg)';
-      section.classList.remove('section-open');
-    } else {
-      if (body)    body.classList.remove('collapsed');
-      if (chevron) chevron.style.transform = '';
-      section.classList.add('section-open');
-    }
+    section.classList.toggle('section-open', !collapse);
   });
   _initSidebarDragHandles();
 }

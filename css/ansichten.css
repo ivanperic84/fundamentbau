@@ -265,28 +265,6 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--c-bg); 
 /* Canvas unter Leaflet-Popups: wird per JS beim Öffnen/Schliessen gesteuert */
 .sketch-canvas.popup-open { z-index: 0 !important; }
 
-/* Sidebar — Karten-Layout */
-.sidebar-section {
-  background: white;
-  border-radius: 8px;
-  padding: 10px 12px 10px 14px;
-  border: none;
-  border-left: 3px solid #e0e4ea;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  transition: border-left-color 0.15s;
-}
-.sidebar-section.section-open { border-left-color: #1a3a5c; }
-.sidebar-section h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-.sidebar-section.section-open h3 { color: #1a3a5c; margin-bottom: 10px; }
-.sidebar-section h3:hover { color: #6b7280; }
-.sb-chevron { font-size: 15px; opacity: 0.45; transition: transform 0.2s; flex-shrink: 0; margin-left: 4px; }
-.sb-body { overflow: hidden; }
-.sb-body.collapsed { display: none; }
-.sb-drag-handle { display:inline-flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;cursor:grab;color:#d1d5db;font-size:13px;user-select:none;transition:color 0.15s; }
-.sb-drag-handle:hover { color:#9ca3af; }
-.sidebar-section.sb-dragging { opacity:0.4; }
-.sidebar-section.sb-drag-over-top    { border-top:2px solid #3b82f6 !important; }
-.sidebar-section.sb-drag-over-bottom { border-bottom:2px solid #3b82f6 !important; }
 .sb-cfg-row { display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb; }
 .sb-cfg-row.sb-drag-over-top    { border-top:2px solid #3b82f6; }
 .sb-cfg-row.sb-drag-over-bottom { border-bottom:2px solid #3b82f6; }

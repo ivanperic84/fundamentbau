@@ -215,3 +215,66 @@ textarea.field-input, textarea.modal-input { resize: vertical; }
    bewusst pointer-events:none, damit normale Toasts nicht stoeren. */
 .ui-toast.mit-aktion { pointer-events: auto; display: flex; align-items: center; }
 .ui-toast.mit-aktion button:hover { background: rgba(255,255,255,.18); }
+
+/* ── AUFKLAPPBARE SEKTION ─────────────────────────────────────
+   Die Abschnitte der Detail-Seitenleiste. Der Zustand steht an genau
+   EINER Stelle: .section-open am Abschnitt. Pfeilrichtung, Farbe der
+   Ueberschrift und Hoehe des Rumpfes leiten sich daraus ab.
+
+   Vorher setzte jede der drei JS-Stellen, die Abschnitte umschaltet,
+   das Aussehen selbst mit (chevron.style.transform, Klasse am Rumpf).
+   Inline gesetzte Werte schlagen jede Regel — deshalb liess sich die
+   Bewegung von hier aus gar nicht gestalten.
+
+   Die Hoehe animiert ueber die Rasterzeile: der Abschnitt ist ein
+   Raster aus Ueberschrift (auto) und Rumpf (0fr → 1fr). Das braucht
+   weder eine gemessene Hoehe noch ein zusaetzliches Element. 'display'
+   und 'height:auto' sind nicht animierbar, Rasterzeilen schon. Wo ein
+   Browser das nicht kann, springt es wie bisher — nichts geht kaputt. */
+.sidebar-section {
+  display: grid;
+  grid-template-rows: auto 0fr;
+  background: var(--c-surface);
+  /* 8px: eigener Wert zwischen --r-md (7) und --r-lg (10). Bewusst nicht
+     angeglichen — das haette die Geometrie des Bestands veraendert. */
+  border-radius: 8px;
+  padding: 10px 12px 10px 14px;
+  border: none;
+  border-left: 3px solid #e0e4ea;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: border-left-color var(--mo-schnell) var(--mo-kurve),
+              grid-template-rows  var(--mo-mittel)  var(--mo-kurve);
+}
+.sidebar-section.section-open {
+  grid-template-rows: auto 1fr;
+  border-left-color: var(--c-primary);
+}
+.sidebar-section h3 {
+  font-size: var(--fs-sm); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--c-text-faint); margin-bottom: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  transition: color var(--mo-schnell) var(--mo-kurve),
+              margin-bottom var(--mo-mittel) var(--mo-kurve);
+}
+.sidebar-section.section-open h3 { color: var(--c-primary); margin-bottom: 10px; }
+.sidebar-section h3:hover { color: var(--c-text-muted); }
+/* Nur die Pfeile IN einem Abschnitt drehen sich mit dem Zustand. Ausserhalb
+   gibt es .sb-chevron auch (Projektbeteiligte), dort steuert JS die Drehung
+   weiterhin inline — eine Vorgabe hier wuerde die Ruhelage umdrehen. */
+.sb-chevron { font-size: 15px; opacity: 0.45; flex-shrink: 0; margin-left: 4px; }
+.sidebar-section .sb-chevron {
+  transform: rotate(-90deg);
+  transition: transform var(--mo-mittel) var(--mo-kurve);
+}
+.sidebar-section.section-open .sb-chevron { transform: none; }
+/* min-height:0 — ohne das kann der Rumpf als Rasterelement nicht unter seine
+   Inhaltshoehe schrumpfen, und die Zeile bliebe trotz 0fr stehen. */
+.sb-body { overflow: hidden; min-height: 0; }
+
+.sb-drag-handle { display:inline-flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;cursor:grab;color:var(--c-border-strong);font-size:13px;user-select:none;transition:color var(--mo-schnell); }
+.sb-drag-handle:hover { color:var(--c-text-faint); }
+.sidebar-section.sb-dragging { opacity:0.4; }
+.sidebar-section.sb-drag-over-top    { border-top:2px solid var(--c-focus) !important; }
+.sidebar-section.sb-drag-over-bottom { border-bottom:2px solid var(--c-focus) !important; }
