@@ -290,6 +290,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--c-bg); 
 .sb-cfg-row.sb-drag-over-top    { border-top:2px solid #3b82f6; }
 .sb-cfg-row.sb-drag-over-bottom { border-bottom:2px solid #3b82f6; }
 .sb-cfg-row.sb-cfg-dragging { opacity:0.4; }
+/* Zeile einer eigenen Vorlage in den Einstellungen. */
+.sb-vorlage-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sb-vorlage-zahl {
+  flex-shrink:0; font-size: var(--fs-xs); font-weight:700;
+  color: var(--c-text-muted); background: var(--c-surface-inset);
+  border-radius: 3px; padding: 1px 6px;
+}
+.sb-vorlage-leer { font-size: var(--fs-sm); color: var(--c-text-faint); padding: 2px 0 6px; }
 
 /* Sub-Label innerhalb Sidebar-Sektionen */
 .sb-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; margin-bottom: 5px; }

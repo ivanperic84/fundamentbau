@@ -517,10 +517,12 @@ function saveTemplateDefaults(d) {
 }
 
 // App-Einstellungen Modal
-function openAppSettingsModal() {
+// reiter (optional): direkt dorthin springen, z. B. vom Zahnrad neben der
+// Vorlagenauswahl in der Seitenleiste.
+function openAppSettingsModal(reiter) {
   closeProjektModal();
   document.getElementById('app-settings-modal').classList.add('open');
-  openAppSettingsTab('allgemein');
+  openAppSettingsTab(reiter || 'allgemein');
   refreshStorageEstimate();
   refreshBackupLabel();
 }
@@ -732,6 +734,7 @@ function initAppTabSidebar() {
 
     list.appendChild(row);
   });
+  sbVorlagenListeFuellen();
 }
 
 function initAppTabPhasen() {
@@ -850,19 +853,42 @@ function saveUserProfile() {
 // eine Begehung macht, braucht davon vier. Eine Vorlage blendet den Rest aus
 // — zusaetzlich zur Phasenlogik und zur Sichtbarkeit aus den Einstellungen,
 // nie darueber hinweg: gezeigt wird nur, was ohnehin sichtbar waere.
-const SB_VORLAGE_KEY = 'sp_sb_vorlage';
+const SB_VORLAGE_KEY  = 'sp_sb_vorlage';
+// Eigene Vorlagen liegen projektuebergreifend: sie bilden die Arbeitsweise ab,
+// nicht das Projekt. Wer Begehungen macht, macht sie ueberall gleich.
+const SB_VORLAGEN_KEY = 'sp_sb_vorlagen';
 
-const SB_VORLAGEN = [
-  { id: 'alles',      label: 'Alle Gruppen', sektionen: null },
-  { id: 'begehung',   label: 'Begehung',     sektionen: ['sec-meta','sec-begehung','sec-zugang','sec-fotos','sec-skizzen','sec-notizen'] },
-  { id: 'bauprojekt', label: 'Bauprojekt',   sektionen: ['sec-meta','sec-phase-bauprojekt','sec-hoehenkoten','sec-bodenkennwerte','sec-naturschutz','sec-notizen'] },
-  { id: 'ausfuehrung',label: 'Ausführung',   sektionen: ['sec-meta','sec-ausfplanung','sec-termine','sec-sicher','sec-aushub','sec-material','sec-abnahme-link','sec-notizen'] },
-  { id: 'bilder',     label: 'Bilder & Notizen', sektionen: ['sec-meta','sec-fotos','sec-skizzen','sec-notizen'] },
+// Mitgeliefert — die Saat, nicht die ganze Liste.
+//
+// 'Bauprojekt' und 'Ausfuehrung' sind entfallen. Die Phasenlogik blendet in
+// diesen Phasen ohnehin genau diese Gruppen ein; die Vorlage hat nichts
+// hinzugefuegt und stand nur doppelt in der Auswahl. Wer sie in einem eigenen
+// Zuschnitt zurueckwill, legt sie sich selbst an — dafuer gibt es das jetzt.
+// Ein gespeicherter Verweis auf eine der beiden faellt in sbVorlageAktiv()
+// auf 'Alle Gruppen' zurueck, es bleibt also nichts haengen.
+const SB_VORLAGEN_FEST = [
+  { id: 'alles',    label: 'Alle Gruppen', sektionen: null },
+  { id: 'begehung', label: 'Begehung',     sektionen: ['sec-meta','sec-begehung','sec-zugang','sec-fotos','sec-skizzen','sec-notizen'] },
+  { id: 'bilder',   label: 'Bilder & Notizen', sektionen: ['sec-meta','sec-fotos','sec-skizzen','sec-notizen'] },
 ];
+
+// Notizen stehen in keiner Vorlage zur Wahl. Sie sind das, was man unterwegs
+// dazuschreibt, und stecken in jeder mitgelieferten Vorlage — eine eigene
+// Vorlage ohne sie waere eine Falle.
+const SB_VORLAGE_IMMER = ['sec-notizen'];
+
+function ladeEigeneVorlagen() {
+  try { const l = jsonParse(store.getItem(SB_VORLAGEN_KEY)); return Array.isArray(l) ? l : []; }
+  catch { return []; }
+}
+function speichereEigeneVorlagen(liste) { store.setItem(SB_VORLAGEN_KEY, JSON.stringify(liste)); }
+
+// Mitgelieferte zuerst, eigene in der Reihenfolge ihrer Entstehung danach.
+function sbVorlagen() { return SB_VORLAGEN_FEST.concat(ladeEigeneVorlagen()); }
 
 function sbVorlageAktiv() {
   const id = store.getItem(SB_VORLAGE_KEY);
-  return SB_VORLAGEN.find(v => v.id === id) ? id : 'alles';
+  return sbVorlagen().some(v => v.id === id) ? id : 'alles';
 }
 
 function sbVorlageSetzen(id) {
@@ -873,9 +899,73 @@ function sbVorlageSetzen(id) {
 function sbVorlageWahlFuellen() {
   const sel = document.getElementById('sb-vorlage');
   if (!sel) return;
-  const aktiv = sbVorlageAktiv();
-  sel.innerHTML = SB_VORLAGEN.map(v =>
-    `<option value="${v.id}"${v.id === aktiv ? ' selected' : ''}>${escHtml(v.label)}</option>`).join('');
+  const aktiv  = sbVorlageAktiv();
+  const eigene = ladeEigeneVorlagen();
+  const opt = v => `<option value="${v.id}"${v.id === aktiv ? ' selected' : ''}>${escHtml(v.label)}</option>`;
+  // Getrennte Gruppen erst, wenn es etwas zu trennen gibt — sonst steht ueber
+  // drei Eintraegen eine Ueberschrift, die nichts erklaert.
+  sel.innerHTML = eigene.length
+    ? '<optgroup label="Mitgeliefert">' + SB_VORLAGEN_FEST.map(opt).join('') + '</optgroup>'
+      + '<optgroup label="Eigene">' + eigene.map(opt).join('') + '</optgroup>'
+    : SB_VORLAGEN_FEST.map(opt).join('');
+}
+
+// ── Eigene Vorlagen verwalten (Reiter «Seitenleiste») ───────
+// Die Haekchen der Sichtbarkeitsliste sind die Auswahl: anhaken, benennen,
+// sichern. Damit gibt es keine zweite Stelle, an der man Gruppen auswaehlt.
+async function sbVorlageSichern() {
+  const feld = document.getElementById('sb-vorlage-name');
+  const name = (feld?.value || '').trim();
+  if (!name) { ui.toast('Bitte einen Namen für die Vorlage eingeben.', 'fehler'); feld?.focus(); return; }
+
+  const gewaehlt = SIDEBAR_SECTIONS
+    .filter(s => document.getElementById('sbcfg-' + s.id)?.checked)
+    .map(s => s.id);
+  if (!gewaehlt.length) { ui.toast('Keine Gruppe angehakt — die Vorlage wäre leer.', 'fehler'); return; }
+
+  const liste = ladeEigeneVorlagen();
+  const schon = liste.find(v => v.label.toLowerCase() === name.toLowerCase());
+  if (schon && !await ui.confirm(`Eine Vorlage «${name}» gibt es schon. Überschreiben?`)) return;
+
+  const sektionen = gewaehlt.concat(SB_VORLAGE_IMMER.filter(id => !gewaehlt.includes(id)));
+  if (schon) schon.sektionen = sektionen;
+  else liste.push({ id: 'eigen-' + Date.now(), label: name, sektionen });
+
+  speichereEigeneVorlagen(liste);
+  if (feld) feld.value = '';
+  sbVorlagenListeFuellen();
+  sbVorlageWahlFuellen();
+  ui.toast(`Vorlage «${name}» gesichert.`, 'erfolg');
+}
+
+async function sbVorlageLoeschen(id) {
+  const liste = ladeEigeneVorlagen();
+  const v = liste.find(x => x.id === id);
+  if (!v) return;
+  if (!await ui.confirm(`Vorlage «${v.label}» löschen?`, { gefaehrlich: true, ok: 'Löschen' })) return;
+  speichereEigeneVorlagen(liste.filter(x => x.id !== id));
+  // Wer gerade auf ihr stand, faellt auf «Alle Gruppen» zurueck statt auf
+  // eine Vorlage, die es nicht mehr gibt.
+  if (store.getItem(SB_VORLAGE_KEY) === id) store.setItem(SB_VORLAGE_KEY, 'alles');
+  sbVorlagenListeFuellen();
+  applySidebarCfg();
+  ui.toast('Vorlage gelöscht.');
+}
+
+function sbVorlagenListeFuellen() {
+  const box = document.getElementById('sb-vorlagen-liste');
+  if (!box) return;
+  const eigene = ladeEigeneVorlagen();
+  if (!eigene.length) {
+    box.innerHTML = '<div class="sb-vorlage-leer">Noch keine eigene Vorlage.</div>';
+    return;
+  }
+  box.innerHTML = eigene.map(v => `
+    <div class="sb-cfg-row">
+      <span class="sb-vorlage-name">${escHtml(v.label)}</span>
+      <span class="sb-vorlage-zahl">${v.sektionen.length}</span>
+      <button class="btn btn-ghost btn-sm" onclick="sbVorlageLoeschen('${v.id}')" title="Vorlage löschen">Löschen</button>
+    </div>`).join('');
 }
 
 function loadSidebarCfg() {
@@ -903,7 +993,7 @@ function sbPhasenStandMerken() {
 
 function applySidebarCfg() {
   const cfg     = loadSidebarCfg();
-  const vorlage = SB_VORLAGEN.find(v => v.id === sbVorlageAktiv());
+  const vorlage = sbVorlagen().find(v => v.id === sbVorlageAktiv());
   const erlaubt = vorlage?.sektionen ? new Set(vorlage.sektionen) : null;
   sbVorlageWahlFuellen();
   _sbAlleSektionen().forEach(id => {

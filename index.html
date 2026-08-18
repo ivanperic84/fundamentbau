@@ -1173,6 +1173,8 @@
           </button>
           <button onclick="resetSbOrder()" class="nur-seitenleiste" title="Gruppen-Reihenfolge zurücksetzen"
             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;line-height:1;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:-2px;" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+          <button onclick="openAppSettingsModal('sidebar')" class="nur-seitenleiste" title="Vorlagen und Gruppen verwalten"
+            style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;border:1px solid #dde3ea;background:white;cursor:pointer;color:#6b7280;padding:0;flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         </div>
       </div>
       <!-- Auto-Save Indikator -->
@@ -6028,6 +6030,22 @@ function _ladeScript(pfad) {
         <button onclick="saveSidebarCfg()" class="btn btn-primary" style="width:100%;">
           Einstellungen speichern
         </button>
+
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--c-border);">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Eigene Vorlagen</div>
+          <p style="font-size:11px;color:#6b7280;margin:0 0 10px;line-height:1.5;">
+            Die Häkchen oben sind die Auswahl: anhaken, benennen, sichern. Notizen
+            sind in jeder Vorlage dabei. Die Zahl nennt die Anzahl Gruppen.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;" id="sb-vorlagen-liste">
+            <!-- Wird durch sbVorlagenListeFuellen() befüllt -->
+          </div>
+          <div style="display:flex;gap:6px;">
+            <input id="sb-vorlage-name" class="field-input" maxlength="30"
+              placeholder="Name der Vorlage" style="flex:1;min-width:0;">
+            <button onclick="sbVorlageSichern()" class="btn btn-secondary" style="flex-shrink:0;">Sichern</button>
+          </div>
+        </div>
       </div>
 
       <!-- ══ TAB: Phasen ══ -->
