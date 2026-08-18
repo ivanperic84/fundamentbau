@@ -52,6 +52,7 @@ const APP_MODULE = [
   'js/listen-bsp.js',
   'js/bahn.js',
   'js/massen-kosten.js',
+  'js/blockcalc-bridge.js',
   'js/start.js',
 ];
 
@@ -113,6 +114,18 @@ self.addEventListener('fetch', event => {
 
   // Nur GET und nur same-origin cachen; alles andere direkt ins Netz
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // BlockCalc liegt als eigenstaendige Anwendung unter /blockcalc/ und bringt
+  // einen eigenen Service Worker mit. Dieser hier haelt sich davon fern.
+  //
+  // Ohne die Ausnahme verschluckt die SPA-Regel weiter unten den iframe: eine
+  // iframe-Navigation hat mode === 'navigate', also lieferte der Cache die
+  // Schale der Fundamentbau-App aus — gemessen kam im iframe <title>
+  // Fundamentbau mit 603'838 Zeichen an, waehrend ein blosses fetch() derselben
+  // Adresse die echten 1'056'991 Zeichen mit <title>BlockCalc — SIA 267 lieferte.
+  // Im iframe lief daher kein einziges Skript von BlockCalc, und der Handschlag
+  // blieb aus.
+  if (url.pathname.includes('/blockcalc/')) return;
 
   // version.js: Netz zuerst, Cache nur als Rueckfall (offline)
   if (url.pathname.endsWith('/' + NETZ_ZUERST) || url.pathname === '/' + NETZ_ZUERST) {

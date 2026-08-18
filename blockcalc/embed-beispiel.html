@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlockCalc — Einbindungsbeispiel (Host-Seite)</title>
+<!--
+  Referenz-Implementierung der HOST-Seite (Fundamentbau-App) für die iframe-Einbindung.
+  Diese Datei ist Vorlage und Testpartner zugleich — der produktive Code in der Fundamentbau-App
+  folgt demselben Ablauf.
+
+  Ablauf
+    1. Host öffnet <iframe src="blockcalc/index.html?embed=1">
+    2. Guest meldet  {type:'blockcalc:ready'}
+    3. Host schickt  {type:'blockcalc:case',   payload:{…}}
+    4. Guest meldet  {type:'blockcalc:loaded', id, hinweise:[…]}
+    5. Ingenieur prüft/dimensioniert in BlockCalc
+    6. Guest schickt {type:'blockcalc:result', id, payload:{…}}   ← Abmessungen zurückschreiben
+       oder          {type:'blockcalc:cancel', id}
+
+  Origin
+    Liegt BlockCalc als Unterordner der Host-App, ist alles same-origin — nichts zu konfigurieren.
+    Bei getrennten Origins zusätzlich EMBED_ORIGINS in index.html ergänzen.
+-->
+<style>
+  :root{ --bg:#faf9f7; --s1:#fff; --ol:#e2e0dc; --on:#26241f; --dim:#77736c; --acc:#4a5cb8; }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--on);
+       display:grid;grid-template-columns:340px 1fr;height:100dvh}
+  .side{border-right:1px solid var(--ol);background:var(--s1);overflow-y:auto;padding:16px}
+  h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:18px 0 8px;color:var(--dim);
+     text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .pos{border:1px solid var(--ol);border-radius:4px;padding:9px 11px;margin-bottom:7px;cursor:pointer}
+  .pos:hover{border-color:var(--acc)}
+  .pos b{display:block;font-size:13px} .pos span{color:var(--dim);font-size:12px}
+  .pos .res{margin-top:6px;padding-top:6px;border-top:1px dashed var(--ol);font-size:12px}
+  .ok{color:#2f7a45} .bad{color:#a02020}
+  iframe{border:0;width:100%;height:100%;display:block}
+  pre{background:#f3f1ee;border:1px solid var(--ol);border-radius:4px;padding:8px;
+      font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:230px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="side">
+  <h1>Fundamentbau-App <span style="color:var(--dim);font-weight:400">(Beispiel-Host)</span></h1>
+  <div style="color:var(--dim);font-size:12px">Position anklicken → in BlockCalc prüfen.</div>
+
+  <h2>Spezialfundamente</h2>
+  <div id="liste"></div>
+
+  <h2>Protokoll</h2>
+  <pre id="log">–</pre>
+</div>
+<iframe id="bc" src="index.html?embed=1" title="BlockCalc"></iframe>
+
+<script>
+// ── Positionen: so, wie sie aus der Fundamentbau-App kämen ────────────────────
+// Nur Positionen mit Spezialfundament werden gerechnet.
+const POSITIONEN = [
+  { id:'P-101', fundament:'Mast 42', mastNr:'42', km:'12.480', typ:'DP2a',
+    fundamentArt:'blockfundament', blockAbmessung:'1200×1200 mm', tiefe:2.00,
+    kopfAbmessung:'600×600 mm', kopfHoehe:1.00, terrain:null,
+    neigungKlasse:'<=14',
+    bk:{ me:25, phi:27, gamma:20, c:0, grundwasser:false } },
+
+  { id:'P-102', fundament:'Mast 43', mastNr:'43', km:'12.615', typ:'HP1a',
+    fundamentArt:'blockfundament', blockAbmessung:'1300×1300 mm', tiefe:3.20,
+    kopfAbmessung:'600×600 mm', kopfHoehe:1.00, terrain:0.25,
+    neigungKlasse:'14-33',
+    bk:{ me:15, phi:24, gamma:19, c:5, grundwasser:true, gwTiefe:2.60 } },
+
+  { id:'P-103', fundament:'Mast 44', mastNr:'44', km:'12.790', typ:'DP1a',
+    fundamentArt:'pfahlfundament', blockAbmessung:'2000×2000 mm', tiefe:0.60,
+    kopfAbmessung:'600×600 mm', kopfHoehe:1.00, terrain:null,
+    anzahlPfaehle:4, pfahlLaenge:10.0,
+    neigungKlasse:'<=14',
+    bk:{ me:25, phi:30, gamma:20, c:0, grundwasser:false } },
+];
+
+const ERGEBNIS = {};                       // id → zurückgemeldetes Resultat
+const logEl = document.getElementById('log');
+const frame = document.getElementById('bc');
+let ready = false, wartend = null;
+
+const log = (...a) => { logEl.textContent =
+  (a.map(x => typeof x==='string' ? x : JSON.stringify(x,null,1)).join(' ') + '\n\n' + logEl.textContent)
+  .slice(0, 4000); };
+
+// „1200×1200 mm" → [1.20, 1.20]
+function masse(s){
+  const m = String(s||'').match(/(\d+(?:[.,]\d+)?)\s*[×x*]\s*(\d+(?:[.,]\d+)?)/);
+  if(!m) return [null,null];
+  const f = v => { const n = parseFloat(String(v).replace(',','.')); return n > 20 ? n/1000 : n; };
+  return [f(m[1]), f(m[2])];
+}
+
+// ── Position → Rechenfall (das eigentliche Austauschformat) ───────────────────
+function baueFall(p){
+  const [B,L]   = masse(p.blockAbmessung);
+  const [Bk,Lk] = masse(p.kopfAbmessung);
+  const ART = { blockfundament:'block', flachfundament:'flach', stahlplatte:'flach',
+                pfahlfundament:'pfahlbock' };
+  return {
+    schema:'blockcalc.case/1',
+    id: p.id,
+    meta:{ projekt:'Weinfelden–Sulgen', fundament:p.fundament, mastNr:p.mastNr, km:p.km,
+           bearbeiter:'—' },
+    modell: ART[p.fundamentArt] || 'block',
+    geometrie:{
+      B, L, H_Block:p.tiefe, B_Kopf:Bk, L_Kopf:Lk,
+      kopfHoehe: p.kopfHoehe,                 // GESAMTMASS OK Block → OK Kopf
+      ueberstand: p.terrain,                  // OK Kopf über Terrain; null ⇒ BlockCalc nimmt ü = 0.40
+      pfahlAnzahl:p.anzahlPfaehle, pfahlLaenge:p.pfahlLaenge
+    },
+    baugrund:{
+      schichten:[{ name:'Baugrund', phi:p.bk.phi, c:p.bk.c, gamma:p.bk.gamma,
+                   gamma2:Math.max(8, p.bk.gamma-10), me:p.bk.me, d:999 }],
+      gw: !!p.bk.grundwasser, gwTiefe: p.bk.gwTiefe ?? null,
+      neigung:{ klasse:p.neigungKlasse }      // BlockCalc setzt konservativ die Klassenobergrenze
+    },
+    lasten:{ typ:p.typ, vFall:'max' }         // V=150; der V=0-Fall wird separat geschickt
+  };
+}
+
+function pruefen(p){
+  const fall = baueFall(p);
+  if(!ready){ wartend = fall; log('warte auf BlockCalc …'); return; }
+  frame.contentWindow.postMessage({v:1, type:'blockcalc:case', payload:fall}, '*');
+  log('→ case', p.id, p.typ);
+}
+
+// ── Rückmeldungen ─────────────────────────────────────────────────────────────
+addEventListener('message', e => {
+  const d = e.data;
+  if(!d || typeof d!=='object' || String(d.type||'').indexOf('blockcalc:')!==0) return;
+  // Produktiv: e.origin gegen den erwarteten Origin prüfen (bei Unterordner === location.origin)
+  if(d.type === 'blockcalc:ready'){
+    ready = true; log('← ready', d.version);
+    if(wartend){ frame.contentWindow.postMessage({v:1,type:'blockcalc:case',payload:wartend},'*'); wartend=null; }
+  }
+  else if(d.type === 'blockcalc:loaded'){ log('← loaded', d.id, d.hinweise&&d.hinweise.length?d.hinweise:''); }
+  else if(d.type === 'blockcalc:cancel'){ log('← abgebrochen', d.id); }
+  else if(d.type === 'blockcalc:error'){  log('← FEHLER', d.message); }
+  else if(d.type === 'blockcalc:result'){
+    const r = d.payload; ERGEBNIS[d.id] = r; log('← result', r); rendern();
+    // Hier schreibt die Fundamentbau-App die dimensionierten Werte in die Position zurück:
+    const p = POSITIONEN.find(x => x.id === d.id);
+    if(p && r.abmessung && r.abmessung.B){
+      p.blockAbmessung = Math.round(r.abmessung.B*1000)+'×'+Math.round(r.abmessung.L*1000)+' mm';
+      if(r.abmessung.H_Block) p.tiefe = r.abmessung.H_Block;
+      rendern();
+    }
+  }
+});
+
+// ── Liste ─────────────────────────────────────────────────────────────────────
+function rendern(){
+  document.getElementById('liste').innerHTML = POSITIONEN.map(p => {
+    const r = ERGEBNIS[p.id];
+    const res = !r ? '' :
+      `<div class="res ${r.nachweise.erfuellt?'ok':'bad'}">
+         ${r.bauweise} · ${r.abmessungText}<br>
+         η = ${r.nachweise.etaMin==null?'–':r.nachweise.etaMin.toFixed(2)}
+         (${r.nachweise.massgebend}) — ${r.nachweise.erfuellt?'erfüllt':'nicht erfüllt'}
+       </div>`;
+    return `<div class="pos" onclick="pruefen(POSITIONEN[${POSITIONEN.indexOf(p)}])">
+              <b>${p.fundament} — ${p.typ}</b>
+              <span>km ${p.km} · ${p.fundamentArt} · ${p.blockAbmessung} / ${Number(p.tiefe).toFixed(2)} m
+                    · Neigung ${p.neigungKlasse}</span>${res}
+            </div>`;
+  }).join('');
+}
+rendern();
+</script>
+</body>
+</html>

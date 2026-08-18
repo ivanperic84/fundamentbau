@@ -3347,6 +3347,12 @@
               Spezialfundament — Statischer Nachweis erforderlich <em style="color:#6b7280;">(kann später ergänzt werden)</em>
             </div>
             <input id="bp-nachweis-link" type="url" onchange="saveBauprojektFeld()" placeholder="https://… oder Dok.-Nr." style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;">
+            <!-- Nachweis in BlockCalc rechnen (js/blockcalc-bridge.js). Sichtbarkeit steuert
+                 bcStatusAktualisieren(): nur bei Bauweisen, die BlockCalc abbildet. -->
+            <button id="bc-btn" onclick="bcNachweisOeffnen()" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:6px;font-size:12px;font-family:inherit;font-weight:600;cursor:pointer;">
+              In BlockCalc prüfen
+            </button>
+            <div id="bc-status" style="display:none;"></div>
           </div>
 
           <!-- Referenztyp: Familien-Kürzel für Fundamentschrauben-Spezifikation (bei Spezialfundamenten) -->
@@ -4478,6 +4484,7 @@ const APP_MODULE = [
   'js/listen-bsp.js',            // Dynamische Listen, Listen-Export, Begehungsskizze, BSP
   'js/bahn.js',                  // Bahnlinien-Ebene (BAV) und Kilometrierung (SBB)
   'js/massen-kosten.js',         // Massenauszug, Leistungsverzeichnis, Kostenschaetzung
+  'js/blockcalc-bridge.js',      // Statischer Nachweis in BlockCalc (iframe + postMessage)
   'js/start.js',                 // MUSS LETZTES BLEIBEN: einmalige Startlogik
 ];
 

@@ -601,6 +601,8 @@ function loadBauprojektFelder(pairId) {
   updateBodenkennwerteUI();
   updateBpFundAbmessung();
   loadHoehenkoten();
+  // BlockCalc-Nachweis: Button-Sichtbarkeit + zuletzt übernommenes Ergebnis
+  if (typeof bcStatusAktualisieren === 'function') bcStatusAktualisieren(pairId);
 }
 
 function saveBauprojektFeld() {
