@@ -508,6 +508,10 @@ select.feld-input { cursor: pointer; }
   max-width: calc(100% - 20px);
 }
 .sketch-toolbar::-webkit-scrollbar { display: none; }
+/* Beschriftung der Werkzeuge. Sie weicht, sobald die Leiste breiter wuerde als
+   die Karte — wer sie setzt, misst nach (toolbarBeschriftungPruefen in
+   js/modals.js). Die Symbole behalten in jedem Fall ihren Titel. */
+.sketch-toolbar.ohne-wort .tool-wort { display: none; }
 
 /* Schnellzugriff in der Detailansicht — über der Werkzeugleiste, rechts */
 /* Über der Werkzeugleiste: diese ist mittig, die Knöpfe rechts — auf

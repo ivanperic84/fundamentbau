@@ -59,6 +59,12 @@ function _uebergang(vorher, zielSuchen, wechsel) {
     if (ziel) { ziel.style.viewTransitionName = UEBERGANG_PAAR; gesetzt.push(ziel); }
   });
 
+  // ready lehnt ab, sobald der Uebergang abgebrochen wird — etwa weil schon der
+  // naechste startet, wenn jemand zuegig durch die Standorte blaettert. Das ist
+  // kein Fehler; ohne Behandlung meldet der Browser aber eine unbehandelte
+  // Ablehnung in der Konsole. finished raeumt in beiden Faellen auf.
+  vt.ready.catch(() => {});
+
   const aufraeumen = () => {
     _uebergangLaeuft = false;
     gesetzt.forEach(el => { el.style.viewTransitionName = ''; });

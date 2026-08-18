@@ -72,16 +72,32 @@ function onMessOptionChange() {
   speichereMessCfg(cfg);
   const w = document.getElementById('ko-mess-deckkraft-wert');
   if (w) w.textContent = cfg.deckkraft + ' %';
-  messToolbarBeschriftung();
+  toolbarBeschriftungPruefen();
   renderMeasureLayer();
 }
 
-// Beschriftung der Werkzeugleiste ein- oder ausblenden. Die Woerter stehen im
-// Markup als eigenes Element, damit sie sich schalten lassen, ohne dass die
-// Symbole ihre Bedeutung verlieren — der Titel bleibt in jedem Fall.
-function messToolbarBeschriftung() {
-  const nur = ladeMessCfg().nurSymbole;
-  document.querySelectorAll('.tool-wort').forEach(el => { el.style.display = nur ? 'none' : ''; });
+// Beschriftung der Werkzeugleiste. Die Woerter stehen im Markup als eigenes
+// Element, damit sie sich schalten lassen, ohne dass die Symbole ihre Bedeutung
+// verlieren — der Titel bleibt in jedem Fall.
+//
+// Sie weichen, sobald die Werkzeuge nicht mehr nebeneinander passen. Gemessen
+// und nicht an eine feste Breite gebunden, weil die Leiste ihre Laenge mit dem
+// Modus aendert: im Kartenmodus sind es drei Knoepfe (gemessen 301 px), im
+// Messmodus kommen acht dazu (627 px). In der Detailansicht teilt sich die
+// Karte den Schirm mit der Seitenleiste und laesst der Leiste 616 px — der
+// Messmodus passte dort bisher nicht und musste gescrollt werden. Ein fester
+// Schwellwert waere fuer einen der beiden Zustaende immer falsch, und beim
+// naechsten Knopf fuer beide.
+function toolbarBeschriftungPruefen() {
+  const leiste = document.querySelector('.sketch-toolbar');
+  if (!leiste) return;
+  // Der Handschalter aus den Optionen geht vor: wer nur Symbole will, bekommt
+  // nur Symbole, auch wenn Platz da waere.
+  if (ladeMessCfg().nurSymbole) { leiste.classList.add('ohne-wort'); return; }
+  // Immer zuerst mit Woertern messen — sonst kaemen sie nicht zurueck, wenn
+  // wieder Platz da ist (Karte im Vollbild, Seitenleiste eingeklappt).
+  leiste.classList.remove('ohne-wort');
+  if (leiste.scrollWidth > leiste.clientWidth) leiste.classList.add('ohne-wort');
 }
 
 function loadMeasureLayer(pairId) {

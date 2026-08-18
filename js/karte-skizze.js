@@ -106,6 +106,10 @@ function karteGroesseBeobachten(karte) {
       angefordert = false;
       karte.invalidateSize({ animate: false });
       if (karte === leafletMap && typeof resizeSketchCanvas === 'function') resizeSketchCanvas();
+      // Mit der Karte aendert sich der Platz fuer die Werkzeugleiste. Hier und
+      // nicht in einem eigenen Beobachter: es ist dasselbe Ereignis, und der
+      // rAF-Riegel oben drosselt beides zusammen.
+      if (karte === leafletMap && typeof toolbarBeschriftungPruefen === 'function') toolbarBeschriftungPruefen();
     });
   });
   wache.observe(karte.getContainer());
@@ -1843,6 +1847,8 @@ function setMode(mode) {
   });
   document.getElementById('pan-tools').style.display = (mode === 'pan') ? 'flex' : 'none';
   document.getElementById('measure-tools').style.display = isMeasure ? 'flex' : 'none';
+  // Die Leiste ist jetzt anders lang — nachsehen, ob die Woerter noch passen.
+  if (typeof toolbarBeschriftungPruefen === 'function') toolbarBeschriftungPruefen();
 
   if (isMeasure) startMeasure();
 }
