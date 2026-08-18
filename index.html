@@ -19,7 +19,6 @@
 <meta name="apple-mobile-web-app-title" content="Fundamentbau">
 <!-- Bibliotheken lokal (lib/) statt CDN — App funktioniert damit auch offline.
      Versionen: Leaflet 1.9.4, SheetJS 0.20.2, jsPDF 2.5.1, autotable 3.8.2, html2canvas 1.4.1 -->
-<link rel="stylesheet" href="lib/leaflet.css"/>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -43,9 +42,14 @@
        marken     — nur Variablen: Farben, Abstaende, Radien, Bewegung
        bausteine  — wiederverwendbare Bauteile: Knopf, Feld, Reiter
        ansichten  — was nur eine Stelle braucht
-     Die Folge entspricht dem frueheren <style>-Block; die Kaskade ist
-     unveraendert. Ohne ?v=: der Service Worker holt die Dateien beim
-     Versionswechsel mit cache:'reload' neu, wie index.html selbst. -->
+     Jede Datei fasst ihren Inhalt in eine gleichnamige @layer; die Folge
+     steht in css/marken.css. Damit entscheidet die Zugehoerigkeit, wer
+     gewinnt, und nicht die Laenge des Selektors.
+     Leaflet kommt von dort per @import in die unterste Ebene 'fremd' — als
+     ungeschichtetes <link> haette es nach der Umstellung alle eigenen
+     Kartenregeln ueberstimmt.
+     Ohne ?v=: der Service Worker holt die Dateien beim Versionswechsel mit
+     cache:'reload' neu, wie index.html selbst. -->
 <link rel="stylesheet" href="css/marken.css">
 <link rel="stylesheet" href="css/bausteine.css">
 <link rel="stylesheet" href="css/ansichten.css">

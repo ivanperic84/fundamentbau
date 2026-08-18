@@ -9,12 +9,13 @@
    wandert es nach css/bausteine.css.
    ============================================================ */
 
+@layer ansichten {
+
 /* ── Basis ────────────────────────────────────────────────── */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-/* Platz der Bildlaufleiste dauerhaft freihalten: sonst verschiebt sich beim
-   Wechsel zwischen kurzem und langem Inhalt die ganze Seite um deren Breite
-   (gemessen 15 px). */
-html { scrollbar-gutter: stable; }
+/* Der Reset (* und html) steht in css/marken.css in der Ebene 'reset'.
+   Hier stand er bis v223; seit der Schichtung waere 'ansichten' die
+   oberste Ebene, und * haette als Regel ohne Spezifitaet trotzdem jede
+   Bausteinregel geschlagen — gemessen 44 Elemente ohne Polsterung. */
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--c-bg); color: var(--c-text-strong); font-size: 14px; }
 
 .header {
@@ -1313,4 +1314,6 @@ select.create-input { cursor: pointer; }
 }
 .an-filter-active {
   background: #1a3a5c; color: white; border-color: #1a3a5c;
+}
+
 }

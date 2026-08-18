@@ -10,6 +10,8 @@
    gar nicht als style="..." in einer JS-Zeichenkette.
    ============================================================ */
 
+@layer bausteine {
+
 /* ── UI-UTILITIES ─────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -278,3 +280,5 @@ textarea.field-input, textarea.modal-input { resize: vertical; }
 .sidebar-section.sb-dragging { opacity:0.4; }
 .sidebar-section.sb-drag-over-top    { border-top:2px solid var(--c-focus) !important; }
 .sidebar-section.sb-drag-over-bottom { border-bottom:2px solid var(--c-focus) !important; }
+
+}

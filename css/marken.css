@@ -1,5 +1,8 @@
 /* ============================================================
-   MARKEN — die Gestaltungswerte der App, sonst nichts.
+   GRUNDLAGE UND MARKEN.
+
+   Die Datei legt zuerst den Boden — Ebenenfolge, Leaflet als Fremdebene,
+   Reset — und danach die Gestaltungswerte der App.
 
    Diese Datei enthaelt ausschliesslich Variablen. Wer eine Farbe, einen
    Abstand, einen Radius oder eine Dauer braucht, holt sie hier heraus
@@ -12,6 +15,41 @@
    Sie entspricht der frueheren Quelltextfolge im <style>-Block von
    index.html. Das Herausloesen hat an der Kaskade nichts geaendert.
    ============================================================ */
+
+/* ── EBENENFOLGE ──────────────────────────────────────────────
+   Ab hier entscheidet die Zugehoerigkeit zu einer Ebene, wer gewinnt — nicht
+   mehr die Spezifitaet des Selektors. Eine Regel in 'ansichten' schlaegt eine
+   in 'bausteine', auch wenn sie kuerzer ist. Genau das war vorher die Quelle
+   der immer laengeren Selektoren.
+
+   'fremd' enthaelt Leaflet und liegt ueber dem Reset, aber unter allem Eigenen. Ungeschichtetes CSS wuerde
+   jede Ebene schlagen — Leaflet als <link> haette nach der Umstellung alle
+   eigenen Kartenregeln ueberstimmt. Deshalb kommt es hier per @import mit
+   ausdruecklicher Ebene herein und nicht mehr als <link> in index.html.
+
+   Nachgeprueft, dass sich dadurch kein Gewinner dreht: von neun Klassen, die
+   in bausteine und ansichten beide vorkommen, ist keine ein echter Konflikt,
+   und Leaflets sechs !important betreffen Kachel-, Marker- und
+   Fahnengroessen — keines der Felder, die diese App ueberschreibt.
+   ──────────────────────────────────────────────────────────── */
+@layer reset, fremd, marken, bausteine, ansichten;
+
+@import url('../lib/leaflet.css') layer(fremd);
+
+/* Der Reset steht in einer eigenen Ebene unter allem Eigenen. Er arbeitet mit
+   dem Universalselektor, hat also keine Spezifitaet und verlor frueher gegen
+   jede Klasse. Unter Schichtung zaehlt das nicht mehr: lag er in 'ansichten',
+   nahm er jedem Knopf und jedem Feld die Polsterung. Hier unten tut er, was
+   ein Reset tun soll — den Boden bereiten und danach jeder Regel weichen. */
+@layer reset {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Platz der Bildlaufleiste dauerhaft freihalten: sonst verschiebt sich beim
+     Wechsel zwischen kurzem und langem Inhalt die ganze Seite um deren Breite
+     (gemessen 15 px). */
+  html { scrollbar-gutter: stable; }
+}
+
+@layer marken {
 
 /* ============================================================
    DESIGN-TOKENS — zentrale Gestaltungswerte.
@@ -89,4 +127,6 @@
    die Marken da. Android, iOS und Windows geben die Einstellung durch. */
 @media (prefers-reduced-motion: reduce) {
   :root { --mo-schnell: 0ms; --mo-mittel: 0ms; --mo-ruhig: 0ms; }
+}
+
 }
