@@ -118,6 +118,27 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--c-bg); 
   .ansicht-rein { animation: none; }
   .bp-fund-auf  { animation: none; }
 }
+
+/* Kachel waechst in die Detailansicht und wieder zurueck (js/ui-uebergang.js).
+   Ohne diese Angaben nimmt der Browser seine eigene Dauer; so laeuft der
+   Uebergang in derselben Zeit und mit derselben Kurve wie alles andere.
+   Der Name kachel-detail wird nur waehrend des Wechsels vergeben. */
+::view-transition-group(kachel-detail),
+::view-transition-old(kachel-detail),
+::view-transition-new(kachel-detail) {
+  /* --mo-mittel statt --mo-ruhig: das bisherige Einblenden lief in 220ms, und
+     die Kachel wird im Feld staendig geoeffnet. Ein laengerer Uebergang sieht
+     beim ersten Mal gut aus und beim fuenfzigsten steht er im Weg. */
+  animation-duration: var(--mo-mittel);
+  animation-timing-function: var(--mo-kurve);
+}
+/* Die uebrige Seite blendet nur kurz um: Kopfband und Leisten bleiben
+   waehrend des Wechsels weitgehend gleich, ein langes Wischen darueber
+   wuerde den Blick vom Wachsen der Kachel wegziehen. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--mo-schnell);
+}
 .filters { display: flex; gap: 6px; }
 .filter-btn {
   padding: 5px 12px; border-radius: 20px; border: 1px solid #d1d5db;

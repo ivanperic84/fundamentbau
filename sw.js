@@ -33,6 +33,7 @@ const CACHE_NAME    = 'sondagen-' + CACHE_VERSION;
 // Sie werden von der Seite als 'js/xy.js?v=<Version>' angefordert, also
 // muessen sie unter genau diesem Schluessel im Cache liegen.
 const APP_MODULE = [
+  'js/ui-uebergang.js',          // Bewegte Ansichtswechsel (View Transitions)
   'js/kern.js',
   'js/fundament-mengen.js',
   'js/uebersicht.js',

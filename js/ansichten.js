@@ -656,7 +656,9 @@ function kopfSucheSichtbarkeit() {
 // erst entfernt und nach einem erzwungenen Umbruch neu gesetzt, sonst laeuft
 // die Animation beim zweiten Wechsel auf denselben Kasten nicht erneut an.
 function ansichtEinblenden(el) {
-  if (!el) return;
+  // Waehrend eines Uebergangs uebernimmt dieser das Einblenden — sonst
+  // laufen zwei Bewegungen uebereinander (js/ui-uebergang.js).
+  if (!el || (typeof uebergangLaeuft === 'function' && uebergangLaeuft())) return;
   el.classList.remove('ansicht-rein');
   void el.offsetWidth;
   el.classList.add('ansicht-rein');
@@ -1885,21 +1887,27 @@ function _restoreNavState(state) {
   if (state.type === 'detail') {
     showDetail(state.pairId);
   } else {
-    // Detail-View aufräumen falls sichtbar
-    const dv = document.getElementById('detail-view');
-    if (dv && dv.style.display !== 'none') {
-      if (pendingDrag) cancelDrag();
-      if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-      destroySketchListeners();
-      if (leafletMap) { try { leafletMap.remove(); } catch(e) {} leafletMap = null; }
-    }
-    // Übersicht IMMER sicherstellen (auch wenn detail bereits hidden war)
-    if (dv) { dv.style.display = 'none'; dv.style.visibility = 'hidden'; }
-    document.getElementById('overview-view').style.display = 'block';
-    bannerProjektZeigen(true);
-    if (overviewMap) overviewMap.closePopup();
+    // Zurueck zur Uebersicht — die Detailansicht schrumpft in ihre Kachel,
+    // sofern gleich Kacheln erscheinen (js/ui-uebergang.js). currentPairId
+    // wird beim Aufbau der Uebersicht ueberschrieben, deshalb vorher merken.
+    const herkunft = currentPairId;
+    uebergangZuUebersicht(herkunft, state.view, () => {
+      // Detail-View aufräumen falls sichtbar
+      const dv = document.getElementById('detail-view');
+      if (dv && dv.style.display !== 'none') {
+        if (pendingDrag) cancelDrag();
+        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+        destroySketchListeners();
+        if (leafletMap) { try { leafletMap.remove(); } catch(e) {} leafletMap = null; }
+      }
+      // Übersicht IMMER sicherstellen (auch wenn detail bereits hidden war)
+      if (dv) { dv.style.display = 'none'; dv.style.visibility = 'hidden'; }
+      document.getElementById('overview-view').style.display = 'block';
+      bannerProjektZeigen(true);
+      if (overviewMap) overviewMap.closePopup();
+      setOverviewView(state.view);
+    });
     setTimeout(updatePhaseSelectState, 50);
-    setOverviewView(state.view);
   }
 }
 

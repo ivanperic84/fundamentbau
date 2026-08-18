@@ -20,7 +20,15 @@ let currentFeldTab = 'rs';
 let pendingDrag = null;
 let markersLocked = true;
 
+// Kachel waechst in die Detailansicht. Hier gebuendelt und nicht an den
+// Aufrufern, weil showDetail von rund zwanzig Stellen aus gerufen wird —
+// Kachel, Liste, Karte, Suche, Vor/Zurueck. Der Helfer sucht selbst, ob zum
+// Standort gerade eine Kachel sichtbar ist; wenn nicht, schaltet er sofort um.
 function showDetail(pairId) {
+  uebergangZuDetail(pairId, () => _detailAufbauen(pairId));
+}
+
+function _detailAufbauen(pairId) {
   try {
   // Übersichtskarte-Popup schliessen (verhindert DOM-Überlagerung nach Zurück-Navigation)
   if (overviewMap) overviewMap.closePopup();
@@ -350,7 +358,10 @@ function appRefresh() {
 function showOverview() {
   if (pendingDrag) cancelDrag();
   _createInstallMode = false;
-  appRefresh();
+  // Zurueck schrumpft die Detailansicht in ihre Kachel — dafuer muss die
+  // Kennung vor dem Neuaufbau gemerkt werden, appRefresh setzt sie zurueck.
+  const herkunft = currentPairId;
+  uebergangZuUebersicht(herkunft, currentOverviewView, () => appRefresh());
   setTimeout(updatePhaseSelectState, 50);
 }
 

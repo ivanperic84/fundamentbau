@@ -128,6 +128,8 @@ function instKachel(p) {
 
   const card = document.createElement('div');
   card.className = 'card';
+  // Ausgangspunkt fuer den Uebergang in die Detailansicht (js/ui-uebergang.js)
+  card.dataset.pairId = p.id;
   card.style.backgroundImage = hatOrt ? 'url(' + cardTileUrl(p) + ')' : '';
   card.style.backgroundColor = getCardBg(pd.status);
   card.addEventListener('click', (e) => {
