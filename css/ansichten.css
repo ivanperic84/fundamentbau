@@ -528,6 +528,28 @@ select.feld-input { cursor: pointer; }
    Handschuhen zaehlt die Flaeche, die man trifft, nicht der Zwischenraum. */
 .sketch-toolbar.eng { padding: 6px 6px; gap: 5px; }
 .sketch-toolbar.eng .toolbar-sep { margin: 0 1px; }
+/* Dritte Stufe: reicht auch das Zusammenruecken nicht, zeigt die Gruppe der
+   Strichstaerken nur noch die gewaehlte — aus 173 px werden 38. Sie ist die
+   einzige Gruppe, die sich dafuer eignet: vier Knoepfe, die einen einzigen
+   Wert einstellen, und der eingestellte steht schon auf dem Knopf.
+   Ein Tipp darauf klappt die vier auf, die Wahl klappt sie wieder zu. */
+/* Die vier Knoepfe zentrieren ihre Strichvorschau. Das stand bis v227 inline
+   im Markup — und damit ausserhalb jeder Regel: die eingeklappte Darstellung
+   unten konnte display gar nicht ueberschreiben, weil Inline jede Regel
+   schlaegt. Die Polsterung kam ohnehin aus .tool-btn und war nur wiederholt.
+   Die gleich aussehenden Knoepfe der Begehungsskizze (bsk-size-btn-*) sind
+   ein eigenes Bauteil und behalten ihren Inline-Stil. */
+#size-tools .tool-btn { display: flex; align-items: center; justify-content: center; }
+#size-tools.zu .tool-btn:not(.active) { display: none; }
+#size-tools.zu .tool-btn.active { position: relative; }
+/* Der Winkel unten rechts sagt, dass hinter dem Knopf mehr steckt. Er liegt
+   absolut und kostet keine Breite — die ist ja gerade der Engpass. */
+#size-tools.zu .tool-btn.active::after {
+  content: ''; position: absolute; right: 2px; bottom: 2px;
+  border: 3px solid transparent;
+  border-right-color: currentColor; border-bottom-color: currentColor;
+  opacity: 0.45;
+}
 
 /* Schnellzugriff in der Detailansicht — über der Werkzeugleiste, rechts */
 /* Über der Werkzeugleiste: diese ist mittig, die Knöpfe rechts — auf

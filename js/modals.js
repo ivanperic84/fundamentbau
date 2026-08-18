@@ -91,11 +91,13 @@ function onMessOptionChange() {
 function toolbarBeschriftungPruefen() {
   const leiste = document.querySelector('.sketch-toolbar');
   if (!leiste) return;
+  const staerken = document.getElementById('size-tools');
   const passt = () => leiste.scrollWidth <= leiste.clientWidth;
 
   // Immer von weit nach eng: erst alles zuruecknehmen, sonst kaeme nichts
   // zurueck, wenn wieder Platz da ist (Karte im Vollbild).
   leiste.classList.remove('ohne-wort', 'eng');
+  if (staerken) staerken.classList.remove('zu');
 
   // Stufe 1 — die Beschriftung. Der Handschalter aus den Optionen nimmt sie
   // ohnehin weg; sonst nur, wenn es sonst nicht reicht.
@@ -105,6 +107,11 @@ function toolbarBeschriftungPruefen() {
   // enger stehende Knoepfe; dafuer bleibt jedes Werkzeug erreichbar, ohne die
   // Leiste seitwaerts schieben zu muessen.
   if (!passt()) leiste.classList.add('eng');
+
+  // Stufe 3 — die Strichstaerken auf die gewaehlte. Jetzt kostet es einen
+  // zweiten Tipp, deshalb steht sie zuletzt: erst wenn Weglassen und
+  // Zusammenruecken ausgereizt sind.
+  if (!passt() && staerken) staerken.classList.add('zu');
 }
 
 function loadMeasureLayer(pairId) {

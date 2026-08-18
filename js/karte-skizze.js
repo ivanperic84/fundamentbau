@@ -1898,11 +1898,18 @@ function setTool(t) {
 }
 
 function setBrushSize(step, size) {
+  // Eingeklappt ist nur die gewaehlte Staerke sichtbar — dann oeffnet der
+  // erste Tipp die Gruppe, statt eine Staerke zu setzen, die ohnehin schon
+  // gilt. Der zweite Tipp waehlt und klappt wieder zu.
+  const gruppe = document.getElementById('size-tools');
+  if (gruppe && gruppe.classList.contains('zu')) { gruppe.classList.remove('zu'); return; }
+
   brushSize = size;
   [1,2,3,4].forEach(s => {
     const btn = document.getElementById('size-btn-' + s);
     if (btn) btn.classList.toggle('active', s === step);
   });
+  if (typeof toolbarBeschriftungPruefen === 'function') toolbarBeschriftungPruefen();
 }
 
 function setBrushSizeFromSelect(val) {
