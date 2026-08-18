@@ -1132,6 +1132,38 @@
         </div>
 
         <div class="sub">
+          <h3>Parameterdatenbank</h3>
+          <p>Zugang: <strong>App-Einstellungen → Parameterdatenbank</strong>. Hier liegen die Kennwerte der Standardfundamente an einer Stelle — getrennt von den Zuweisungen, die auf sie verweisen. Änderungen wirken sofort auf alle Standorte, die den Typ verwenden.</p>
+          <p>Bearbeitet wird nur im <strong>Bearbeiten-Modus</strong>; ausserhalb ist die Tabelle eine Lesekarte. Drei Registerkarten:</p>
+          <table class="data-table">
+            <thead><tr><th>Registerkarte</th><th>Inhalt</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Geometrie</strong></td><td>Bezeichnung, Hangneigung, Kopfabmessung und -höhe, Blockabmessung, Tiefe</td></tr>
+              <tr><td><strong>Material &amp; Bewehrung</strong></td><td>Beton, Betondeckung, Bewehrungsstahl, Längs- und Querbewehrung, Anker</td></tr>
+              <tr><td><strong>Masttypen</strong></td><td>Masttypen mit ihren Kennwerten; Einträge lassen sich ergänzen und entfernen</td></tr>
+            </tbody>
+          </table>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span><strong>Die Spalte Hangneigung steuert die Auswahl.</strong> Sie entscheidet, welche Fundamenttypen bei welcher Geländeneigung überhaupt angeboten werden. Stellt man einen Typ von «14–33°» auf «≤ 14°», verschwindet er als Böschungsvariante aus der Auswahl in der Sidebar — ohne dass dort etwas geändert wurde.</span>
+          </div>
+          <p style="margin-top:8px;">Eine <strong>Namensänderung</strong> zieht sich durch: die Bibliothek und sämtliche Zuweisungen in den Bauprojektdaten werden nachgeführt.</p>
+        </div>
+
+        <div class="sub">
+          <h3>Parameterdatenbank austauschen</h3>
+          <ol class="steps">
+            <li><strong>Excel-Export</strong>Schreibt eine Datei mit je einem Blatt für Geometrie und Material.</li>
+            <li><strong>Ausserhalb bearbeiten</strong>Die Datei lässt sich weitergeben und im Team anpassen.</li>
+            <li><strong>Excel-Import</strong>Liest die geänderten Werte zurück; sie wirken sofort auf alle Standorte.</li>
+          </ol>
+          <div class="info-box info-warn" style="margin-top:8px;">
+            <span class="ib-icon">!</span>
+            <span><strong>Zurücksetzen</strong> verwirft alle eigenen Werte und stellt die Auslieferungswerte wieder her. Das lässt sich nicht rückgängig machen — vorher exportieren.</span>
+          </div>
+        </div>
+
+        <div class="sub">
           <h3>FT-Zuweisung zu Standorten</h3>
           <p>In der Kachelansicht des Fundamente-Tabs können mehrere Standard-FT gleichzeitig ausgewählt und gemeinsam ein Leistungsprofil zugewiesen werden (<strong>Alle auswählen</strong> + Bulk-Zuweisung).</p>
         </div>

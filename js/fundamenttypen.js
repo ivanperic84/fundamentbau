@@ -1,5 +1,41 @@
 // FUNDAMENTTYPEN-BIBLIOTHEK
 // ============================================================
+//
+// WER HAENGT AN WEM
+// Uebernommen aus HANDBUCH.md, die nach dem Modulschnitt sonst nur noch
+// veraltete Wegbeschreibungen enthielt und entfernt wurde. Der Zusammenhang
+// spannt vier Module und ist in keiner einzelnen Datei zu sehen — deshalb
+// steht er hier, bei der Bibliothek, die alle anderen befragen. Alle
+// genannten Namen sind nachgeprueft und vorhanden.
+//
+//   Gelaendeneigung (Feld bp-neigung)
+//        |
+//        v
+//   Fundamenttyp-Auswahl (Feld bp-ft-familie)
+//        |   filtert ueber _ftMatchesNeigung()  -> js/bauprogramm.js
+//        |   liest dazu einsatzBedingung aus dem FT-Profil
+//        v
+//   Fundamenttyp-Tiefe (Feld bp-ft-tiefe)
+//        v
+//   Karte «Aus Bibliothek»  <- renderBpFtInfo() -> js/init-phasen.js
+//        v
+//   Statischer Nachweis, nur bei Spezialtypen   -> js/blockcalc-bridge.js
+//
+//   Parameterdatenbank (sp_ft_geo_overrides)
+//        |-> renderParamdbGeo()  Anzeige in den Einstellungen
+//        |                       -> js/projekt-einstellungen.js
+//        |-> onFtRefTypChange()  fuellt beim Spezialfundament vor (hier)
+//        `-> ftUpdateVol()       Volumenberechnung (hier)
+//
+//   Namensaenderung in der Parameterdatenbank
+//        |-> saveFtProfile()      fuehrt die Bibliothek nach (hier)
+//        `-> saveAllBauprojekt()  fuehrt alle Zuweisungen nach
+//
+// Die Spalte Hangneigung der Parameterdatenbank steuert damit mittelbar,
+// welche Typen in der Seitenleiste ueberhaupt zur Wahl stehen. Wer dort
+// «14-33°» auf «<= 14°» stellt, nimmt den Typ aus der Boeschungsvariante —
+// sichtbar wird das erst in der Sidebar, drei Module weiter.
+// ============================================================
 const FT_PROFIL_KEY    = () => 'sp_ft_profile__'    + _activeId;
 const FT_VERSION_KEY   = () => 'sp_ft_version__'    + _activeId;
 const DEFAULT_FT_VERSION = 15; // Erhöhen bei Änderungen an Standardtypen
