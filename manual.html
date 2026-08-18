@@ -370,8 +370,8 @@
         <div class="mockup">
           <div class="mockup-bar">
             <div>
-              <div class="mockup-bar-title">FsE O 710 ZUE SK Etappe B ✎</div>
-              <div class="mockup-bar-sub">17 Standorte · ISP 1164803</div>
+              <div class="mockup-bar-title">Fahrleitung Abschnitt Nord ✎</div>
+              <div class="mockup-bar-sub">17 Standorte · Projekt 2026-04</div>
             </div>
             <div style="display:flex;gap:5px;">
               <div class="mockup-btn">PHASE &nbsp;Bauprojekt ▾</div>
@@ -499,7 +499,7 @@
 
         <div class="sub">
           <h3>Import aus Fundamentliste (Excel)</h3>
-          <p>Über <strong>Einstellungen → Import</strong> kann eine SBB-Fundamentliste (<code>.xlsx</code> / <code>.xlsm</code>) importiert werden. Die App liest KM, Mast, Gleis, Massnahme, Fundamenttyp und Bodenkennwerte. RS/RKS/BS-Koordinaten werden beim Import <strong>nicht</strong> gesetzt — diese werden separat erfasst.</p>
+          <p>Über <strong>Einstellungen → Import</strong> kann eine Fundamentliste (<code>.xlsx</code> / <code>.xlsm</code>) importiert werden. Die App liest KM, Mast, Gleis, Massnahme, Fundamenttyp und Bodenkennwerte. RS/RKS/BS-Koordinaten werden beim Import <strong>nicht</strong> gesetzt — diese werden separat erfasst.</p>
           <div class="info-box info-warn" style="margin-top:8px;">
             <span class="ib-icon">!</span>
             <span>Bei «OK» werden bestehende Daten ersetzt. «Abbrechen» fügt die importierten Standorte zu den bestehenden hinzu.</span>
@@ -654,7 +654,7 @@
             <tbody>
               <tr><td><strong>Parzelle (AV)</strong></td><td>Parzellennummer aus amtlicher Vermessung</td></tr>
               <tr><td><strong>Grundeigentümer</strong></td><td>Name und Kontakt aus der Kontaktliste</td></tr>
-              <tr><td><strong>Zugangsart</strong></td><td>Fremdparzelle / Gleisbereich / öffentlich / SBB-eigen</td></tr>
+              <tr><td><strong>Zugangsart</strong></td><td>Fremdparzelle / SBB Infrastruktur / SBB Immobilien / öffentlich</td></tr>
               <tr><td><strong>Nutzungsanfrage</strong></td><td>Status: ausstehend / eingereicht / bewilligt / abgelehnt</td></tr>
               <tr><td><strong>Abklärung</strong></td><td>Status und Notiz zur laufenden Abklärung</td></tr>
               <tr><td><strong>KM-Abschnitt</strong></td><td>Streckennummer und KM-Bereich</td></tr>
@@ -790,11 +790,11 @@
 
         <div class="sub">
           <h3>Standardlasten — einmalig je Arbeitsstation</h3>
-          <p>Die Lastwerte stecken nicht in der App, sondern in einer eigenen Datei mit acht Lastniveaus (DP1a / DP2a / HP1a / HP2a, je für V = 0 und V = 150 kN). Sie muss in BlockCalc <strong>auf jedem Rechner einmal</strong> eingelesen werden.</p>
+          <p>Die Lastwerte stecken nicht in der App, sondern in einer eigenen Datei mit acht Lastniveaus — vier Referenztypen, je für V = 0 und V = 150 kN. Sie muss in BlockCalc <strong>auf jedem Rechner einmal</strong> eingelesen werden.</p>
           <ol class="steps">
             <li><strong>BlockCalc öffnen</strong>Über «Nachweis rechnen» an einem beliebigen Standort.</li>
             <li><strong>Optionen → Datenaustausch → Import</strong>Im Menü von BlockCalc, nicht in der App.</li>
-            <li><strong>Datei wählen</strong><code>blockcalc/Lastniveaus_SBB_0161.1011.0002_a.json</code> aus dem App-Verzeichnis.</li>
+            <li><strong>Datei wählen</strong>Die mitgelieferte Lastniveau-Datei im Ordner <code>blockcalc/</code> — es ist die einzige dort.</li>
           </ol>
           <div class="info-box info-warn" style="margin-top:8px;">
             <span class="ib-icon">!</span>
@@ -1104,7 +1104,7 @@
           <table class="data-table">
             <thead><tr><th>Feld</th><th>Beschreibung</th></tr></thead>
             <tbody>
-              <tr><td><strong>Name / Typ</strong></td><td>Bezeichnung (z.B. «Blockfundament DP1a»)</td></tr>
+              <tr><td><strong>Name / Typ</strong></td><td>Bezeichnung (z.B. «Blockfundament, Standardtyp»)</td></tr>
               <tr><td><strong>Fundamentart</strong></td><td>Blockfundament / Bohrpfahlfundament / Brunnen / Fels / Mehrpfahl</td></tr>
               <tr><td><strong>Tiefe Soll</strong></td><td>Planmässige Fundationstiefe in Metern</td></tr>
               <tr><td><strong>Schrauben</strong></td><td>Schraubentyp (M30 / M36 / ohne)</td></tr>
@@ -1128,7 +1128,7 @@
 
         <div class="sub">
           <h3>Standard-Fundamenttypen</h3>
-          <p>Die App enthält vordefinierte Standard-FT (gemäss SBB-Fundamentliste). Diese können bearbeitet, aber nicht gelöscht werden. Eigene Spezial-FT können hinzugefügt werden.</p>
+          <p>Die App enthält vordefinierte Standard-FT (aus der importierten Fundamentliste). Diese können bearbeitet, aber nicht gelöscht werden. Eigene Spezial-FT können hinzugefügt werden.</p>
         </div>
 
         <div class="sub">
@@ -1196,64 +1196,8 @@
 
         <div class="sub">
           <h3>Werkzeugleiste</h3>
-          <p>Die Leiste unten auf der Karte richtet sich nach dem Platz, den die Karte <em>tatsächlich</em> hat — in der geteilten Detailansicht ist das deutlich weniger als im Kartenvollbild. Sie misst nach und gibt in drei Stufen nach:</p>
-          <ol class="steps">
-            <li><strong>Beschriftung weicht</strong>Die Symbole bleiben, die Wörter gehen. Der Titel eines Werkzeugs erscheint weiterhin beim Verweilen.</li>
-            <li><strong>Gruppen rücken zusammen</strong>Nur die Abstände werden enger — die Knopfflächen bleiben, damit sie sich mit Handschuhen treffen lassen.</li>
-            <li><strong>Strichstärken klappen zusammen</strong>Sichtbar bleibt die gewählte Stärke. Ein Tipp darauf klappt die vier auf, die Wahl klappt sie wieder zu; ein kleiner Winkel am Knopf weist darauf hin.</li>
-          </ol>
-          <div class="mockup" style="background:white;">
-            <div class="mockup-body" style="padding:12px 13px;">
-              <div style="display:grid;grid-template-columns:88px 1fr;gap:9px 12px;align-items:center;font-size:11px;">
-
-                <div style="color:#9ca3af;font-size:10px;font-weight:700;">breite Karte</div>
-                <div style="display:flex;gap:5px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 8px;">
-                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 9px;font-size:10px;font-weight:600;">▲ Karte</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 9px;font-size:10px;">✎ Kommentieren</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 9px;font-size:10px;">↔ Messen</span>
-                  <span style="width:1px;height:15px;background:var(--border);"></span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
-                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
-                </div>
-
-                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 1</div>
-                <div style="display:flex;gap:5px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 8px;width:max-content;">
-                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
-                  <span style="width:1px;height:15px;background:var(--border);"></span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
-                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
-                </div>
-
-                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 2</div>
-                <div style="display:flex;gap:3px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 5px;width:max-content;">
-                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
-                  <span style="width:1px;height:15px;background:var(--border);"></span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━</span>
-                  <span style="background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 7px;font-size:10px;">━━━</span>
-                </div>
-
-                <div style="color:#9ca3af;font-size:10px;font-weight:700;">Stufe 3</div>
-                <div style="display:flex;gap:3px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:5px 5px;width:max-content;">
-                  <span style="background:var(--brand);color:white;border-radius:5px;padding:3px 8px;font-size:10px;">▲</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">✎</span>
-                  <span style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:3px 8px;font-size:10px;">↔</span>
-                  <span style="width:1px;height:15px;background:var(--border);"></span>
-                  <span style="position:relative;background:var(--brand);color:white;border:1px solid var(--brand);border-radius:5px;padding:3px 7px;font-size:10px;">━━<span style="position:absolute;right:1px;bottom:1px;width:0;height:0;border:3px solid transparent;border-right-color:white;border-bottom-color:white;opacity:0.5;"></span></span>
-                </div>
-
-              </div>
-              <div style="font-size:10px;color:#9ca3af;margin-top:9px;">Nur die gewählte Strichstärke bleibt stehen — der Winkel unten rechts weist auf die verborgenen hin.</div>
-            </div>
-          </div>
-
-          <p>Wird die Karte wieder breiter, kommen die Stufen von selbst zurück. In den App-Einstellungen lässt sich <strong>«nur Symbole»</strong> dauerhaft erzwingen. <code>Escape</code> bringt die Leiste in die neutrale Stellung «Karte» zurück.</p>
+          <p>Die Leiste unten auf der Karte richtet sich nach dem Platz, den die Karte tatsächlich hat: wird es eng, weichen zuerst die Beschriftungen, dann rücken die Werkzeuge zusammen, und zuletzt zeigt die Strichstärke nur noch die gewählte — ein Tipp darauf klappt die übrigen auf. Wird die Karte wieder breiter, kommt alles von selbst zurück.</p>
+          <p>In den App-Einstellungen lässt sich <strong>«nur Symbole»</strong> dauerhaft erzwingen. <code>Escape</code> bringt die Leiste in die neutrale Stellung «Karte» zurück.</p>
         </div>
 
         <div class="sub">
@@ -1281,7 +1225,7 @@
           <h3>Neues Projekt</h3>
           <ol class="steps">
             <li><strong>«+ Neues Projekt»</strong>Button in der Projektliste antippen.</li>
-            <li><strong>Name eingeben</strong>Projektname vergeben (z.B. «FsE O 710 Etappe C»).</li>
+            <li><strong>Name eingeben</strong>Projektname vergeben (z.B. «Fahrleitung Abschnitt Süd»).</li>
             <li><strong>Optional: Fundamentliste importieren</strong>Direkt beim Erstellen eine Excel-Datei laden.</li>
           </ol>
         </div>
@@ -1310,7 +1254,7 @@
           <table class="data-table">
             <thead><tr><th>Format</th><th>Inhalt</th><th>Verwendung</th></tr></thead>
             <tbody>
-              <tr><td><strong>Fundamentliste (Excel)</strong></td><td>KM, Mast, Koordinaten, Bodenparameter, Fundamenttyp</td><td>SBB-Standard, Weitergabe an Planer</td></tr>
+              <tr><td><strong>Fundamentliste (Excel)</strong></td><td>KM, Mast, Koordinaten, Bodenparameter, Fundamenttyp</td><td>Standardformat, Weitergabe an Planer</td></tr>
               <tr><td><strong>Schichtzuweisung (Excel)</strong></td><td>Alle Standorte mit Baupaket, Schicht, Datum, Einschränkungen</td><td>Ausführungsplanung, Bauleitung</td></tr>
               <tr><td><strong>Baugrund (Excel)</strong></td><td>Felddaten RS/RKS/BS, Schichtbeschriebe</td><td>Geotechnischer Bericht</td></tr>
               <tr><td><strong>Backup (JSON)</strong></td><td>Alle Projektdaten inkl. Fotos, Einstellungen</td><td>Vollsicherung, Gerätetransfer</td></tr>

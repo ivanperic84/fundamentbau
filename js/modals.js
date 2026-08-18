@@ -366,7 +366,7 @@ function toggleMeasRadierer() {
   if (_measRadierer) _measAuswahlId = null;
   const btn = document.getElementById('btn-measure-radierer');
   if (btn) btn.classList.toggle('active', _measRadierer);
-  if (leafletMap) leafletMap.getContainer().style.cursor = _measRadierer ? 'not-allowed' : 'crosshair';
+  if (leafletMap) leafletMap.getContainer().style.cursor = _measRadierer ? 'pointer' : 'crosshair';
   showMeasureLabel(_measRadierer
     ? 'Radierer: Messung antippen zum Löschen'
     : (measureType === 'area' ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen'));
