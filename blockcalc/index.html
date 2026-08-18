@@ -95,7 +95,12 @@ html.embed .embed-bar .eb-btn { border:1px solid #e5e7eb; background:#fff; borde
   padding:4px 10px; font:inherit; font-size:12px; color:#374151; cursor:pointer;
   flex-shrink:0; white-space:nowrap; }
 html.embed .embed-bar .eb-btn:hover { border-color:#9ca3af; }
-html.embed .embed-bar .eb-btn.pri { background:#374151; border-color:#374151; color:#fff; font-weight:500; }
+/* Die Hauptaktion steht rechts aussen, wie «Schliessen» im Kopf des Host-Overlays.
+   margin-left:auto statt eines wachsenden Abstandhalters: ist der Hinweis sichtbar,
+   nimmt er den freien Platz (flex:1 1 auto) und die Regel bewirkt nichts; ist er
+   ausgeblendet, schiebt sie den Knopf trotzdem an den rechten Rand. */
+html.embed .embed-bar .eb-btn.pri { background:#374151; border-color:#374151; color:#fff;
+  font-weight:500; margin-left:auto; }
 html.embed .embed-bar .eb-btn.pri:hover { background:#1f2937; border-color:#1f2937; }
 html.embed .embed-bar .eb-btn:focus { outline:none; }
 html.embed .embed-bar .eb-btn:focus-visible { outline:2px solid #9ca3af; outline-offset:1px; }
