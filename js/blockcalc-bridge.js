@@ -11,12 +11,21 @@
 // Projekt lag und nach dem Einbau entfernt wurde. Die Punkte stehen sonst
 // nirgends im Code und sind keiner Datei anzusehen.
 //
-// Kopfhoehe — die Falle, die man nicht erraten kann.
+// Kopfhoehe — beide Seiten meinen inzwischen dasselbe.
 //   Diese App fuehrt kopfHoehe als GESAMTMASS (OK Block bis OK Kopf,
-//   Standard 1.00 m). BlockCalcs H_Kopf ist dagegen der UEBERSTAND ueber
-//   Terrain. Die Bruecke schickt deshalb den Ueberstand, BlockCalc rechnet
-//   daraus ue = kopfHoehe - Ueberstand. Falsch zugeordnet waere jeder
-//   Hebelarm um ue daneben.
+//   Standard 1.00 m). BlockCalc hat seine Konvention im August 2026
+//   nachgezogen: dort ist H_Kopf seither ebenfalls das Gesamtmass ab
+//   Koerper-Oberkante, und der Ueberstand ueber Terrain ist keine
+//   Eingabegroesse mehr, sondern H_Kopf - ue.
+//
+//   Bis dahin war H_Kopf der Ueberstand, und die Zuordnung war die Falle,
+//   die man nicht erraten konnte. Sie ist keine mehr — aber die Bruecke
+//   schickt weiterhin BEIDE Groessen, kopfHoehe und ueberstand, denn
+//   BlockCalc leitet die Ueberdeckung daraus ab:
+//     ue = kopfHoehe - Ueberstand     H_Kopf = kopfHoehe
+//   Fehlt der Ueberstand, setzt BlockCalc ue auf 0.40 m und warnt.
+//   Nachgemessen am laufenden Rundlauf (v238): gesendet kopfHoehe 1.00 und
+//   Ueberstand 0.60, in BlockCalc angekommen g_hkopf 1.00 und g_uberd 0.40.
 //   Ueberstand = fundkopf_mueM - (gelaende_swisstopo ?? pair.gelaendehoehe).
 //   Fehlen die Hoehenkoten, greift der Erwartungswert der Neigungsklasse:
 //   0.60 m bei <= 14 Grad, 0.40 m bei 14-33 Grad — dieselben Werte, gegen
