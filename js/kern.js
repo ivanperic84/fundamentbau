@@ -485,7 +485,17 @@ function updateUndoBtn() {
   document.querySelectorAll('.undo-btn').forEach(b => { b.disabled = undoStack.length === 0; });
 }
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  if (!(e.ctrlKey || e.metaKey) || e.key !== 'z') return;
+  e.preventDefault();
+  // Wer gerade zeichnet, meint mit Ctrl+Z den letzten Strich und nicht die
+  // letzte Datenaenderung — der Blick liegt auf der Karte. Nur dort, und nur
+  // solange es etwas zurueckzunehmen gibt; sonst wie bisher.
+  if (typeof currentMode !== 'undefined' && currentMode === 'draw'
+      && typeof skizzeZurueckMoeglich === 'function' && skizzeZurueckMoeglich()) {
+    skizzeZurueck();
+    return;
+  }
+  undo();
 });
 
 // ============================================================

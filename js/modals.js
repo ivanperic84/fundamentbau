@@ -199,6 +199,7 @@ function saveMeasureLayer() {
     result,
     color: _messFarbe(measureType),
   });
+  const typ = measureType;   // clearCurrentMeasure setzt ihn zurueck
   _measSpeichern();
   clearCurrentMeasure();
   renderMeasureLayer();
@@ -206,6 +207,19 @@ function saveMeasureLayer() {
   // nach einer Sekunde zurueckgetauscht — der Knopf sprang in der Breite.
   // Die Rueckmeldung steht jetzt dort, wo auch sonst der Messhinweis steht.
   showMeasureLabel('Messung gespeichert · ' + result);
+
+  // Auf einer Installationsflaeche ist die eben gemessene Flaeche fast immer
+  // die gesuchte Groesse. Bisher hiess der Weg dorthin: Messen beenden,
+  // Sektion «Installationsflaeche» suchen, «Flaeche aus Messung» druecken.
+  // Jetzt wird sie hier angeboten — wer sie nicht will, tut nichts.
+  const objekt = PAIRS.find(p => p.id === currentPairId);
+  if (typ === 'area' && objekt && objekt._objType === 'installation') {
+    ui.toast('Fläche gemessen: ' + result, '', 9000, {
+      text: 'Als Installationsfläche',
+      aufRuf: () => instFlaecheAusMessung(currentPairId),
+    });
+  }
+
   setTimeout(() => {
     if (currentMode === 'measure') showMeasureLabel(measureType === 'area'
       ? 'Ersten Eckpunkt antippen (mind. 3)' : 'Ersten Punkt antippen');

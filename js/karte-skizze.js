@@ -1955,7 +1955,12 @@ async function clearSketch() {
   if (!await ui.confirm('Skizze wirklich löschen?')) return;
   sketchStrokes = [];
   redrawSketch();
-  setPairData(currentPairId, { sketch: null });
+  // Ueber saveSketchToStorage statt direkt: erst dadurch laesst sich das
+  // Loeschen zurueckholen. Und es raeumt den richtigen Schluessel — die
+  // Zeile davor leerte `sketch`, die Zuege liegen aber seit der Phasenteilung
+  // in `sketch_<phase>` und kamen beim naechsten Oeffnen zurueck.
+  saveSketchToStorage();
+  setPairData(currentPairId, { sketch: null });   // Altbestand mit raeumen
 }
 
 // Skizze manuell speichern — kein renderCards nötig, Sketch-Icon wird beim nächsten Öffnen aktualisiert
@@ -1966,7 +1971,56 @@ function saveSketch() {
   btn.textContent = '✓'; setTimeout(() => btn.textContent = orig, 1500);
 }
 
+// ── SKIZZE: EIN SCHRITT ZURUECK ──────────────────────────────
+// Das «Rueckgaengig» im Kopfband schnappt PAIRS; Skizzenzuege liegen in den
+// Felddaten und sind davon nicht erfasst. Deshalb hier ein eigener, kleiner
+// Verlauf.
+//
+// Er haengt an saveSketchToStorage(), weil dort JEDE Aenderung durchkommt —
+// Freihandstrich, Polylinie, Flaeche, Text, Radierer, Skizze loeschen. Sieben
+// Aufrufstellen, aber nur ein Ort, an dem gemerkt werden muss. Gemerkt wird
+// der Stand VOR der Aenderung; dafuer laeuft der zuletzt gesicherte Stand
+// nebenher mit.
+const SKIZZE_VERLAUF_MAX = 20;
+let _skizzeVerlauf = [];
+let _skizzeStand = '[]';
+let _skizzeStelltWiederHer = false;
+
+// Nach dem Laden einer Skizze faengt der Verlauf neu an: der geladene Stand
+// ist der Ausgangspunkt, nicht ein Schritt, den man zurueckgehen koennte.
+function skizzeVerlaufZuruecksetzen() {
+  _skizzeVerlauf = [];
+  _skizzeStand = JSON.stringify(sketchStrokes);
+  skizzeZurueckKnopf();
+}
+
+function skizzeZurueckMoeglich() { return _skizzeVerlauf.length > 0; }
+
+function skizzeZurueck() {
+  if (!_skizzeVerlauf.length) return;
+  sketchStrokes = jsonParse(_skizzeVerlauf.pop()) || [];
+  // Der Riegel verhindert, dass das Wiederherstellen selbst als Schritt in den
+  // Verlauf wandert — sonst kaeme man nie zurueck.
+  _skizzeStelltWiederHer = true;
+  try { redrawSketch(); saveSketchToStorage(); }
+  finally { _skizzeStelltWiederHer = false; }
+  skizzeZurueckKnopf();
+}
+
+function skizzeZurueckKnopf() {
+  const b = document.getElementById('btn-skizze-zurueck');
+  if (b) b.disabled = !_skizzeVerlauf.length;
+}
+
 function saveSketchToStorage() {
+  const jetzt = JSON.stringify(sketchStrokes);
+  if (!_skizzeStelltWiederHer && jetzt !== _skizzeStand) {
+    _skizzeVerlauf.push(_skizzeStand);
+    if (_skizzeVerlauf.length > SKIZZE_VERLAUF_MAX) _skizzeVerlauf.shift();
+    skizzeZurueckKnopf();
+  }
+  _skizzeStand = jetzt;
+
   // Phasenspezifischer Key: sketch_<phase>
   const key = `sketch_${_activePhase}`;
   if (sketchStrokes.length > 0) {
@@ -1999,6 +2053,7 @@ function loadSketchFromStorage() {
   }
 
   if (leafletMap) { redrawSketch(); redrawRefLayer(); }
+  skizzeVerlaufZuruecksetzen();
 }
 
 // ── Referenz-Layer: andere Phasen ────────────────────────────
