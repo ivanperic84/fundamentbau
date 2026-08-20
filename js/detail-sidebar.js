@@ -160,8 +160,25 @@ function _detailAufbauen(pairId) {
   if (!isInst) {
     loadBegehungFelder(pairId);
     loadSidebar_Termine(pairId);
-    setTimeout(() => loadMeasureLayer(pairId), 100);
   }
+
+  // Die Messebene gehoert zum geoeffneten Objekt — auch zu einer
+  // Installationsflaeche, auf deren Karte ja gerade gemessen wird.
+  //
+  // Sie stand bis v235 in dem if darueber und wurde bei Installationen nie
+  // geladen. Folge: die Messungen des zuvor geoeffneten Standorts blieben im
+  // Arbeitsspeicher stehen, waehrend currentPairId schon die Installation war.
+  // Gemessen: eine Flaeche von 7971 m² an Standort A wurde beim naechsten
+  // Speichern in die Installation kopiert, und «Flaeche aus Messung» trug sie
+  // dort als Installationsflaeche ein — eine plausible Zahl, die niemandem
+  // auffaellt.
+  //
+  // Sofort laden, nicht erst nach 100 ms: dazwischen laege ein Fenster, in dem
+  // fremde Messungen im Speicher stehen und currentPairId schon umgestellt
+  // ist. Gezeichnet wird danach, wenn die Karte da ist — renderMeasureLayer
+  // steigt ohne leafletMap von selbst aus.
+  loadMeasureLayer(pairId);
+  setTimeout(() => renderMeasureLayer(), 100);
   setTimeout(() => renderSkizzeThumbs(), 50);
   renderPaarNotizen(pairId);
   // User-Sidebar-Config anwenden (nach Phase-basierter Sichtbarkeit).
