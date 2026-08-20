@@ -360,6 +360,18 @@ function bcErgebnisUebernehmen(r) {
 
 // ── Statuszeile für die Nachweis-Sektion ─────────────────────────────────────
 // Wird von loadBauprojektFelder() aufgerufen; zeigt das zuletzt übernommene Ergebnis.
+// Traegt der Nachweisbereich nur noch BlockCalc (FT-Profil zugewiesen), soll er
+// verschwinden, wenn weder Knopf noch Statuszeile etwas zeigen — sonst bliebe
+// die Ueberschrift «Statischer Nachweis» ueber einer leeren Flaeche stehen.
+function _bcBereichEinziehen() {
+  const wrap = document.getElementById('bp-nachweis-wrap');
+  if (!wrap || wrap.dataset.nurBc !== '1') return;
+  const sichtbar = el => el && el.style.display !== 'none';
+  wrap.style.display =
+    (sichtbar(document.getElementById('bc-btn')) || sichtbar(document.getElementById('bc-status')))
+      ? '' : 'none';
+}
+
 function bcStatusAktualisieren(pairId) {
   const box = document.getElementById('bc-status');
   if (!box) return;
@@ -374,11 +386,12 @@ function bcStatusAktualisieren(pairId) {
     box.innerHTML =
       '<div style="border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px;font-size:11px;' +
            'margin-top:5px;color:#6b7280;background:#f9fafb">' + BC_NICHT_RECHENBAR[chk.art] + '</div>';
+    _bcBereichEinziehen();
     return;
   }
 
   const bc = (loadAllBauprojekt()[pairId] || {}).blockcalc;
-  if (!bc) { box.style.display = 'none'; return; }
+  if (!bc) { box.style.display = 'none'; _bcBereichEinziehen(); return; }
   box.style.display = '';
   const farbe = bc.erfuellt ? '#15803d' : '#b91c1c';
   const wechsel = bc.bauweiseVorher
@@ -393,4 +406,5 @@ function bcStatusAktualisieren(pairId) {
       '<div style="color:#9ca3af;font-size:10px">' + bc.version + ' · ' +
         new Date(bc.zeitpunkt).toLocaleString('de-CH') + '</div>' +
     '</div>';
+  _bcBereichEinziehen();
 }

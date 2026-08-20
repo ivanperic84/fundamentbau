@@ -756,12 +756,29 @@
         <p style="font-size:11px;color:var(--muted);margin-top:-2px;">Die Hauptaktion steht rechts aussen, wie «Schliessen» im Kopf. «Schliessen» verwirft, «Ergebnis übernehmen» schreibt zurück.</p>
 
         <div class="sub">
+          <h3>Welche Bauweisen gerechnet werden</h3>
+          <p>Der Knopf erscheint nur bei einem <strong>Spezialfundament</strong> und nur bei Bauweisen, für die BlockCalc ein Modell hat. Gerechnet werden das <strong>Blockfundament</strong> und das <strong>Mehrpfahlfundament</strong> — ein Fundamenttyp mit «Pfahl» im Namen wird von selbst als Mehrpfahlfundament erkannt.</p>
+          <table class="data-table">
+            <thead><tr><th>Bauweise</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><strong>Blockfundament</strong></td><td>wird gerechnet</td></tr>
+              <tr><td><strong>Mehrpfahlfundament</strong></td><td>wird gerechnet — Pfahlzahl und -länge gehen mit hinüber</td></tr>
+              <tr><td>Verankerung im Fels</td><td>kein Modell — Nachweis separat führen</td></tr>
+              <tr><td>Befestigung an einer Mauer</td><td>kein Modell — Nachweis separat führen</td></tr>
+              <tr><td>Mast auf Kunstbau</td><td>der Nachweis gehört zum Bauwerk</td></tr>
+              <tr><td>Brunnenring und Übrige</td><td>kein Modell</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;">Wo kein Modell vorliegt, steht statt des Knopfs ein Satz, der sagt warum — nicht bloss nichts.</p>
+        </div>
+
+        <div class="sub">
           <h3>Ablauf</h3>
           <ol class="steps">
             <li><strong>Phase Bauprojekt wählen</strong>Der Nachweis hängt an den Bauprojekt-Feldern; in Baugrund oder Ausführung erscheint er nicht.</li>
-            <li><strong>Standort öffnen</strong>In der Detailansicht zur Sektion mit dem statischen Nachweis blättern.</li>
+            <li><strong>Standort öffnen</strong>In der Detailansicht zur Gruppe <strong>Bauprojekt</strong> blättern, dort steht unter dem Fundamenttyp der Bereich «Statischer Nachweis».</li>
             <li><strong>Voraussetzungen prüfen</strong>Fundamenttyp, Baugrundprofil und — bei Spezialfundamenten — der Referenztyp (Standardlasten) müssen gesetzt sein. Fehlt eines, bleibt der Knopf aus und die Statuszeile sagt, was fehlt.</li>
-            <li><strong>«Nachweis rechnen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
+            <li><strong>«In BlockCalc prüfen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
             <li><strong>Rechnen und sichten</strong>Abmessungen, Ausnutzungsgrade und Hinweise prüfen. Bei Bedarf in BlockCalc die Bauweise wechseln und neu rechnen.</li>
             <li><strong>«Ergebnis übernehmen»</strong>Abmessungen und Bauweise gehen in den Standort. Die Statuszeile in der Sidebar zeigt danach Ergebnis und Datum.</li>
           </ol>
@@ -792,7 +809,7 @@
           <h3>Standardlasten — einmalig je Arbeitsstation</h3>
           <p>Die Lastwerte stecken nicht in der App, sondern in einer eigenen Datei mit acht Lastniveaus — vier Referenztypen, je für V = 0 und V = 150 kN. Sie muss in BlockCalc <strong>auf jedem Rechner einmal</strong> eingelesen werden.</p>
           <ol class="steps">
-            <li><strong>BlockCalc öffnen</strong>Über «Nachweis rechnen» an einem beliebigen Standort.</li>
+            <li><strong>BlockCalc öffnen</strong>Über «In BlockCalc prüfen» an einem beliebigen Standort.</li>
             <li><strong>Optionen → Datenaustausch → Import</strong>Im Menü von BlockCalc, nicht in der App.</li>
             <li><strong>Datei wählen</strong>Die mitgelieferte Lastniveau-Datei im Ordner <code>blockcalc/</code> — es ist die einzige dort.</li>
           </ol>

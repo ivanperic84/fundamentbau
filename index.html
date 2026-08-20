@@ -1807,10 +1807,17 @@
           <!-- Nachweis nur bei Spezial und Neubau -->
           <div id="bp-nachweis-wrap" style="display:none;margin-bottom:10px;">
             <label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statischer Nachweis</label>
-            <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:5px 8px;font-size:11px;color:#0369a1;margin-bottom:5px;">
-              Spezialfundament — Statischer Nachweis erforderlich <em style="color:#6b7280;">(kann später ergänzt werden)</em>
+            <!-- Hinweis und Verweisfeld. Sie weichen, sobald ein FT-Profil zugewiesen
+                 ist — dann stehen Nachweis und Referenztyp in der Karte «Aus Bibliothek».
+                 Der BlockCalc-Knopf darunter weicht NICHT mit: er ist keine Angabe,
+                 sondern eine Handlung, und wurde bis v237 mit ausgeblendet. Damit war
+                 er genau im Normalfall unerreichbar. -->
+            <div id="bp-nachweis-felder">
+              <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:5px 8px;font-size:11px;color:#0369a1;margin-bottom:5px;">
+                Spezialfundament — Statischer Nachweis erforderlich <em style="color:#6b7280;">(kann später ergänzt werden)</em>
+              </div>
+              <input id="bp-nachweis-link" type="url" onchange="saveBauprojektFeld()" placeholder="https://… oder Dok.-Nr." style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;">
             </div>
-            <input id="bp-nachweis-link" type="url" onchange="saveBauprojektFeld()" placeholder="https://… oder Dok.-Nr." style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;">
             <!-- Nachweis in BlockCalc rechnen (js/blockcalc-bridge.js). Sichtbarkeit steuert
                  bcStatusAktualisieren(): nur bei Bauweisen, die BlockCalc abbildet. -->
             <button id="bc-btn" onclick="bcNachweisOeffnen()" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:6px;font-size:12px;font-family:inherit;font-weight:600;cursor:pointer;">

@@ -1656,9 +1656,21 @@ function updateBpNachweisAndBoden() {
 
   const showNachweis = (isSpezial && !isBestandErhalten && !isBestandAbbruchNur) || isBestandSicherung;
 
-  // Wenn FT hinterlegt + Spezial → Nachweis + Referenztyp werden in der Info-Box angezeigt → Inputs ausblenden
+  // Wenn FT hinterlegt + Spezial → Nachweis + Referenztyp stehen in der Info-Box
+  // → nur die EINGABEN ausblenden. Der BlockCalc-Knopf bleibt; er ist keine
+  // Angabe, sondern die Handlung, für die man hier ist. Bis v237 wurde der
+  // ganze Bereich versteckt, und damit war der Knopf genau dann weg, wenn ein
+  // Typ zugewiesen war — also im Normalfall.
   const hideInBox = hasFtProfil && isSpezial;
-  if (nachweisWrap) nachweisWrap.style.display = (!hideInBox && showNachweis) ? '' : 'none';
+  const nachweisFelder = document.getElementById('bp-nachweis-felder');
+  if (nachweisFelder) nachweisFelder.style.display = hideInBox ? 'none' : '';
+  if (nachweisWrap) {
+    nachweisWrap.style.display = showNachweis ? '' : 'none';
+    // Merker fuer bcStatusAktualisieren: in diesem Zustand traegt der Bereich
+    // nur noch BlockCalc. Hat BlockCalc nichts zu zeigen, verschwindet er ganz,
+    // damit keine leere Ueberschrift stehen bleibt.
+    nachweisWrap.dataset.nurBc = hideInBox ? '1' : '';
+  }
   if (nachweisInput && !hideInBox && showNachweis) {
     nachweisInput.placeholder = 'https://… oder Dok.-Nr.';
     nachweisInput.disabled        = false;
