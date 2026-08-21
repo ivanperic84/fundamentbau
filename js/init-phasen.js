@@ -437,6 +437,30 @@ function onBpNeignungChange() {
   const famVal = document.getElementById('bp-ft-familie')?.value || '';
   if (famVal && !famVal.startsWith('__spez__')) onBpFamilieChange();
   saveBauprojektFeld(); updateBpFundAbmessung(); updateBodenkennwerteUI(); loadHoehenkoten();
+  bpNeigungHinweis();
+}
+
+// Sagt an, was der gemessene Winkel mit der Klasse macht. Ohne das bliebe
+// unklar, warum die Standardabmessung verschwindet, obwohl die Stufe noch
+// «14–33°» anzeigt.
+function bpNeigungHinweis() {
+  const box = document.getElementById('bp-neigung-hinweis');
+  if (!box) return;
+  const bp = { neigung:     document.getElementById('bp-neigung')?.value || '',
+               neigungGrad: document.getElementById('bp-neigung-grad')?.value || '' };
+  const g = neigungGemessen(bp);
+  if (g == null) { box.textContent = ''; box.style.color = '#9ca3af'; return; }
+  const klasse = neigungKlasse(bp);
+  if (g > NEIGUNG_STANDARD_MAX) {
+    box.textContent = g.toFixed(1) + '° über ' + NEIGUNG_STANDARD_MAX + '° — kein Standardfundament, Nachweis erforderlich.';
+    box.style.color = '#b45309';
+  } else if (bp.neigung && klasse !== bp.neigung) {
+    box.textContent = g.toFixed(1) + '° entspricht der Klasse ' + klasse + ' — es gilt der gemessene Wert.';
+    box.style.color = '#b45309';
+  } else {
+    box.textContent = 'Gerechnet wird mit ' + g.toFixed(1) + '° statt der Klassenobergrenze.';
+    box.style.color = '#9ca3af';
+  }
 }
 
 // Zeigt FT-Profil-Daten als read-only Infokarte im Bauprojekt-Sidebar
@@ -584,6 +608,7 @@ function loadBauprojektFelder(pairId) {
   renderBpFtInfo();
   v('bp-nachweis-link',    d.nachweisLink);
   v('bp-neigung',          d.neigung);
+  v('bp-neigung-grad',     d.neigungGrad);
   v('bp-bemerkung',        d.bemerkung || pair.zugang || '');
   // Bodenkennwerte
   v('bk-me-wert',          d.bkMe);
@@ -648,6 +673,7 @@ function saveBauprojektFeld() {
     vfk:               document.getElementById('bp-vfk')?.checked || false,
     nachweisLink:      v('bp-nachweis-link'),
     neigung:           v('bp-neigung'),
+    neigungGrad:       v('bp-neigung-grad'),
     bemerkung:         v('bp-bemerkung'),
     refFamilie:        v('bp-ref-familie'),
   };
@@ -1171,7 +1197,11 @@ function updateBpFundAbmessung() {
   if (!wrap || !text || !zeich) return;
 
   const fundtyp = document.getElementById('bp-fundtyp')?.value || '';
-  const neigung = document.getElementById('bp-neigung')?.value || '';
+  // Massgebend ist die Klasse inklusive gemessenem Winkel — ein Hang von 35°
+  // hebt sie auf «>33°», und dann gibt es keine Standardabmessung mehr.
+  const neigung = neigungKlasse({
+    neigung:     document.getElementById('bp-neigung')?.value || '',
+    neigungGrad: document.getElementById('bp-neigung-grad')?.value || '' });
 
   if (!fundtyp || !neigung || isFtSpezial(fundtyp) || neigung === '>33°') {
     wrap.style.display = 'none';

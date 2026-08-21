@@ -463,6 +463,42 @@ function getSondagen()       { return PAIRS.filter(p => p._objType === 'sondage'
 function getInstallationen() { return PAIRS.filter(p => p._objType === 'installation'); }
 
 // ============================================================
+// GELAENDENEIGUNG
+// ============================================================
+// Die Klasse ist die Regel, der gemessene Winkel geht ihr vor.
+//
+// Ueber 33 Grad gibt es keinen Standardfall mehr — und zwar auch dann nicht,
+// wenn Baugrund, Lasten und alles Uebrige ihn zulassen wuerden. Genau dafuer
+// gibt es das Feld: die Klasse «14–33°» deckt einen gemessenen Hang von 35°
+// nicht ab, sagt das aber von sich aus nicht.
+const NEIGUNG_STANDARD_MAX = 33;
+const NEIGUNG_KLASSE_GRAD  = { '≤14°': 14, '14–33°': 33, '>33°': 33 };
+
+// Der gemessene Winkel, sofern erfasst. Sonst null.
+function neigungGemessen(bp) {
+  const g = parseFloat(String(bp?.neigungGrad ?? '').replace(',', '.'));
+  return (Number.isFinite(g) && g > 0) ? g : null;
+}
+
+// Der massgebende Winkel in Grad: gemessen, sonst die Obergrenze der Klasse.
+// Fuer die Rechnung — dort will man den echten Wert, nicht die Stufe.
+function neigungGrad(bp) {
+  return neigungGemessen(bp) ?? (NEIGUNG_KLASSE_GRAD[bp?.neigung] ?? null);
+}
+
+// Die Klasse, mit der der Rest der App arbeitet. Ist ein Winkel gemessen,
+// bestimmt er sie — sonst bleibt die gewaehlte stehen. So braucht keine der
+// bestehenden Stellen eine neue Fallunterscheidung: sie sehen weiterhin eine
+// Klasse, nur die richtige.
+function neigungKlasse(bp) {
+  const g = neigungGemessen(bp);
+  if (g == null) return bp?.neigung || '';
+  if (g > NEIGUNG_STANDARD_MAX) return '>33°';
+  if (g > 14) return '14–33°';
+  return '≤14°';
+}
+
+// ============================================================
 // UNDO
 // ============================================================
 const undoStack = [];

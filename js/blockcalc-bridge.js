@@ -211,9 +211,14 @@ function bcFallBauen(pairId) {
   } else if (ueberstand <= 0) {
     hinweise.push('Gemessener Überstand ' + ueberstand.toFixed(2) + ' m ist ≤ 0 — Höhenkoten prüfen.');
   }
-  if (bp.neigung === '>33°')
+  const _neigGemessen = (typeof neigungGemessen === 'function') ? neigungGemessen(bp) : null;
+  const _neigKlasse   = (typeof neigungKlasse === 'function') ? neigungKlasse(bp) : (bp.neigung || '');
+  if (_neigGemessen != null)
+    hinweise.push('Gemessene Geländeneigung ' + _neigGemessen.toFixed(1) + '° übergeben'
+                + (_neigGemessen > 33 ? ' — über 33°, kein Standardfundament.' : '.'));
+  else if (_neigKlasse === '>33°')
     hinweise.push('Neigung > 33°: BlockCalc erhält 33° als UNTERGRENZE — den tatsächlichen Winkel dort von Hand erfassen.');
-  else if (bp.neigung === '14–33°')
+  else if (_neigKlasse === '14–33°')
     // Die Klassenobergrenze ist zwar konservativ, treibt den Block-GZG aber in seinen
     // Modellgrenzfall: Steckners Gl.4 mindert C₁ mit (1+β/40) und lässt die Bettung gegen
     // β = −40° verschwinden. Bei −33° bleibt davon wenig übrig → η_GZG wird sehr klein.
@@ -263,7 +268,9 @@ function bcFallBauen(pairId) {
       }],
       gw: !!bp.bkGrundwasser && bp.bkGrundwasser !== 'nein',
       gwTiefe: bcNum(bp.bkGrundwasserTiefe),
-      neigung: { beta: BC_BETA[bp.neigung] ?? 0 }
+      // Gemessener Winkel, sonst die Klassenobergrenze. Der gemessene ist der
+      // belastbarere Wert — die Obergrenze ist eine konservative Annahme.
+      neigung: { beta: neigungGrad(bp) ?? 0 }
     },
     lasten: bcLastblock(familie, BC_MODELL[art]),
     _hinweise: hinweise

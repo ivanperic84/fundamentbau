@@ -4584,7 +4584,7 @@ function assignFundtypFromTable(pairId, val) {
     if (val.startsWith('__fam__')) {
       const family  = val.replace('__fam__', '');
       const allBp   = loadAllBauprojekt();
-      const neigung = (allBp[pairId] || {}).neigung || '';
+      const neigung = neigungKlasse(allBp[pairId] || {});
       const resolved = resolveFtByFamilieNeigung(family, neigung, null);
       if (resolved) {
         assignFundtyp(pairId, resolved.id);
@@ -4607,7 +4607,7 @@ function assignFundtypFromTable(pairId, val) {
 
   targets.forEach(id => {
     const bp      = allBp[id] || {};
-    const neigung = bp.neigung || '';
+    const neigung = neigungKlasse(bp);
 
     if (!val) {
       delete zuws[id];
