@@ -1239,9 +1239,13 @@ const LK_BAND_MAX = 8.05;     // 8.1-9.0 h bleibt aussen vor
 // Kostenschätzung ist die Überschätzung der günstigere Fehler. Darum
 // AUFgerundet, nicht gerundet.
 //
-// Die Stufe wächst mit dem Betrag, damit der Aufschlag verhältnismässig
+// Die Stufe folgt der STELLENZAHL, damit der Aufschlag verhältnismässig
 // bleibt: 50 Franken auf 590 sind 1.7 %, 50 Franken auf 12 000 wären
 // Scheingenauigkeit in der anderen Richtung.
+//
+//   dreistellig und kleiner    auf   50
+//   vierstellig                auf  100
+//   fünfstellig und grösser    auf  500
 //
 // NICHT angewendet auf Preise, die so im Vertrag stehen. Ein Einheitspreis
 // von 1650 CHF je Fundament ist keine Schätzung; ihn aufzurunden hiesse,
@@ -1249,7 +1253,7 @@ const LK_BAND_MAX = 8.05;     // 8.1-9.0 h bleibt aussen vor
 function mkAufrunden(betrag) {
   const n = Number(betrag);
   if (!Number.isFinite(n) || n <= 0) return betrag;
-  const stufe = n < 2000 ? 50 : n < 10000 ? 100 : 500;
+  const stufe = n < 1000 ? 50 : n < 10000 ? 100 : 500;
   return Math.ceil(n / stufe) * stufe;
 }
 
