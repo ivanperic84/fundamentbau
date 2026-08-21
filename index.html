@@ -6734,6 +6734,26 @@ function _ladeScript(pfad) {
           <input id="bp-pak-naechte" type="number" min="1" max="30" step="1" oninput="bpUpdateKapHint()" placeholder="z.B. 3" class="field-input" style="padding:8px 10px;border:1.5px solid #e5e7eb;">
         </div>
       </div>
+      <!-- LEISTUNG OHNE FUNDAMENTE.
+           Kabelumlegung und Sicherung laufen vorgängig, Kabelkanal und
+           Terraininstandsetzung als Abschlussarbeit nach dem Ausschalen.
+           Beides verbraucht Schichten, ohne dass ein Fundament zugewiesen
+           wäre — Menge geteilt durch Leistung ergibt den Bedarf, genau wie
+           die Fundamente ihn über ihre Schichtleistung ergeben. -->
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Leistung ohne Fundamente</label>
+          <input id="bp-pak-menge-bez" type="text" placeholder="z.B. Kabelkanal T24" class="field-input" style="padding:8px 10px;border:1.5px solid #e5e7eb;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Menge</label>
+          <input id="bp-pak-menge" type="number" min="0" step="1" oninput="bpUpdateKapHint()" placeholder="z.B. 200" class="field-input" style="padding:8px 10px;border:1.5px solid #e5e7eb;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">je Schicht</label>
+          <input id="bp-pak-leistung" type="number" min="0" step="1" oninput="bpUpdateKapHint()" placeholder="z.B. 110" class="field-input" style="padding:8px 10px;border:1.5px solid #e5e7eb;">
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
           <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Los / Team</label>

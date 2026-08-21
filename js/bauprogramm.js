@@ -559,10 +559,25 @@ function bpSchichtKapazitaet(pak) {
 // Fund./Schicht brauchen 17 Fundamente 6 Nächte, nicht 17. Deshalb werden die
 // Anteile zuerst summiert und erst die Summe aufgerundet. Pfahlfundamente
 // zählen weiter ganzzahlig — ihre Bohrschichten teilen sich niemand.
+// Schichtbedarf einer Leistung, die nicht an Fundamenten haengt.
+// Kabelumlegung und Sicherung laufen vorgaengig, Kabelkanal und
+// Terraininstandsetzung als Abschlussarbeit nach dem Ausschalen — beides
+// verbraucht Sperrungen, ohne dass ein Fundament zugewiesen waere.
+//
+// Der Hebel liegt dabei nicht beim Material: 200 m Kabelkanal T24 kosten
+// rund 3700 CHF an Kanal und Einbau, verbrauchen aber sechs Schichten und
+// damit ein Vielfaches davon. Ohne diese Groesse fehlten sie in der
+// Schaetzung ganz.
+function bpMengenBedarf(pak) {
+  const zahl = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const m = zahl(pak?.menge), l = zahl(pak?.leistung);
+  return (m > 0 && l > 0) ? m / l : 0;
+}
+
 function bpPaketBedarf(pakId) {
   const pakete = loadBaupakete();
   const pak    = pakete.find(p => p.id === pakId);
-  if (!pak) return { bedarf: 0, bedarfRoh: 0, kapSum: 0, cnt: 0 };
+  if (!pak) return { bedarf: 0, bedarfRoh: 0, kapSum: 0, cnt: 0, menge: 0 };
   const zuwAll = loadSchichtZuw();
   const ftZuw  = loadFtZuweisungen();
   const ftAll  = loadFtProfile();
@@ -590,9 +605,14 @@ function bpPaketBedarf(pakId) {
       kapSum += 1;
     }
   });
-  const bedarfRoh = bedarfGanz + bedarfAnteil;
+  // Die Menge zaehlt als Anteil mit und wird gemeinsam aufgerundet: 200 m bei
+  // 110 m je Schicht sind 1.82 Schichten, nicht 2 — steht daneben noch ein
+  // halbes Fundament, ergibt beides zusammen 3 Naechte und nicht 4.
+  const mengeBedarf = bpMengenBedarf(pak);
+  const bedarfRoh = bedarfGanz + bedarfAnteil + mengeBedarf;
   // 1e-9 fängt Rundungsreste ab: 3 × (1/3) ergibt 1.0000000000000002 → sonst 2 N.
-  return { bedarf: bedarfGanz + Math.ceil(bedarfAnteil - 1e-9), bedarfRoh, kapSum, cnt };
+  return { bedarf: bedarfGanz + Math.ceil(bedarfAnteil + mengeBedarf - 1e-9),
+           bedarfRoh, kapSum, cnt, menge: mengeBedarf };
 }
 
 // Nächte-Bedarf einer Fundamentgruppe, für die Paket-Auto-Generierung.
@@ -2565,8 +2585,10 @@ function renderBpLegende() {
       ? `<span style="color:#6b7280;font-size:10px;padding:1px 5px;border-radius:4px;background:#f3f4f6;border:1px solid #e5e7eb;" title="Gleise">Gl. ${gleisSet.join(', ')}</span>`
       : '';
     const bd       = bpPaketBedarf(pak.id);
-    const _überlast = bd.cnt > 0 && pak.anzahlNaechte && bd.bedarf > pak.anzahlNaechte;
-    const bdLabel  = bd.cnt > 0 && pak.anzahlNaechte
+    // Auch ein Paket ohne Fundamente kann ueberlastet sein — Kabelkanal
+    // und Terrain brauchen Schichten wie alles andere.
+    const _überlast = (bd.cnt > 0 || bd.menge > 0) && pak.anzahlNaechte && bd.bedarf > pak.anzahlNaechte;
+    const bdLabel  = (bd.cnt > 0 || bd.menge > 0) && pak.anzahlNaechte
       ? `${bd.bedarf}/${pak.anzahlNaechte}&nbsp;N.`
       : '';
     const kapSumLabel = bd.kapSum > 0
@@ -2662,7 +2684,7 @@ function updateBpInfoBar() {
   // Überlast-Prüfung: Pakete mit Bedarf > anzahlNaechte
   const überlastPaks = pakete.filter(p => {
     const bd = bpPaketBedarf(p.id);
-    return bd.cnt > 0 && p.anzahlNaechte && bd.bedarf > p.anzahlNaechte;
+    return (bd.cnt > 0 || bd.menge > 0) && p.anzahlNaechte && bd.bedarf > p.anzahlNaechte;
   });
 
   // Text fuer ein JS-Stringliteral in einem onclick-Attribut absichern:
@@ -6697,6 +6719,9 @@ function openBaupaketModal(id) {
   ahEl2.placeholder = (einst.aushaerteTage ?? 28) + ' (Projekt)';
   document.getElementById('bp-pak-farbe').value      = pak?.farbe       || '#1a3a5c';
   document.getElementById('bp-pak-bemerkung').value  = pak?.bemerkung   || '';
+  document.getElementById('bp-pak-menge-bez').value  = pak?.mengeBez    || '';
+  document.getElementById('bp-pak-menge').value      = pak?.menge       ?? '';
+  document.getElementById('bp-pak-leistung').value   = pak?.leistung    ?? '';
 
   const teamSel = document.getElementById('bp-pak-team');
   teamSel.innerHTML = '<option value="">— kein Los / Team —</option>' +
@@ -7210,6 +7235,9 @@ function saveBaupaketModal() {
     vorgaengerRefPunkt: document.querySelector('input[name="bp-pak-vorg-ref"]:checked')?.value || 'ende',
     farbe:            document.getElementById('bp-pak-farbe').value    || '#1a3a5c',
     bemerkung:        document.getElementById('bp-pak-bemerkung').value.trim(),
+    mengeBez:         document.getElementById('bp-pak-menge-bez').value.trim(),
+    menge:            document.getElementById('bp-pak-menge').value.trim(),
+    leistung:         document.getElementById('bp-pak-leistung').value.trim(),
     vorarbeiten:      _readBpVorarbeitenFromDom(),
     // Leeres Feld = Projektvorgabe. 0 ist ein gültiger Wert (Abbruch härtet
     // nicht aus), darum kein `|| null`.
