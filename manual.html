@@ -803,6 +803,7 @@
             <li><strong>«In BlockCalc prüfen»</strong>Es erscheint zuerst die <strong>Übergabe-Vorschau</strong>: sie zeigt vollständig, was hinübergeht — Baugrund, Geometrie, Lasten, Geländeneigung — und je Wert, woher er stammt. Hinweise stehen ausgeschrieben darunter.</li>
             <li><strong>Baugrund wählen</strong>Hat das Profil einen Schichtaufbau, wird in der Vorschau entschieden, ob die <strong>Einzelschichten</strong> übergeben werden oder die <strong>interpretierten Werte</strong> als eine Schicht. Die Wahl bleibt am Standort stehen.</li>
             <li><strong>«In BlockCalc öffnen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
+            <li><strong>Übernahmehinweise lesen</strong>Konnte BlockCalc einen übergebenen Wert nicht verwenden, steht das sofort als gelber Streifen im Kopf der Überlagerung — noch bevor gerechnet wird. Die Kopfzeile nennt, wie viele Werte <em>anders angesetzt</em> wurden als übergeben; rein informative Hinweise stehen grau darunter.</li>
             <li><strong>Rechnen und sichten</strong>Abmessungen, Ausnutzungsgrade und Hinweise prüfen. Bei Bedarf in BlockCalc die Bauweise wechseln und neu rechnen.</li>
             <li><strong>«Ergebnis übernehmen»</strong>Abmessungen und Bauweise gehen in den Standort. Die Statuszeile in der Sidebar zeigt danach Ergebnis und Datum.</li>
           </ol>
@@ -820,9 +821,13 @@
               <tr><td><strong>hin</strong></td><td>Neigungsklasse / Böschung</td><td>Höhenkoten bzw. Erwartungswert der Klasse</td></tr>
               <tr><td><strong>zurück</strong></td><td>Abmessungen L × B × T</td><td>Fundamentmasse des Standorts</td></tr>
               <tr><td><strong>zurück</strong></td><td>Bauweise</td><td>Bauart des Standorts (Bauart-Wechsel)</td></tr>
-              <tr><td><strong>zurück</strong></td><td>Nachweisstatus und Hinweise</td><td>Statuszeile in der Sidebar</td></tr>
+              <tr><td><strong>zurück</strong></td><td>Nachweisstatus und Hinweise</td><td>Statuszeile in der Sidebar — auch die Übernahmehinweise, damit ein Nachweis, der mit abweichenden Werten gerechnet wurde, später als solcher erkennbar bleibt</td></tr>
             </tbody>
           </table>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span><strong>Abweichend angesetzte Werte.</strong> BlockCalc kennt nicht jeden Wert, den die App übergeben kann — die Pfahlzahl etwa nur in festen Stufen (2, 3, 4, 6, 8, 9). Werden 5 Pfähle übergeben, rechnet BlockCalc mit seiner Vorgabe weiter und meldet das. Der Streifen zeigt es sofort; nach «Ergebnis übernehmen» trägt die Position die tatsächlich gerechnete Zahl, und der Hinweis bleibt in der Statuszeile stehen. Position und Nachweis stimmen damit überein, und es ist nachvollziehbar, warum.</span>
+          </div>
           <div class="info-box info-tip" style="margin-top:8px;">
             <span class="ib-icon">i</span>
             <span><strong>Kopfhöhe.</strong> Beide Seiten meinen dasselbe: das Gesamtmass von OK Block bis OK Kopf (Standard 1.00 m). Übergeben wird zusätzlich der <em>Überstand über Terrain</em>, aus dem BlockCalc die Überdeckung ableitet. Fehlen die Höhenkoten, rechnet die App mit dem Erwartungswert der Neigungsklasse und weist darauf hin.</span>

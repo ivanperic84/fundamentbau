@@ -68,7 +68,7 @@
 // Protokoll (Gegenstück in BlockCalc: Abschnitt „EMBED-MODUS")
 //   ← blockcalc:ready              BlockCalc ist bereit
 //   → blockcalc:case   {payload}   ein Rechenfall
-//   ← blockcalc:loaded {hinweise}  übernommen, ggf. mit Hinweisen
+//   ← blockcalc:loaded {id,hinweise}  übernommen (FLACH — kein payload)
 //   ← blockcalc:result {payload}   Bauweise + Abmessungen + Nachweise
 // Ohne Ergebnis verlassen wird über „Schliessen" im Kopf dieses Overlays erledigt — der Host
 // schliesst also selbst und braucht dafür keine Meldung des Guests.
@@ -159,6 +159,39 @@ function bcBaugrundModus(bp, profil) {
   return bp.bcBaugrundModus === 'auslegung' ? 'auslegung' : 'schichten';
 }
 
+// ── BLOCKCALCS UEBERNAHMEHINWEISE ───────────────────────────
+// Was BlockCalc beim Einlesen des Falls beanstandet, meldet es zurück:
+//   ← blockcalc:loaded { id, hinweise: [...] }
+//
+// Die Nachricht wurde bisher nicht behandelt. Verloren waren die Hinweise
+// deshalb nicht ganz — BlockCalc legt dieselbe Liste auch dem ERGEBNIS bei,
+// und bcErgebnisUebernehmen() schreibt sie seit je nach bp.blockcalc.hinweise.
+// Nur gelesen hat sie dort nie jemand: die Statuszeile zeigte Bauweise,
+// Abmessung, η und Datum — die Hinweise nicht.
+//
+// Zweimal falsch also, an zwei Stellen:
+//   live    Wer den Fall lädt, sieht erst nach dem Rechnen, dass BlockCalc
+//           etwas anderes angesetzt hat als geschickt wurde — und wer ohne
+//           Ergebnis schliesst, erfährt es nie.
+//   später  Ein Nachweis, der mit abweichender Pfahlzahl gerechnet wurde,
+//           sah in der Sidebar aus wie jeder andere.
+//
+// Beides ist hier behoben: die Liste erscheint sofort im Kopf der
+// Überlagerung und bleibt danach in der Statuszeile stehen.
+//
+// EINSTUFUNG. Ein Hinweis heisst entweder «BlockCalc hat etwas anderes
+// angesetzt als geschickt» (Lastniveau nicht gefunden, Pfahlzahl nicht im
+// Auswahlsatz, Baugrund der Voreinstellung) oder er ist reine Auskunft
+// (Torsion wird nicht geführt, Klassenobergrenze konservativ angesetzt).
+// Unterschieden wird am Text — die Auskunftsfälle sind benannt, ALLES
+// ANDERE gilt als Abweichung. Diese Richtung ist Absicht: formuliert
+// BlockCalc einmal um oder kommt eine neue Warnung dazu, wird sie zu
+// deutlich angezeigt statt zu leise. Der umgekehrte Fehler wäre der
+// gefährliche.
+const BC_NUR_AUSKUNFT = /nicht geführt|konservativ/i;
+const bcIstAbweichung = t => !BC_NUR_AUSKUNFT.test(String(t || ''));
+
+let _bcUebernahme = [];    // Hinweise aus blockcalc:loaded, für diesen Lauf
 let _bcPairId = null;      // Position, für die gerade gerechnet wird
 let _bcReady  = false;
 let _bcPending = null;     // Fall, der noch auf 'ready' wartet
@@ -353,6 +386,8 @@ function bcOverlay() {
         '<button onclick="bcSchliessen()" style="border:1px solid #e5e7eb;background:#fff;border-radius:6px;' +
                 'padding:4px 10px;font-size:12px;cursor:pointer">Schliessen</button>' +
       '</div>' +
+      '<div id="bc-ov-warn" style="display:none;padding:7px 12px;border-bottom:1px solid #fde68a;' +
+           'background:#fffbeb;max-height:120px;overflow-y:auto"></div>' +
       '<iframe id="bc-frame" title="BlockCalc" style="border:0;flex:1;width:100%"></iframe>' +
     '</div>';
   document.body.appendChild(ov);
@@ -361,7 +396,31 @@ function bcOverlay() {
 function bcSchliessen() {
   const ov = document.getElementById('bc-overlay');
   if (ov) { ov.style.display = 'none'; const f = document.getElementById('bc-frame'); if (f) f.src = 'about:blank'; }
-  _bcReady = false; _bcPending = null; _bcPairId = null;
+  _bcReady = false; _bcPending = null; _bcPairId = null; _bcUebernahme = [];
+}
+
+// Was BlockCalc beim Einlesen beanstandet hat — im Kopf der Überlagerung,
+// solange noch etwas daran zu ändern ist.
+function bcUebernahmeZeigen(liste) {
+  const box = document.getElementById('bc-ov-warn');
+  if (!box) return;
+  if (!liste.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const abw = liste.filter(bcIstAbweichung).length;
+  box.style.display = '';
+  box.innerHTML =
+    '<div style="font-size:11px;font-weight:600;color:#92400e;margin-bottom:3px">' +
+      (abw ? 'BlockCalc hat ' + abw + ' Wert' + (abw > 1 ? 'e' : '') + ' anders angesetzt als übergeben'
+           : 'Hinweise zur Übernahme') + '</div>' +
+    '<ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.55">' +
+      liste.map(t => '<li style="color:' + (bcIstAbweichung(t) ? '#92400e' : '#78716c') + '">' +
+                     _bcText(t) + '</li>').join('') +
+    '</ul>';
+}
+
+// BlockCalcs Texte sind fremde Zeichenketten und gehen in innerHTML — sie
+// werden entschärft, nicht vertraut.
+function _bcText(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 
@@ -582,6 +641,25 @@ window.addEventListener('message', ev => {
     _bcReady = true;
     if (_bcPending) { bcSenden(_bcPending); _bcPending = null; }
   }
+  else if (d.type === 'blockcalc:loaded') {
+    // ACHTUNG, die beiden Meldungen sind NICHT gleich gebaut. BlockCalcs
+    // _embedSend() legt seine Daten mit Object.assign auf die oberste Ebene,
+    // und nur das Ergebnis reicht zusätzlich ein eigenes payload durch:
+    //
+    //   blockcalc:result   { v, type, id, payload:{ … } }    verschachtelt
+    //   blockcalc:loaded   { v, type, id, hinweise:[ … ] }   flach
+    //
+    // Wer hier wie beim Ergebnis nach d.payload greift, bekommt undefined,
+    // vergleicht undefined mit der id und verwirft die Meldung stumm — genau
+    // das ist beim ersten Versuch passiert und fiel nur auf, weil eine Sonde
+    // am Fenster hing. Gelesen werden darum beide Formen; flach ist die heutige.
+    const p = d.payload || d;
+    // Nur die Meldung zum laufenden Fall — eine fremde id gehört nicht hierher.
+    if (String(p.id) === String(_bcPairId)) {
+      _bcUebernahme = Array.isArray(p.hinweise) ? p.hinweise : [];
+      bcUebernahmeZeigen(_bcUebernahme);
+    }
+  }
   else if (d.type === 'blockcalc:result') bcErgebnisUebernehmen(d.payload);
   else if (d.type === 'blockcalc:error')  {
     ui.toast('BlockCalc-Fehler: ' + d.message, 'fehler');
@@ -616,7 +694,10 @@ function bcErgebnisUebernehmen(r) {
     abmessung: r.abmessungText, kubatur: r.betonKubatur,
     etaGZT: r.nachweise?.etaGZT ?? null, etaGZG: r.nachweise?.etaGZG ?? null,
     etaMin: r.nachweise?.etaMin ?? null, massgebend: r.nachweise?.massgebend || '',
-    erfuellt: !!r.nachweise?.erfuellt, hinweise: r.hinweise || []
+    // BlockCalc legt seine Übernahmehinweise dem Ergebnis ohnehin bei;
+    // _bcUebernahme ist der Rückfall, falls eine ältere Fassung das nicht tut.
+    erfuellt: !!r.nachweise?.erfuellt,
+    hinweise: (r.hinweise && r.hinweise.length) ? r.hinweise : _bcUebernahme
   }};
   // Dimensionierte Abmessungen in die Position übernehmen. Beim Einzelpfahl gibt es kein
   // Bankett — dort sind Pfahllänge und Profil die Abmessung, ein B×L wäre irreführend.
@@ -701,6 +782,14 @@ function bcStatusAktualisieren(pairId) {
         ' (' + bc.massgebend + ')' + (bc.kubatur ? ' · ' + bc.kubatur + ' m³' : '') + '</div>' +
       '<div style="color:#9ca3af;font-size:10px">' + bc.version + ' · ' +
         new Date(bc.zeitpunkt).toLocaleString('de-CH') + '</div>' +
+      // Die Hinweise der Übernahme wurden schon immer mitgespeichert, aber nie
+      // gezeigt. Ein Nachweis, der mit abweichender Pfahlzahl oder mit
+      // Standardlasten gerechnet wurde, sah bisher aus wie jeder andere.
+      ((bc.hinweise && bc.hinweise.length)
+        ? '<ul style="margin:4px 0 0;padding-left:14px;font-size:10px;line-height:1.5">' +
+          bc.hinweise.map(t => '<li style="color:' + (bcIstAbweichung(t) ? '#b45309' : '#9ca3af') + '">' +
+                               _bcText(t) + '</li>').join('') + '</ul>'
+        : '') +
     '</div>';
   _bcBereichEinziehen();
 }
