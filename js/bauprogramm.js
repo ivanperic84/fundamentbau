@@ -6608,9 +6608,15 @@ function _readTeamRows() {
   }));
 }
 
+// Ein neues Los startet mit der Standardbesetzung — den sechs Rollen, die
+// auf jeder Schicht stehen. Sechs Zeilen von Hand anzulegen war der Grund,
+// warum die Besetzung in der Praxis leer blieb, und eine leere Besetzung
+// kostet in der Schaetzung nichts. Die Positionsnummern kommen aus dem
+// Katalog, soweit sie dort eindeutig sind; der Rest wird hier gewaehlt.
 function addTeamRow() {
   const teams = _readTeamRows();
-  teams.push({ id: 'team_' + Date.now(), name: '', geraet: '', mannschaft: [], geraete: [] });
+  const mannschaft = typeof besetzungStandard === 'function' ? besetzungStandard() : [];
+  teams.push({ id: 'team_' + Date.now(), name: '', geraet: '', mannschaft, geraete: [] });
   renderEinstTeamsList(teams);
 }
 

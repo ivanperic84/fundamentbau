@@ -1172,6 +1172,7 @@ function lkKatalogAusPuffer(puffer) {
   });
   if (!positionen.length) throw new Error('Keine Positionen erkannt.');
 
+  _lkRollenCache = null;      // Rollengruppen gehoeren zum alten Katalog
   saveLkKatalog({
     stand: new Date().toISOString(),
     region: 'Zürich',
@@ -1196,6 +1197,193 @@ function lkKatalogImport(input) {
     input.value = '';
   };
   leser.readAsArrayBuffer(datei);
+}
+
+
+// ============================================================
+// ROLLEN DER BESETZUNG
+// ============================================================
+// Personal und Geraete werden NACH SCHICHT abgerechnet, und zwar immer als
+// ganze Schicht zu acht Stunden. Wie lange das Sperrintervall wirklich
+// dauert, bestimmt nur, WIE VIEL in der Schicht geschafft wird — nicht was
+// sie kostet. Dieselbe Ueberlegung steckt schon in mkStundenJeSchicht().
+//
+// Der Katalog fuehrt jede Rolle trotzdem sechsmal, einmal je Intervallband
+// (3.0-4.0 h bis 8.1-9.0 h), mit Preisen, die um bis zu 23 % auseinander-
+// liegen. Fuer die Schaetzung ist keines dieser Baender das richtige:
+// gerechnet wird mit dem MITTELWERT ueber die Baender, ohne 8.1-9.0 h —
+// ein Intervall dieser Laenge ist im Fahrplan die Ausnahme und wuerde den
+// Mittelwert nach oben ziehen.
+//
+// WELCHE POSITIONEN GEHOEREN ZUR SELBEN ROLLE? Nicht am Text erkennbar:
+// «1 Arbeitsgruppe» steht sowohl in 100.31x (Los 1, Standardfundamente) als
+// auch in 100.33x (Los 2, Pfahlfundamente) — gleicher Wortlaut, 2800 gegen
+// 2965 CHF. Und die Nummerierung traegt auch nicht: beim Sicherheitschef
+// steckt das Band in der Hauptposition (100.211…216), beim
+// Arbeitsstellenkoordinator in der Zehnergruppe, beim Bedienpersonal um
+// eine Stelle versetzt.
+//
+// Erkannt wird darum ueber die STRUKTUR: zwei Positionen gehoeren zur
+// selben Rolle, wenn sie denselben Rollentext tragen und sich in genau
+// EINER Ziffernstelle unterscheiden — und diese Stelle fuer die ganze
+// Gruppe dieselbe ist. Damit trennen sich Los 1 und Los 2 von selbst.
+// Nachgemessen ueber den ganzen Katalog: 13 Rollengruppen, jede mit ihren
+// 5 bis 6 Baendern, keine Vermischung.
+const LK_BAND_RE  = /^(.*?),?\s*Intervalldauer\s*([\d.]+)\s*h\s*bis\s*([\d.]+)\s*h/;
+const LK_BAND_MAX = 8.05;     // 8.1-9.0 h bleibt aussen vor
+
+let _lkRollenCache = null;
+
+// Rollengruppen des Katalogs: Positionsnummer → { rolle, baender[] }.
+// Einmal gerechnet und gehalten; ein neuer Katalogimport verwirft den Stand.
+function lkRollen() {
+  if (_lkRollenCache) return _lkRollenCache;
+  const katalog = loadLkKatalog();
+  const zu = new Map();
+  if (!katalog) return (_lkRollenCache = zu);
+
+  // Vorsortieren nach Rollentext und Laenge der Kennung
+  const vor = new Map();
+  katalog.positionen.forEach(p => {
+    const m = LK_BAND_RE.exec(p.text || '');
+    if (!m || p.preis == null || !/^\d+$/.test(p.id)) return;
+    const schluessel = m[1].trim() + '|' + p.id.length;
+    if (!vor.has(schluessel)) vor.set(schluessel, []);
+    vor.get(schluessel).push({ id: p.id, rolle: m[1].trim(), von: parseFloat(m[2]), preis: p.preis });
+  });
+
+  vor.forEach(liste => {
+    if (liste.length < 2) return;
+    const n = liste[0].id.length;
+    // Stellen, an denen sich die Kennungen unterscheiden
+    const variabel = [];
+    for (let i = 0; i < n; i++) {
+      if (new Set(liste.map(x => x.id[i])).size > 1) variabel.push(i);
+    }
+    // Die Bandstelle ist die, an der jede Ziffer fuer GENAU EIN Band steht.
+    let stelle = null, breite = -1;
+    variabel.forEach(i => {
+      const paare = new Map();
+      liste.forEach(x => {
+        if (!paare.has(x.id[i])) paare.set(x.id[i], new Set());
+        paare.get(x.id[i]).add(x.von);
+      });
+      const sauber = [...paare.values()].every(s => s.size === 1);
+      if (sauber && paare.size > breite) { stelle = i; breite = paare.size; }
+    });
+    if (stelle == null) return;
+
+    const gruppen = new Map();
+    liste.forEach(x => {
+      const g = x.id.slice(0, stelle) + '*' + x.id.slice(stelle + 1);
+      if (!gruppen.has(g)) gruppen.set(g, []);
+      gruppen.get(g).push(x);
+    });
+    gruppen.forEach((mitglieder, g) => {
+      const eintrag = { gruppe: g, rolle: mitglieder[0].rolle, baender: mitglieder };
+      mitglieder.forEach(x => zu.set(x.id, eintrag));
+    });
+  });
+
+  // NACHZUEGLER. Der Katalog ist nicht ueberall sauber nummeriert: der
+  // Arbeitsstellenkoordinator mit Zusatzausbildung laeuft ueber 10023101,
+  // 10023301 … 10023601 — und mittendrin steht fuer 4.1-5.0 h die
+  // NEUNSTELLIGE 100232364, wo 10023201 haette stehen muessen. Genau die
+  // verwendet das Zusammenstellungsblatt.
+  //
+  // Weil die Vorsortierung nach Laenge trennt, faellt so eine Position aus
+  // ihrer Gruppe. Sie wird nachgetragen, wenn es zu ihrer Rolle GENAU EINE
+  // Gruppe gibt und deren Band noch fehlt — mehr Zuordnung waere geraten.
+  const nachzuegler = [];
+  vor.forEach(liste => liste.forEach(x => { if (!zu.has(x.id)) nachzuegler.push(x); }));
+  nachzuegler.forEach(x => {
+    const passende = [...new Set([...zu.values()])].filter(e => e.rolle === x.rolle);
+    if (passende.length !== 1) return;
+    const e = passende[0];
+    if (e.baender.some(b => Math.abs(b.von - x.von) < 0.05)) return;
+    e.baender.push(x);
+    e.baender.sort((a, b) => a.von - b.von);
+    zu.set(x.id, e);
+  });
+
+  return (_lkRollenCache = zu);
+}
+
+// Preis einer Besetzungsposition: Mittel ueber die Baender ohne 8.1-9.0 h.
+// Kennt der Katalog die Position nicht als Rolle, gilt ihr eigener Preis —
+// dann ist sie keine Schichtposition mit Baendern, sondern eine gewoehnliche.
+function lkRollePreis(posNr, rueckfall) {
+  const e = lkRollen().get(String(posNr));
+  if (!e) return rueckfall ?? null;
+  const werte = e.baender.filter(b => b.von < LK_BAND_MAX).map(b => b.preis);
+  if (!werte.length) return rueckfall ?? null;
+  return Math.round(werte.reduce((s, v) => s + v, 0) / werte.length);
+}
+
+// Zuschlag einer Rolle. Er haengt NICHT immer unter der Basisposition:
+// beim Sicherheitschef steht die Basis unter .01, der Nachtzuschlag aber
+// unter der Schwesterposition .02 («In separater Funktion bei groesseren
+// Arbeitsstellen»). Gesucht wird darum vom laengsten Praefix abwaerts —
+// der naechstgelegene Treffer gewinnt.
+const LK_ZUSCHLAG_TEXT = {
+  nacht:   /^=>\s*Nachtzuschlag\s*$/i,
+  sonntag: /^=>\s*Sonntagszuschlag\s*$/i,
+};
+
+function lkZuschlagPreis(posNr, art) {
+  const e = lkRollen().get(String(posNr));
+  const katalog = loadLkKatalog();
+  if (!e || !katalog) return null;
+  const muster = LK_ZUSCHLAG_TEXT[art];
+  if (!muster) return null;
+
+  const werte = [];
+  e.baender.filter(b => b.von < LK_BAND_MAX).forEach(b => {
+    for (let len = b.id.length; len >= 6; len -= 2) {
+      const praefix = b.id.slice(0, len);
+      const treffer = katalog.positionen.filter(
+        p => p.id.length > praefix.length && p.id.startsWith(praefix)
+             && p.preis != null && muster.test((p.text || '').trim()));
+      if (treffer.length) { werte.push(treffer[0].preis); return; }
+    }
+  });
+  if (!werte.length) return null;
+  return Math.round(werte.reduce((s, v) => s + v, 0) / werte.length);
+}
+
+// ── Standardbesetzung ───────────────────────────────────────
+// Die sechs Rollen, die auf jeder Schicht stehen. Die Positionsnummer steht
+// bewusst NICHT dabei: sie gehoert dem Vertrag, nicht der App. Gesucht wird
+// sie im Katalog ueber den Rollentext — und nur gesetzt, wenn es dort GENAU
+// EINE Rollengruppe dieses Namens gibt. Bei der Arbeitsgruppe gibt es zwei
+// (Los 1 und Los 2), beim Bedienpersonal drei; dort bleibt das Feld leer
+// und wird im Los gewaehlt. Raten waere hier teuer.
+const BESETZUNG_STANDARD = [
+  { bez: 'Sicherheitschef SC',        such: /^1 Sicherheitschef/i },
+  { bez: 'Arbeitsstellenkoordinator', such: /^1 Arbeitsstellenkoordinator/i },
+  { bez: 'Sicherheitswärter Siwä',    such: /^1 Sicherheitswärter/i },
+  { bez: 'Rangierbegleiter Rb',       such: /^1 Rangierbegleiter/i },
+  { bez: 'Arbeitsgruppe',             such: /^1 Arbeitsgruppe/i },
+  { bez: 'Bedienpersonal',            such: /^Bedienpersonal/i },
+];
+
+function besetzungStandard() {
+  const rollen = lkRollen();
+  const gruppen = new Map();
+  rollen.forEach(e => { if (!gruppen.has(e.gruppe)) gruppen.set(e.gruppe, e); });
+  // Welche Bänder führt die Positionsdatenbank? Aus ihr schöpft das
+  // Verzeichnis; ein Band, das dort fehlt, würde beim Erzeugen still
+  // übersprungen. Darum wird bevorzugt eines genommen, das sie kennt.
+  const inDb = new Set((typeof loadLvVorlage === 'function' ? loadLvVorlage() : []).map(v => String(v.pos)));
+  return BESETZUNG_STANDARD.map(r => {
+    const treffer = [...gruppen.values()].filter(e => r.such.test(e.rolle));
+    let pos = '';
+    if (treffer.length === 1) {
+      const baender = treffer[0].baender.slice().sort((a, b) => a.von - b.von);
+      pos = (baender.find(b => inDb.has(b.id)) || baender[0]).id;
+    }
+    return { bez: r.bez, anzahl: 1, pos };
+  });
 }
 
 // ── Katalogposition ↔ Fundamenttyp ───────────────────────────
@@ -1705,12 +1893,11 @@ function mkZuordnungVorschlagen() {
 // oder ein verhandelter Preis waere sonst weg. Fehlt einer vorhandenen Zeile
 // nur die Bindung, wird sie nachgetragen.
 function lvAusModell() {
+  // Ohne Bindung gibt es nichts aus dem Massenauszug zu holen — die
+  // BESETZUNG der Lose entsteht trotzdem: sie haengt an den Schichten und
+  // bringt ihre Preise aus dem Katalog mit. Frueher kehrte die Funktion
+  // hier um, und ein frisch eingelesenes Projekt bekam gar kein Verzeichnis.
   const db = loadLvVorlage().filter(v => v.herkunft && v.pos);
-  if (!db.length) {
-    ui.toast('In der Datenbank ist noch keine Position an eine Grösse gebunden.\n'
-             + 'Im Fenster «Datenbank» über «Zuordnung vorschlagen» oder von Hand setzen.', 'fehler');
-    return;
-  }
   const gliederung = document.getElementById('mk-massen-gliederung')?.value || 'typ';
   const summen = massenSummen(massenauszugRechnen(gliederung));
   const liste  = loadLvPositionen();
@@ -1742,7 +1929,10 @@ function lvAusModell() {
   const bes = _lvBesetzungZeilen(liste);
 
   if (!neu && !gebunden && !bes.neu && !bes.aktualisiert) {
-    ui.toast('Nichts hinzuzufügen — die Positionen mit Menge stehen bereits im Verzeichnis.', 'fehler');
+    ui.toast(db.length
+      ? 'Nichts hinzuzufügen — die Positionen mit Menge stehen bereits im Verzeichnis.'
+      : 'In der Datenbank ist noch keine Position an eine Grösse gebunden.\n'
+        + 'Im Fenster «Datenbank» über «Zuordnung vorschlagen» oder von Hand setzen.', 'fehler');
     return;
   }
   saveLvPositionen(liste);
@@ -1763,32 +1953,82 @@ function lvAusModell() {
 // Erkannt werden diese Zeilen an quelle/teamId/schluessel, damit ein zweiter
 // Lauf die Anzahl nachfuehrt statt zu doppeln: aendert sich die Besetzung,
 // soll das Verzeichnis mitgehen und nicht zweimal dasselbe fuehren.
+//
+// DER PREIS IST DER MITTELWERT ueber die Intervallbaender der Rolle, nicht
+// der Preis der gebundenen Position. Die Besetzung wird nach Schicht
+// abgerechnet, immer als ganze Schicht — welches Band die gebundene
+// Position nennt, ist dafuer unerheblich. Stand dort das Band 4.1-5.0 h,
+// waehrend das Projekt mit acht Stunden faehrt, fehlten bisher bis zu 23 %.
+//
+// ZUSCHLAEGE ENTSTEHEN MIT. Jede Rolle traegt ihren Nacht- und
+// Sonntagszuschlag als eigene Katalogposition; die Zahl der betroffenen
+// Schichten steht im Bauprogramm. Beides ist da — es war nur nie verbunden.
+const _BES_ZUSCHLAG = [
+  { art: 'nacht',   herkunft: 'schichtNacht',   wort: 'Nachtzuschlag' },
+  { art: 'sonntag', herkunft: 'schichtSonntag', wort: 'Sonntagszuschlag' },
+];
+
 function _lvBesetzungZeilen(liste) {
   const teams = (typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || [];
   const db    = loadLvVorlage();
   let neu = 0, aktualisiert = 0;
 
+  // Eine Zeile anlegen oder ihre Anzahl nachfuehren.
+  const zeile = (team, schluessel, daten) => {
+    const da = liste.find(z => z.quelle === 'besetzung' && z.teamId === team.id && z.schluessel === schluessel);
+    if (da) {
+      let ge = false;
+      if (da.faktor !== daten.faktor) { da.faktor = daten.faktor; ge = true; }
+      if (daten.preis && da.preis !== daten.preis) { da.preis = daten.preis; ge = true; }
+      if (ge) aktualisiert++;
+      return;
+    }
+    liste.push({
+      id: 'lv_bes_' + team.id + '_' + neu + '_' + Date.now().toString(36),
+      menge: 0, teamId: team.id, quelle: 'besetzung', schluessel, ...daten,
+    });
+    neu++;
+  };
+
   teams.forEach(team => {
     [...(team.mannschaft || []), ...(team.geraete || [])].forEach(p => {
       if (!p.pos) return;
-      const v = db.find(x => x.pos === p.pos);
+      // Die Datenbank zuerst — dort stehen die gepflegten Preise. Kennt sie
+      // die Position nicht, gilt der Katalog: eine Besetzungszeile ohne
+      // Gegenstück würde sonst kommentarlos aus dem Verzeichnis fallen.
+      const kat = loadLkKatalog();
+      const v = db.find(x => x.pos === p.pos)
+             || (kat && kat.positionen.find(x => x.id === String(p.pos)));
       if (!v) return;
+      const vPos = v.pos ?? v.id;
       const herkunft = mkHerkunftVorschlag(v) === 'stunden' ? 'stunden' : 'schicht';
-      const schluessel = p.pos + '#' + (p.bez || '');
-      const da = liste.find(z => z.quelle === 'besetzung' && z.teamId === team.id && z.schluessel === schluessel);
-      if (da) {
-        if (da.faktor !== (p.anzahl || 1)) { da.faktor = p.anzahl || 1; aktualisiert++; }
-        return;
-      }
-      liste.push({
-        id: 'lv_bes_' + team.id + '_' + neu + '_' + Date.now().toString(36),
-        pos: v.pos,
-        text: v.text + ' — ' + (team.name || 'Los') + (p.bez ? ' · ' + p.bez : ''),
-        einheit: v.einheit, menge: 0, preis: v.preis || 0,
-        herkunft, teamId: team.id, faktor: p.anzahl || 1,
-        quelle: 'besetzung', schluessel,
+      const anzahl   = p.anzahl || 1;
+      const name     = (team.name || 'Los') + (p.bez ? ' · ' + p.bez : '');
+      // Der Beschrieb nennt ein Intervallband («Intervalldauer 3.0 h bis
+      // 4.0 h»), der Preis ist aber das Mittel über ALLE Bänder. Beides
+      // nebeneinander stehen zu lassen wäre ein Widerspruch auf dem Papier
+      // — die Bandangabe fällt darum weg, sobald gemittelt wird.
+      const rolle = lkRollen().get(String(p.pos));
+      const text  = (rolle ? rolle.rolle : v.text) + ' — ' + name;
+
+      zeile(team, p.pos + '#' + (p.bez || ''), {
+        pos: vPos, text, einheit: v.einheit,
+        preis: lkRollePreis(p.pos, v.preis || 0) || v.preis || 0,
+        herkunft, faktor: anzahl,
       });
-      neu++;
+
+      // Nacht und Sonntag nur, wo der Katalog sie fuehrt — und nur bei
+      // Positionen, die nach Schicht gehen. Eine Stundenposition traegt
+      // ihre Zuschlaege anders.
+      if (herkunft !== 'schicht') return;
+      _BES_ZUSCHLAG.forEach(z => {
+        const preis = lkZuschlagPreis(p.pos, z.art);
+        if (!preis) return;
+        zeile(team, p.pos + '#' + (p.bez || '') + '#' + z.art, {
+          pos: vPos, text: text + ' · ' + z.wort,
+          einheit: v.einheit, preis, herkunft: z.herkunft, faktor: anzahl,
+        });
+      });
     });
   });
   return { neu, aktualisiert };
