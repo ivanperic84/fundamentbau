@@ -108,6 +108,7 @@ const MK_HERKUENFTE = [
   { id: 'schicht',        label: 'Anzahl Schichten' },
   { id: 'schichtNacht',   label: 'Schichten Nacht' },
   { id: 'schichtSonntag', label: 'Schichten Sonntag' },
+  { id: 'arbeitstage',    label: 'Arbeitstage' },
   { id: 'stunden',        label: 'Verrechnete Stunden' },
   { id: 'stundenNacht',   label: 'Verrechnete Stunden Nacht' },
   { id: 'stundenSonntag', label: 'Verrechnete Stunden Sonntag' },
@@ -421,6 +422,7 @@ const MK_SCHICHT_HERKUNFT = {
   schicht:        'Anzahl Schichten',
   schichtNacht:   'Schichten im Nachtfenster',
   schichtSonntag: 'Schichten an Sonntagen',
+  arbeitstage:    'Arbeitstage — 24 h ab Intervallbeginn',
   stunden:        'Verrechnete Stunden',
   stundenNacht:   'Verrechnete Stunden im Nachtfenster',
   stundenSonntag: 'Verrechnete Stunden an Sonntagen',
@@ -440,7 +442,8 @@ function lvMenge(zeile, summen) {
   const f = zeile.faktor > 0 ? zeile.faktor : 1;
   if (MK_SCHICHT_HERKUNFT[zeile.herkunft]) {
     const a  = zeile.teamId ? schichtenAufteilung(zeile.teamId) : schichtenAufteilung();
-    const nr = zeile.herkunft.endsWith('Nacht')   ? a.nacht
+    const nr = zeile.herkunft === 'arbeitstage'   ? a.tage
+             : zeile.herkunft.endsWith('Nacht')   ? a.nacht
              : zeile.herkunft.endsWith('Sonntag') ? a.sonntag
              : (zeile.teamId ? a.total : schichtenGesamt());
     return nr * f * (zeile.herkunft.startsWith('stunden') ? mkStundenJeSchicht() : 1);
@@ -474,7 +477,15 @@ function schichtenAufteilung(teamId) {
   const alle   = typeof loadBaupakete === 'function' ? loadBaupakete() : [];
   const pakete = teamId ? alle.filter(p => p.teamId === teamId) : alle;
   const muster = typeof loadSperrmuster === 'function' ? loadSperrmuster() : [];
-  const aufteilung = { total: 0, nacht: 0, sonntag: 0 };
+  // «tage» sind ARBEITSTAGE, nicht Schichten. Der Katalog definiert den
+  // Arbeitstag als 24 h ab Intervallbeginn — Geraete, Traktionsmittel und
+  // Mieten werden danach abgerechnet, nicht nach Schicht.
+  //
+  // In der Regel ist das dasselbe: eine Sperrung je Nacht, ein Arbeitstag.
+  // Zwei Schichten am selben Kalendertag sind aber EIN Arbeitstag, und
+  // genau dafuer werden die Daten gezaehlt statt der Schichten.
+  const aufteilung = { total: 0, nacht: 0, sonntag: 0, tage: 0 };
+  const daten = new Set();
 
   // Ohne Bauprogramm — oder wenn bewusst ohne gerechnet wird — gibt es keine
   // Termine und damit keine Wochentage. Dann gelten alle Schichten als
@@ -484,9 +495,11 @@ function schichtenAufteilung(teamId) {
     // Ein Los laesst sich ohne Bauprogramm nicht heraustrennen: die
     // Schichtzahl von Hand gilt dem ganzen Projekt. Sie hier auszuweisen
     // wuerde sie mit jedem weiteren Los ein zweites Mal verrechnen.
-    if (teamId) return { total: 0, nacht: 0, sonntag: 0, ohneTermine: true };
+    if (teamId) return { total: 0, nacht: 0, sonntag: 0, tage: 0, ohneTermine: true };
+    // Ohne Termine gibt es keine Kalendertage: dann gilt eine Schicht als
+    // ein Arbeitstag. Das ist der Normalfall und nicht geraten.
     const n = schichtenGesamt();
-    return { total: n, nacht: n, sonntag: 0, ohneTermine: true };
+    return { total: n, nacht: n, sonntag: 0, tage: n, ohneTermine: true };
   }
   if (typeof bpGetSchichten !== 'function') return aufteilung;
 
@@ -503,8 +516,10 @@ function schichtenAufteilung(teamId) {
       if (istNacht(sp)) aufteilung.nacht++;
       const d = new Date(s.datum + 'T00:00:00');
       if (d.getDay() === 0) aufteilung.sonntag++;
+      if (s.datum) daten.add(s.datum);
     });
   });
+  aufteilung.tage = daten.size || aufteilung.total;
   return aufteilung;
 }
 
@@ -1873,9 +1888,20 @@ const MK_ZUORDNUNG_REGELN = [
   { herkunft: 'pfahlStk',       text: /pfahl/,                                einheit: /stk|stück|stueck/ },
   { herkunft: 'ankerMeter',     text: /anker/,                                einheit: /^(m|lfm)$|laufmeter/ },
   { herkunft: 'ankerStk',       text: /anker/,                                einheit: /stk|stück|stueck/ },
+  // Geraete, Traktionsmittel und Mieten gehen nach Arbeitstagen. Der Katalog
+  // definiert ihn selbst: «Miete pro Arbeitstag (24 h ab Intervallbeginn)».
+  // Die Einheit sagt es — der Beschrieb reicht von «ZW-Bagger» bis
+  // «Aushubwagen Ladevolumen ca. 38 m3» und traegt kein gemeinsames Wort.
+  { herkunft: 'arbeitstage',    text: /./,       einheit: /^arbeits-?tag/ },
   // Alles, was nach Stunden geht, nimmt die verrechneten Stunden — welche
   // Leistung dahintersteht, spielt keine Rolle: die Einheit sagt es.
   { herkunft: 'stunden',        text: /./,       einheit: /^(std|h|stunde)/ },
+  // Die EINHEIT sagt es zuverlaessiger als der Beschrieb. «1 Arbeitsgruppe,
+  // Intervalldauer 4.1 h bis 5.0 h» — 2700 CHF je Schicht, die groesste
+  // wiederkehrende Position — enthaelt das Wort «Schicht» nirgends im Text
+  // und blieb darum ungebunden. Gemessen am Zusammenstellungsblatt: diese
+  // eine Regel bindet fuenf weitere Positionen.
+  { herkunft: 'schicht',        text: /./,       einheit: /^schicht/ },
   { herkunft: 'schicht',        text: /schicht|einsatz|bauleit|sicherheitschef|sicherheitsw|wärter|waerter|maschinist|absperr|zugsicher|bahnersatz/ },
   { herkunft: 'anzahl',         text: /fundament/,                            einheit: /stk|stück|stueck/ },
 ];
