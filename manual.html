@@ -322,7 +322,7 @@
       <h1>Benutzerhandbuch</h1>
       <p>Fundamentbau App — Planung, Bauprojekt &amp; Ausführung</p>
     </div>
-    <span class="header-badge">v2.1</span>
+    <span class="header-badge">v2.2</span>
   </div>
 </div>
 
@@ -705,6 +705,28 @@
         </div>
 
         <div class="sub">
+          <h3>Schichtaufbau und Auslegung</h3>
+          <p>Ein Profil führt zwei Dinge nebeneinander: den <strong>Aufschluss</strong> — die Schichtenfolge, wie die Sondierung sie angetroffen hat — und die <strong>Auslegung</strong>, den einen Kennwertsatz, mit dem gerechnet wird. Die Liste, die Grenzwertprüfung und alle Exporte arbeiten mit der Auslegung; der Aufbau steht dahinter und begründet sie.</p>
+          <p>Im Profilmodal wird der Aufbau Zeile für Zeile erfasst: Bezeichnung, USCS, Mächtigkeit sowie M<sub>E</sub>, φ&prime;<sub>k</sub>, γ und c&prime;<sub>k</sub>. Die Tiefenlage rechnet die App mit; die unterste Schicht reicht immer durchgehend nach unten und braucht keine Mächtigkeit.</p>
+          <p>Wie aus dem Aufbau ein Satz wird, bestimmt das Feld <strong>Auslegung der Kennwerte</strong>:</p>
+          <table class="data-table">
+            <thead><tr><th>Modus</th><th>Herleitung</th><th>Wann</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Manuell</strong></td><td>Die Kennwerte gelten so, wie sie eingetragen sind.</td><td>Ohne Aufschluss, oder wenn der Satz von aussen vorgegeben ist.</td></tr>
+              <tr><td><strong>GEO</strong></td><td>Mittelwert über die Schichten im massgebenden Bereich, nach Mächtigkeit gewichtet.</td><td>Wenn die Schichtenfolge als Ganzes trägt.</td></tr>
+              <tr><td><strong>ING</strong></td><td>Die ungünstigste Schicht des Bereichs, mit ihrem vollständigen Kennwertsatz.</td><td>Wenn eine weiche Lage das Tragverhalten bestimmt.</td></tr>
+            </tbody>
+          </table>
+          <p>Der <strong>massgebende Bereich</strong> reicht von Terrain bis zu der Tiefe, die daneben eingetragen ist (Vorgabe 3.0 m). Was tiefer liegt, trägt zum Tragverhalten eines Blockfundaments nichts mehr bei und würde einen Mittelwert nur schönen.</p>
+          <div class="info-box info-tip" style="margin-top:8px;">
+            <span class="ib-icon">i</span>
+            <span><strong>M<sub>E</sub> wird nicht arithmetisch gemittelt.</strong> Die Schichten liegen in Serie — die Zusammendrückungen addieren sich, die Steifigkeiten nicht. Eine steife Deckschicht über weichem Untergrund käme sonst als tragfähig heraus, obwohl sich alles darunter setzt. GEO verwendet deshalb das harmonische Mittel, das Ersatz-M<sub>E</sub> der Schichtfolge. Für φ&prime;, γ und c&prime; wird nach Mächtigkeit gewichtet gemittelt.</span>
+          </div>
+          <p>Bei GEO und ING sind die Kennwertfelder gesperrt und werden laufend aus dem Aufbau nachgerechnet — die Zeile darunter nennt Herleitung und, bei ING, die massgebende Schicht. Wer auf <strong>Manuell</strong> zurückschaltet, behält die zuletzt hergeleiteten Werte als Ausgangspunkt und kann sie überschreiben.</p>
+          <p>Profile ohne Schichtaufbau verhalten sich unverändert. Es ist keine Umstellung nötig; der Aufbau kann jederzeit nachgetragen werden.</p>
+        </div>
+
+        <div class="sub">
           <h3>Statische Nachweise</h3>
           <p>Im Tab <strong>Statische Nachweise</strong> können Berechnungsdokumente (Typ, Datum, Bearbeiter, Link) erfasst und verwaltet werden. Pro Standort sind mehrere Nachweise möglich.</p>
         </div>
@@ -778,7 +800,9 @@
             <li><strong>Phase Bauprojekt wählen</strong>Der Nachweis hängt an den Bauprojekt-Feldern; in Baugrund oder Ausführung erscheint er nicht.</li>
             <li><strong>Standort öffnen</strong>In der Detailansicht zur Gruppe <strong>Bauprojekt</strong> blättern, dort steht unter dem Fundamenttyp der Bereich «Statischer Nachweis».</li>
             <li><strong>Voraussetzungen prüfen</strong>Fundamenttyp, Baugrundprofil und — bei Spezialfundamenten — der Referenztyp (Standardlasten) müssen gesetzt sein. Fehlt eines, bleibt der Knopf aus und die Statuszeile sagt, was fehlt.</li>
-            <li><strong>«In BlockCalc prüfen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
+            <li><strong>«In BlockCalc prüfen»</strong>Es erscheint zuerst die <strong>Übergabe-Vorschau</strong>: sie zeigt vollständig, was hinübergeht — Baugrund, Geometrie, Lasten, Geländeneigung — und je Wert, woher er stammt. Hinweise stehen ausgeschrieben darunter.</li>
+            <li><strong>Baugrund wählen</strong>Hat das Profil einen Schichtaufbau, wird in der Vorschau entschieden, ob die <strong>Einzelschichten</strong> übergeben werden oder die <strong>interpretierten Werte</strong> als eine Schicht. Die Wahl bleibt am Standort stehen.</li>
+            <li><strong>«In BlockCalc öffnen»</strong>BlockCalc öffnet als Überlagerung, der Rechenfall ist bereits gefüllt. Nichts muss abgetippt werden.</li>
             <li><strong>Rechnen und sichten</strong>Abmessungen, Ausnutzungsgrade und Hinweise prüfen. Bei Bedarf in BlockCalc die Bauweise wechseln und neu rechnen.</li>
             <li><strong>«Ergebnis übernehmen»</strong>Abmessungen und Bauweise gehen in den Standort. Die Statuszeile in der Sidebar zeigt danach Ergebnis und Datum.</li>
           </ol>
@@ -791,7 +815,7 @@
             <tbody>
               <tr><td><strong>hin</strong></td><td>Bauweise und Geometrie</td><td>Fundamenttyp des Standorts</td></tr>
               <tr><td><strong>hin</strong></td><td>Kopfüberstand über Terrain</td><td>Fundamentkopf m ü. M. minus Geländehöhe</td></tr>
-              <tr><td><strong>hin</strong></td><td>Baugrundkennwerte</td><td>Baugrundprofil (USCS, ME, Reibungswinkel, Raumlast, Kohäsion, Grundwasser)</td></tr>
+              <tr><td><strong>hin</strong></td><td>Baugrund</td><td>Schichtaufbau des Profils, oder dessen Auslegung als eine Schicht — die Wahl trifft die Übergabe-Vorschau</td></tr>
               <tr><td><strong>hin</strong></td><td>Lastniveau</td><td>Referenztyp (Standardlasten) des Standorts</td></tr>
               <tr><td><strong>hin</strong></td><td>Neigungsklasse / Böschung</td><td>Höhenkoten bzw. Erwartungswert der Klasse</td></tr>
               <tr><td><strong>zurück</strong></td><td>Abmessungen L × B × T</td><td>Fundamentmasse des Standorts</td></tr>
@@ -1415,7 +1439,7 @@
 </div><!-- /.layout -->
 
 <div class="page-footer">
-  Fundamentbau App &nbsp;·&nbsp; Benutzerhandbuch v2.1 &nbsp;·&nbsp; Alle Daten werden lokal gespeichert
+  Fundamentbau App &nbsp;·&nbsp; Benutzerhandbuch v2.2 &nbsp;·&nbsp; Alle Daten werden lokal gespeichert
 </div>
 
 </body>

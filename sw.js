@@ -46,6 +46,7 @@ const APP_MODULE = [
   'js/modals.js',
   'js/init-phasen.js',
   'js/begehung-ausfuehrung.js',
+  'js/baugrund-schichten.js',
   'js/bibliotheken.js',
   'js/bauprogramm.js',
   'js/fundamenttypen.js',

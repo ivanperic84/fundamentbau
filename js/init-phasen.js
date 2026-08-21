@@ -895,6 +895,22 @@ function updateBodenkennwerteUI() {
   const unitS= 'font-size:10px;color:#9ca3af;flex-shrink:0;';
   const hint = (ok, txt) => `<div style="font-size:10px;color:${ok?'#9ca3af':'#b91c1c'};padding:1px 0 2px 90px;">${txt}</div>`;
 
+  // Der zugewiesene Aufbau. Das Panel zeigt weiterhin den EINEN Satz, mit
+  // dem gerechnet wird — aber daneben, woher er kommt. Ohne das sieht man
+  // einem gemittelten ME nicht an, dass drei Schichten dahinterstehen.
+  const _bgProf = (() => {
+    const id = loadBgZuweisungen()[currentPairId];
+    return id ? loadBgProfile().find(p => p.id === id) : null;
+  })();
+  const _bgAufbau = _bgProf ? bgSchichten(_bgProf) : [];
+  const aufbauZeile = _bgAufbau.length ? `
+      <div style="display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:600;color:#4b5563;background:#f3f4f6;padding:1px 6px;border-radius:3px;">
+          ${_bgAufbau.length} Schichten · ${BG_AUSLEGUNG[bgAuslegungModus(_bgProf)].kurz}</span>
+        <span style="font-size:10px;color:#9ca3af;">${_bgAufbau.map((s, i) =>
+          (s.name || ('Schicht ' + (i + 1))) + ' ' + bgSchichtTiefeText(_bgAufbau, i)).join(' · ')}</span>
+      </div>` : '';
+
   const gwLabels = { nicht_angetroffen:'Nicht angetroffen', angetroffen:'Angetroffen', gespannt:'Gespannt', unbekannt:'Unbekannt' };
   const _gwResolved = _bkGrundwasser ? (gwLabels[_bkGrundwasser] || _bkGrundwasser) : '—';
   const _gwIsNumeric = _bkGrundwasser && !gwLabels[_bkGrundwasser] && !isNaN(parseFloat(_bkGrundwasser));
@@ -909,6 +925,7 @@ function updateBodenkennwerteUI() {
         <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:${isFein?'#eff6ff':'#fef9c3'};color:${isFein?'#2563eb':'#854d0e'};">${isFein?'Feinkörnig':'Grobkörnig'}</span>
       </div>
       <div style="font-size:10px;color:#9ca3af;margin-bottom:6px;">${isFein?'CL, ML, CM, CH, MH (USCS)':'GW, GP, GM, GC, SW, SP, SM, SC (USCS)'}</div>
+      ${aufbauZeile}
 
       <div style="${rowS}">
         <span style="${lblS}">ME-Wert</span>

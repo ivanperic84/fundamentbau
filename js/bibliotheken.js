@@ -378,6 +378,14 @@ function renderBgProfileGrid() {
       ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:5px;"></span>'
       : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626;margin-right:5px;"></span>';
     const count = Object.values(loadBgZuweisungen()).filter(id => id === p.id).length;
+    // Der Aufbau steht neben den Kennwerten, nicht statt ihrer: die Kachel
+    // zeigt weiterhin den Satz, mit dem gerechnet wird, und dazu woher er
+    // kommt — sonst sieht man einem gemittelten ME nicht an, dass es eines ist.
+    const nSch  = bgSchichten(p).length;
+    const modus = bgAuslegungModus(p);
+    const aufbau = nSch
+      ? `<span style="background:#f3f4f6;color:#4b5563;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;margin-right:4px;">${nSch} Schichten · ${BG_AUSLEGUNG[modus].kurz}</span>`
+      : '';
     return `<div class="card" onclick="openBaugrundProfilModal('${p.id}')" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
         <div style="font-size:13px;font-weight:700;color:#1a3a5c;">${p.name}</div>
@@ -385,7 +393,7 @@ function renderBgProfileGrid() {
       </div>
       ${p.beschrieb ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">${p.beschrieb}</div>` : ''}
       <div style="font-size:11px;color:#374151;line-height:1.7;">
-        ${p.bodentyp ? `<span style="background:#eff6ff;color:#2563eb;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;margin-right:4px;">${p.bodentyp === 'fein' ? 'Feinkörnig' : 'Grobkörnig'}</span>` : ''}
+        ${aufbau}${p.bodentyp ? `<span style="background:#eff6ff;color:#2563eb;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;margin-right:4px;">${p.bodentyp === 'fein' ? 'Feinkörnig' : 'Grobkörnig'}</span>` : ''}
         ${p.uscs ? `<span style="background:#f3f4f6;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">${p.uscs}</span>` : ''}
         ${p.me ? `ME ${p.me} MPa` : ''} ${p.phi ? `· φ'k ${p.phi}°` : ''}
         ${p.gwTiefe ? `· GW bei ${p.gwTiefe} m` : ''} ${p.gwMueM ? `(${p.gwMueM} m ü.M.)` : ''}
@@ -770,11 +778,17 @@ function openBaugrundProfilModal(id) {
     v('bg-prof-gw-tiefe',   p.gwTiefe);
     v('bg-prof-gw-mueM',    p.gwMueM);
     v('bg-prof-bemerkung',  p.bemerkung);
+    v('bg-prof-auslegung',  bgAuslegungModus(p));
+    v('bg-prof-masstiefe',  p.massTiefe);
+    bgSchichtenLaden(p);
   } else {
     ['bg-prof-name','bg-prof-beschrieb','bg-prof-uscs','bg-prof-me','bg-prof-phi','bg-prof-gamma','bg-prof-c','bg-prof-gw-tiefe','bg-prof-bemerkung'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     v('bg-prof-bodentyp',''); v('bg-prof-grundwasser','');
+    v('bg-prof-auslegung','manuell'); v('bg-prof-masstiefe','');
     const gwEl = document.getElementById('bg-prof-gw-mueM'); if (gwEl) gwEl.value = '';
+    bgSchichtenLaden(null);
   }
+  onBgAuslegungChange();
   updateBgProfilBeurteilung();
   document.getElementById('baugrund-profil-modal').style.display = 'flex';
 }
@@ -829,6 +843,12 @@ function saveBaugrundProfil() {
     gwTiefe:     v('bg-prof-gw-tiefe'),
     gwMueM:      v('bg-prof-gw-mueM'),
     bemerkung:   v('bg-prof-bemerkung'),
+    // Der Aufschluss. Die Kennwerte darueber sind bei GEO/ING daraus
+    // hergeleitet und werden trotzdem flach gespeichert — genau so lesen
+    // Liste, Zuweisung und Export sie unveraendert weiter.
+    schichten:   bgSchichtenSammeln(),
+    auslegung:   v('bg-prof-auslegung') || 'manuell',
+    massTiefe:   v('bg-prof-masstiefe'),
   };
   const list = loadBgProfile();
   const idx = list.findIndex(p => p.id === profil.id);

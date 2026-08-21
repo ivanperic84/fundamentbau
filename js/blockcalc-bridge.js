@@ -138,6 +138,27 @@ const BC_NICHT_RECHENBAR = {
   sonstige: 'Für diese Bauweise (z. B. Brunnenring) hat BlockCalc kein Modell.'
 };
 
+// Das Baugrundprofil dieser Position — als EINE Form, egal woher es kommt.
+// Ist keines zugewiesen, stehen die Kennwerte direkt an der Position (aus
+// der Bodenkennwerte-Sektion); sie werden als Profil ohne Schichtaufbau
+// gereicht, damit die Übergabe nur einen Weg kennt.
+function bcBaugrundProfil(pairId, bp) {
+  const id = bp.bgProfilId || (typeof loadBgZuweisungen === 'function' ? loadBgZuweisungen()[pairId] : '');
+  const p  = id && typeof loadBgProfile === 'function' ? loadBgProfile().find(x => x.id === id) : null;
+  if (p) return p;
+  return { name: 'Baugrund', auslegung: 'manuell', schichten: [],
+           bodentyp: bp.bkBodentyp, uscs: '',
+           me: bp.bkMe, phi: bp.bkPhi, gamma: bp.bkGamma, c: bp.bkC };
+}
+
+// Welcher Baugrund geht hinüber: der erfasste Schichtaufbau oder der eine
+// ausgelegte Satz. Die Wahl gehört zur Position und bleibt dort stehen —
+// wer sie einmal getroffen hat, soll sie beim zweiten Lauf nicht wiederholen.
+function bcBaugrundModus(bp, profil) {
+  if (!bgSchichten(profil).length) return 'auslegung';
+  return bp.bcBaugrundModus === 'auslegung' ? 'auslegung' : 'schichten';
+}
+
 let _bcPairId = null;      // Position, für die gerade gerechnet wird
 let _bcReady  = false;
 let _bcPending = null;     // Fall, der noch auf 'ready' wartet
@@ -248,9 +269,21 @@ function bcFallBauen(pairId) {
     hinweise.push('Für den Referenztyp «' + familie + '» sind in der App noch keine Lasten hinterlegt — '
                 + 'BlockCalc sucht den Schlüssel in seiner eigenen Tabelle.');
 
-  const phi   = bcNum(bp.bkPhi);
-  const gamma = bcNum(bp.bkGamma) ?? 20;
-  if (phi == null) hinweise.push('Kein φ′ erfasst — BlockCalc rechnet mit seiner Voreinstellung.');
+  // ── Baugrund
+  const profil   = bcBaugrundProfil(pairId, bp);
+  const bgModus  = bcBaugrundModus(bp, profil);
+  const schichten = bgSchichtenFuerBlockCalc(profil, bgModus);
+  const nSchicht = bgSchichten(profil).length;
+  if (!nSchicht)
+    hinweise.push('Kein Schichtaufbau erfasst — der Baugrund geht als eine durchgehende Schicht hinüber.');
+  else if (bgModus === 'auslegung')
+    hinweise.push('Baugrund als ' + (BG_AUSLEGUNG[bgAuslegungModus(profil)]?.kurz || 'ausgelegter')
+                + '-Auslegung übergeben; die ' + nSchicht + ' erfassten Schichten bleiben aussen vor.');
+  // Fehlt φ′ überall, setzt bgSchichtenFuerBlockCalc still 27° ein. Das ist
+  // ein Vorgabewert, kein erfasster Boden — er gehört benannt.
+  const phiErfasst = nSchicht ? bgSchichten(profil).some(s => bgZahl(s.phi) != null)
+                              : bgZahl(profil.phi) != null;
+  if (!phiErfasst) hinweise.push('Kein φ′ erfasst — BlockCalc rechnet mit seiner Voreinstellung.');
 
   return {
     schema: 'blockcalc.case/1',
@@ -275,12 +308,10 @@ function bcFallBauen(pairId) {
       pfahlLaenge: bcNum(bp.bcPfahlLaenge) ?? bcNum(ft?.pfahlLaenge)
     },
     baugrund: {
-      schichten: [{
-        name: bp.bkBodentyp || 'Baugrund',
-        phi: phi ?? 27, c: bcNum(bp.bkC) ?? 0,
-        gamma, gamma2: Math.max(8, gamma - 10),
-        me: bcNum(bp.bkMe) ?? 25, d: 999
-      }],
+      // Der erfasste Aufbau, oder dessen Auslegung als eine Schicht.
+      // BlockCalc nimmt beide Formen gleich entgegen; die unterste Schicht
+      // trägt d = 999 und reicht damit durchgehend nach unten.
+      schichten,
       gw: !!bp.bkGrundwasser && bp.bkGrundwasser !== 'nein',
       gwTiefe: bcNum(bp.bkGrundwasserTiefe),
       // Gemessener Winkel, sonst die Klassenobergrenze. Der gemessene ist der
@@ -288,7 +319,19 @@ function bcFallBauen(pairId) {
       neigung: { beta: neigungGrad(bp) ?? 0 }
     },
     lasten: bcLastblock(familie, BC_MODELL[art]),
-    _hinweise: hinweise
+    _hinweise: hinweise,
+    // Nur für die Vorschau: woher jeder Wert stammt. Eine Zahl allein sagt
+    // nicht, ob sie aus einer früheren Rechnung, aus dem Typenprofil oder
+    // gar nicht kommt — und genau das will man vor dem Start sehen.
+    _herkunft: {
+      masse:  Bbc != null ? 'Ergebnis' : (Bft != null ? 'Typenprofil' : '—'),
+      tiefe:  bcNum(bp.bcTiefe) != null ? 'Ergebnis' : (bcNum(ft?.tiefe) != null ? 'Typenprofil' : '—'),
+      pfahl:  bcNum(bp.bcPfahlLaenge) != null ? 'Ergebnis' : (bcNum(ft?.pfahlLaenge) != null ? 'Typenprofil' : '—'),
+      hoehe:  (kopfKote != null && gelaende != null) ? 'gemessen' : 'Erwartungswert der Neigungsklasse',
+      beta:   _neigGemessen != null ? 'gemessen' : 'Klassenobergrenze',
+      boden:  bgModus, bodenProfil: profil.name || '', bodenSchichten: nSchicht,
+      bodenAuslegung: bgAuslegungModus(profil),
+    }
   };
 }
 
@@ -321,7 +364,175 @@ function bcSchliessen() {
   _bcReady = false; _bcPending = null; _bcPairId = null;
 }
 
+
+// ── Übergabe-Vorschau ────────────────────────────────────────────────────────
+// Vor dem Start zeigen, was hinübergeht. Zwei Gründe:
+//
+//   1. Der Baugrund ist eine ECHTE Wahl geworden. Ein Profil mit erfasstem
+//      Schichtaufbau kann als Schichtenfolge hinübergehen oder als der eine
+//      ausgelegte Satz, mit dem die Liste arbeitet. Beides ist richtig, je
+//      nachdem was nachgewiesen wird — also fragt die App, statt zu raten.
+//
+//   2. Die Hinweise waren bisher unsichtbar. bcNachweisOeffnen() schrieb ihre
+//      ANZAHL in die Kopfzeile des Overlays; was drinstand, sah niemand. Dass
+//      der Überstand geschätzt, der Referenztyp leer oder die Geometrie aus
+//      dem Typenprofil statt aus einer Rechnung stammt, gehört vor den Start,
+//      nicht dahinter.
+//
+// Die Wahl bleibt an der Position stehen (bp.bcBaugrundModus) — beim zweiten
+// Lauf steht sie schon richtig da.
+let _bcVorschauPairId = null;
+
+function bcVorschau() {
+  let ov = document.getElementById('bc-vorschau');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'bc-vorschau';
+  ov.className = 'modal-overlay';
+  ov.style.display = 'none';
+  ov.onclick = ev => { if (ev.target === ov) bcVorschauSchliessen(); };
+  ov.innerHTML =
+    '<div class="modal" style="width:600px;max-height:88vh;overflow-y:auto;">' +
+      '<h2 id="bc-vs-titel">Übergabe an BlockCalc</h2>' +
+      '<div id="bc-vs-inhalt"></div>' +
+      '<div class="modal-actions">' +
+        '<button class="modal-btn cancel" onclick="bcVorschauSchliessen()">Abbrechen</button>' +
+        '<button class="modal-btn primary" onclick="bcVorschauStarten()">In BlockCalc öffnen</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  return ov;
+}
+
+function bcVorschauSchliessen() {
+  const ov = document.getElementById('bc-vorschau');
+  if (ov) ov.style.display = 'none';
+  _bcVorschauPairId = null;
+}
+
+function bcVorschauStarten() {
+  const id = _bcVorschauPairId;
+  bcVorschauSchliessen();
+  if (id) bcStarten(id);
+}
+
+// Baugrundwahl umstellen und die Vorschau neu aufbauen — die Kennwerte
+// darunter ändern sich mit, sonst zeigt die Tabelle die alte Wahl.
+function bcVorschauBoden(modus) {
+  if (!_bcVorschauPairId) return;
+  const all = loadAllBauprojekt();
+  all[_bcVorschauPairId] = { ...(all[_bcVorschauPairId] || {}), bcBaugrundModus: modus };
+  saveAllBauprojekt(all);
+  bcNachweisOeffnen(_bcVorschauPairId);
+}
+
+// Wertzeile: Grösse, Wert, Herkunft. Ein fehlender Wert wird als «—» gezeigt
+// und nicht verschwiegen — leer heisst hier «BlockCalc setzt seine Vorgabe».
+function _bcZeile(label, wert, herkunft) {
+  const leer = wert == null || wert === '' || wert === '—';
+  return '<div style="display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:baseline;' +
+              'padding:3px 0;border-bottom:1px solid #f3f4f6;">' +
+    '<span style="font-size:11px;color:#9ca3af;">' + label + '</span>' +
+    '<span style="font-size:12px;color:' + (leer ? '#9ca3af' : '#374151') + ';font-weight:500;">' +
+      (leer ? '—' : wert) + '</span>' +
+    // Ohne Wert keine Herkunft — «Kopf B x L: — / Typenprofil» behauptete,
+    // das Profil habe etwas geliefert, obwohl das Feld dort leer ist.
+    '<span style="font-size:10px;color:#9ca3af;white-space:nowrap;">' + (leer ? '' : (herkunft || '')) + '</span>' +
+  '</div>';
+}
+
+function _bcAbschnitt(titel, inhalt) {
+  return '<div style="margin-bottom:12px;">' +
+    '<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;' +
+         'letter-spacing:0.04em;margin-bottom:3px;">' + titel + '</div>' + inhalt + '</div>';
+}
+
+function bcVorschauFuellen(fall, pairId) {
+  const h = fall._herkunft, g = fall.geometrie, b = fall.baugrund;
+  const bp = loadAllBauprojekt()[pairId] || {};
+  const m  = v => v == null ? '' : (Math.round(v * 100) / 100).toFixed(2) + ' m';
+
+  // ── Baugrund: die Wahl, dann was sie liefert
+  const hatAufbau = h.bodenSchichten > 0;
+  const wahlKnopf = (wert, titel, unter, aktiv) =>
+    '<label style="display:flex;gap:7px;align-items:flex-start;padding:6px 8px;border:1px solid ' +
+        (aktiv ? '#1a3a5c' : '#e5e7eb') + ';border-radius:7px;cursor:pointer;flex:1;' +
+        'background:' + (aktiv ? '#f8fafc' : 'white') + ';">' +
+      '<input type="radio" name="bc-vs-boden" value="' + wert + '"' + (aktiv ? ' checked' : '') +
+        ' onchange="bcVorschauBoden(\'' + wert + '\')" style="accent-color:#1a3a5c;margin-top:1px;">' +
+      '<span><span style="font-size:12px;font-weight:600;color:#374151;display:block;">' + titel + '</span>' +
+      '<span style="font-size:10px;color:#9ca3af;">' + unter + '</span></span></label>';
+
+  const auslKurz = BG_AUSLEGUNG[h.bodenAuslegung]?.kurz || 'Manuell';
+  const wahl = hatAufbau
+    ? '<div style="display:flex;gap:7px;margin-bottom:7px;">' +
+        wahlKnopf('schichten', 'Einzelschichten',
+                  h.bodenSchichten + ' Schichten wie erfasst', h.boden === 'schichten') +
+        wahlKnopf('auslegung', 'Interpretierte Werte',
+                  auslKurz + '-Auslegung als eine Schicht', h.boden === 'auslegung') +
+      '</div>'
+    : '<div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">Für dieses Profil ist kein ' +
+      'Schichtaufbau erfasst — der Baugrund geht als eine durchgehende Schicht hinüber.</div>';
+
+  const kopfS = 'font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;padding:0 5px 2px;text-align:right;';
+  const zellS = 'font-size:11px;color:#374151;padding:3px 5px;text-align:right;border-top:1px solid #f3f4f6;';
+  const tabelle =
+    '<table style="width:100%;border-collapse:collapse;">' +
+      '<tr><th style="' + kopfS + 'text-align:left;">Schicht</th>' +
+          '<th style="' + kopfS + '">bis [m]</th><th style="' + kopfS + '">M<sub>E</sub></th>' +
+          '<th style="' + kopfS + '">φ&prime;</th><th style="' + kopfS + '">γ</th>' +
+          '<th style="' + kopfS + '">γ&prime;</th><th style="' + kopfS + '">c&prime;</th></tr>' +
+      b.schichten.map((s, i, arr) => {
+        let z = 0; for (let j = 0; j < i; j++) z += arr[j].d === 999 ? 0 : arr[j].d;
+        const bis = (i === arr.length - 1 || s.d === 999) ? '∞' : (z + s.d).toFixed(1);
+        return '<tr><td style="' + zellS + 'text-align:left;font-weight:600;">' + (s.name || '—') + '</td>' +
+          '<td style="' + zellS + '">' + bis + '</td><td style="' + zellS + '">' + s.me + '</td>' +
+          '<td style="' + zellS + '">' + s.phi + '</td><td style="' + zellS + '">' + s.gamma + '</td>' +
+          '<td style="' + zellS + '">' + s.gamma2 + '</td><td style="' + zellS + '">' + s.c + '</td></tr>';
+      }).join('') +
+    '</table>';
+
+  const gwText = b.gw ? ('angetroffen' + (b.gwTiefe != null ? ' bei ' + b.gwTiefe + ' m' : ', ohne Tiefe')) : 'nicht angesetzt';
+
+  // ── Lasten
+  const l = fall.lasten;
+  const lastText = l.werte
+    ? l.typ + ' · N_G ' + l.werte.NG + ' kN, H_Gx ' + l.werte.HGx + ' kN, M_Gx ' + l.werte.MGx + ' kNm'
+    : (l.typ ? l.typ + ' — Werte sucht BlockCalc in seiner Tabelle' : '');
+
+  document.getElementById('bc-vs-inhalt').innerHTML =
+    '<div style="font-size:11px;color:#6b7280;margin:-6px 0 12px;">' +
+      fall.meta.fundament + ' · ' + (fall.modell === 'pfahlbock' ? 'Pfahlfundament' : 'Blockfundament') +
+      (h.bodenProfil ? ' · Baugrundprofil ' + h.bodenProfil : '') + '</div>' +
+
+    _bcAbschnitt('Baugrund', wahl + tabelle +
+      _bcZeile('Grundwasser', gwText, '') +
+      _bcZeile('Geländeneigung', (b.neigung.beta || 0).toFixed(1) + '°', h.beta)) +
+
+    _bcAbschnitt('Geometrie',
+      _bcZeile('Abmessung B × L', g.B != null ? m(g.B) + ' × ' + m(g.L) : '', h.masse) +
+      _bcZeile('Blocktiefe', m(g.H_Block), h.tiefe) +
+      _bcZeile('Kopf B × L', g.B_Kopf != null ? m(g.B_Kopf) + ' × ' + m(g.L_Kopf) : '', 'Typenprofil') +
+      _bcZeile('Kopfhöhe (ab OK Block)', m(g.kopfHoehe), 'Typenprofil') +
+      _bcZeile('Überstand über Terrain', m(g.ueberstand), h.hoehe) +
+      (fall.modell === 'pfahlbock'
+        ? _bcZeile('Pfähle', (g.pfahlAnzahl || '—') + ' Stk. à ' + (g.pfahlLaenge != null ? m(g.pfahlLaenge) : '—') +
+                             ' ab UK Block', h.pfahl)
+        : '')) +
+
+    _bcAbschnitt('Lasten', _bcZeile('Referenztyp', lastText, l.vFall === 'max' ? 'V = 150 kN' : 'V = 0 kN') +
+      (l.torsion ? _bcZeile('Torsion T', l.torsion + ' kNm', 'BlockCalc rechnet T nicht') : '')) +
+
+    (fall._hinweise.length
+      ? _bcAbschnitt('Hinweise',
+          '<ul style="margin:0;padding-left:16px;font-size:11px;color:#b45309;line-height:1.6;">' +
+          fall._hinweise.map(t => '<li>' + t + '</li>').join('') + '</ul>')
+      : '');
+}
+
 // ── Öffnen ───────────────────────────────────────────────────────────────────
+// Erst die Vorschau, dann die Rechnung. Der Knopf in der Sidebar ruft
+// weiterhin diese Funktion — was sich ändert, ist der Zwischenschritt.
 function bcNachweisOeffnen(pairId) {
   pairId = pairId || (typeof currentPairId !== 'undefined' ? currentPairId : null);
   if (!pairId) return;
@@ -331,6 +542,16 @@ function bcNachweisOeffnen(pairId) {
     ui.toast('BlockCalc: ' + g, 'fehler');
     return;
   }
+  _bcVorschauPairId = pairId;
+  const ov = bcVorschau();
+  document.getElementById('bc-vs-titel').textContent = 'Übergabe an BlockCalc';
+  bcVorschauFuellen(fall, pairId);
+  ov.style.display = 'flex';
+}
+
+function bcStarten(pairId) {
+  const fall = bcFallBauen(pairId);
+  if (!fall) return;
   _bcPairId = pairId; _bcReady = false; _bcPending = fall;
 
   const ov = bcOverlay();

@@ -2961,6 +2961,7 @@ const APP_MODULE = [
   'js/modals.js',                // Service Worker, Messen, Kartenpicker, Kontakte, Mailvorlagen
   'js/init-phasen.js',           // Init, phasenabhaengige Maske, Bauprojektfelder, Notiz-Storage
   'js/begehung-ausfuehrung.js',  // Begehung, Ausfuehrungsprojekt, Abnahme-Checkliste
+  'js/baugrund-schichten.js',    // Schichtaufbau der Baugrundprofile und dessen Auslegung
   'js/bibliotheken.js',          // Baugrund, Installationen, Statik, Schichten, Sperrmuster
   'js/bauprogramm.js',           // Bauprogramm-Tab: Datenmodell, Gantt, Zuweisung
   'js/fundamenttypen.js',        // Fundamenttypen-Bibliothek und Parameterdatenbank
@@ -4796,7 +4797,7 @@ function _ladeScript(pfad) {
 
 <!-- BAUGRUND PROFIL MODAL -->
 <div class="modal-overlay" id="baugrund-profil-modal" onclick="if(event.target===this)closeBaugrundProfilModal()" style="display:none;">
-  <div class="modal" style="width:520px;max-height:90vh;overflow-y:auto;">
+  <div class="modal" style="width:660px;max-height:90vh;overflow-y:auto;">
     <h2 id="baugrund-profil-modal-title">Baugrundprofil erfassen</h2>
     <div class="modal-grid">
       <div class="modal-field full">
@@ -4807,6 +4808,40 @@ function _ladeScript(pfad) {
         <label>Beschreibung</label>
         <textarea class="modal-input" id="bg-prof-beschrieb" rows="2" placeholder="Kurzbeschreibung des Bodens…" style="resize:vertical;"></textarea>
       </div>
+      <!-- SCHICHTAUFBAU — der Aufschluss.
+           Was die Sondierung angetroffen hat, Schicht fuer Schicht. Die
+           Kennwerte darunter sind die AUSLEGUNG daraus: ein Satz, mit dem
+           gerechnet wird. Bei GEO/ING leitet ihn bgAuslegungVorschau() aus
+           diesen Zeilen ab und traegt ihn unten ein — deshalb liest der
+           Rest der App (Liste, Zuweisung, Export) unveraendert weiter. -->
+      <div class="modal-field full" style="border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;background:#fbfcfd;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <span style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Schichtaufbau</span>
+          <button type="button" onclick="bgSchichtAdd()"
+            style="padding:3px 10px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Bodenschicht
+          </button>
+        </div>
+        <div id="bg-schichten-liste"></div>
+      </div>
+
+      <div class="modal-field">
+        <label>Auslegung der Kennwerte</label>
+        <select class="modal-input" id="bg-prof-auslegung" onchange="onBgAuslegungChange()">
+          <option value="manuell">Manuell erfasst</option>
+          <option value="geo">GEO &mdash; gewichtetes Mittel</option>
+          <option value="ing">ING &mdash; massgebende Schicht</option>
+        </select>
+      </div>
+      <div class="modal-field" id="bg-masstiefe-wrap">
+        <label>Massgebende Tiefe ab Terrain (m)</label>
+        <input class="modal-input" id="bg-prof-masstiefe" type="number" step="0.5" min="0" placeholder="3.0" oninput="bgAuslegungVorschau()">
+      </div>
+      <div class="modal-field full">
+        <div id="bg-auslegung-info" style="font-size:10px;color:#6b7280;margin-top:-6px;"></div>
+      </div>
+
       <div class="modal-field">
         <label>Bodentyp</label>
         <select class="modal-input" id="bg-prof-bodentyp">
