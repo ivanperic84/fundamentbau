@@ -186,16 +186,28 @@ function bcFallBauen(pairId) {
   const { ft, bp, art } = chk;
   const hinweise = [];
 
-  // Geometrie: aus dem Profil, sonst aus einer früheren BlockCalc-Dimensionierung dieser
-  // Position. Spezialfundamente haben regelmässig KEINE Standardmasse — dann bleiben die
+  // Geometrie: ZUERST aus einer früheren BlockCalc-Dimensionierung dieser Position,
+  // sonst aus dem Profil.
+  //
+  // Die Reihenfolge war umgekehrt, und bei den Pfählen fehlte der Rückfall ganz.
+  // Folge: eine auf 7.5 m dimensionierte Pfahllänge wurde beim nächsten Öffnen
+  // wieder als die 6.0 m des Profils hinübergeschickt — das Ergebnis war
+  // gespeichert, kam aber nicht mit. Ein Ergebnis gehört zu DIESER Position und
+  // ist neuer; das Profil ist der Bibliothekswert für den Start.
+  //
+  // Für die Blockmasse ist die Umkehr folgenlos: kein Spezialprofil trägt Masse
+  // (alle sieben durchgesehen). Sie vereinheitlicht nur, was für die Pfähle
+  // ohnehin nötig war.
+  //
+  // Spezialfundamente haben regelmässig KEINE Standardmasse — dann bleiben die
   // Felder leer, BlockCalc startet mit seinen Vorgabewerten und der Ingenieur trägt die
   // tatsächliche Geometrie dort ein. Das ist der vorgesehene Weg, kein Fehlerfall.
-  const [Bft, Lft] = bcMasse(ft?.blockAbmessung);
   const [Bbc, Lbc] = bcMasse(bp.bcAbmessung);
-  const B = Bft ?? Bbc, L = Lft ?? Lbc;
+  const [Bft, Lft] = bcMasse(ft?.blockAbmessung);
+  const B = Bbc ?? Bft, L = Lbc ?? Lft;
   const [Bk, Lk]  = bcMasse(ft?.kopfAbmessung);
   const kopfHoehe = bcNum(ft?.kopfHoehe) ?? 1.00;
-  const tiefe     = bcNum(ft?.tiefe) ?? bcNum(bp.bcTiefe);
+  const tiefe     = bcNum(bp.bcTiefe) ?? bcNum(ft?.tiefe);
   if (B == null || tiefe == null)
     hinweise.push('Für diesen Typ sind keine Standardmasse hinterlegt — Geometrie in BlockCalc erfassen.');
 
@@ -256,8 +268,11 @@ function bcFallBauen(pairId) {
       B_Kopf: Bk, L_Kopf: Lk,
       kopfHoehe,                 // Gesamtmass OK Block → OK Kopf
       ueberstand,                // OK Kopf über Terrain
-      pfahlAnzahl: bcNum(ft?.anzahlPfaehle) ?? (/mono|einzel/i.test(bp.fundtyp) ? 1 : null),
-      pfahlLaenge: bcNum(ft?.pfahlLaenge)
+      // Pfahllänge ab UK Block — dieselbe Definition wie BlockCalcs pb_L, das
+      // beim Pfahlbock ab Unterkante Bankett misst.
+      pfahlAnzahl: bcNum(bp.bcPfahlAnzahl) ?? bcNum(ft?.anzahlPfaehle)
+                   ?? (/mono|einzel/i.test(bp.fundtyp) ? 1 : null),
+      pfahlLaenge: bcNum(bp.bcPfahlLaenge) ?? bcNum(ft?.pfahlLaenge)
     },
     baugrund: {
       schichten: [{

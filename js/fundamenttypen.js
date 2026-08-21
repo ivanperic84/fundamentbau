@@ -1366,16 +1366,39 @@ function onFtArtChange() {
   // Label- und Placeholder-Anpassungen je Art
   const lbl   = id => document.getElementById(id);
   const input = id => document.getElementById(id);
+  // Der Bezugspunkt gehoert in die Beschriftung, nicht in den Kopf des
+  // Bearbeiters. Fuer den Pfahl ist er bekannt und mit BlockCalc identisch
+  // (UK Block); fuer den Anker im Fels wird hier nichts behauptet.
+  const hint = id => document.getElementById(id);
   if (art === 'fels') {
     if (lbl('ft-label-pfahl-laenge')) lbl('ft-label-pfahl-laenge').textContent = 'Ankerlänge (m)';
     if (lbl('ft-label-tiefe'))        lbl('ft-label-tiefe').textContent        = 'Einbindetiefe (m)';
     if (input('ft-prof-pfahl-laenge')) input('ft-prof-pfahl-laenge').placeholder = 'z.B. 3.0';
     if (input('ft-prof-tiefe'))        input('ft-prof-tiefe').placeholder        = 'z.B. 0.5';
-  } else {
-    if (lbl('ft-label-pfahl-laenge')) lbl('ft-label-pfahl-laenge').textContent = 'Pfahllänge (m)';
+    if (hint('ft-hint-pfahl-laenge'))  hint('ft-hint-pfahl-laenge').style.display = 'none';
+  } else if (art === 'monopfahl') {
+    // Ein Monopfahl hat kein Bankett und keinen Block. BlockCalc misst die
+    // Laenge dort ab Terrain als Einbindelaenge; der freie Teil ueber GOK
+    // laeuft getrennt als Ueberstand. «ab UK Block» waere hier falsch.
+    if (lbl('ft-label-pfahl-laenge')) lbl('ft-label-pfahl-laenge').textContent = 'Einbindelänge ab Terrain (m)';
     if (lbl('ft-label-tiefe'))        lbl('ft-label-tiefe').textContent        = 'Blocktiefe (m)';
     if (input('ft-prof-pfahl-laenge')) input('ft-prof-pfahl-laenge').placeholder = 'z.B. 6.0';
     if (input('ft-prof-tiefe'))        input('ft-prof-tiefe').placeholder        = 'z.B. 1.6';
+    if (hint('ft-hint-pfahl-laenge')) {
+      hint('ft-hint-pfahl-laenge').style.display = '';
+      hint('ft-hint-pfahl-laenge').textContent =
+        'Gemessen ab Terrain — beim Einzelpfahl gibt es keinen Block; der Teil über Terrain zählt getrennt.';
+    }
+  } else {
+    if (lbl('ft-label-pfahl-laenge')) lbl('ft-label-pfahl-laenge').textContent = 'Pfahllänge ab UK Block (m)';
+    if (lbl('ft-label-tiefe'))        lbl('ft-label-tiefe').textContent        = 'Blocktiefe (m)';
+    if (input('ft-prof-pfahl-laenge')) input('ft-prof-pfahl-laenge').placeholder = 'z.B. 6.0';
+    if (input('ft-prof-tiefe'))        input('ft-prof-tiefe').placeholder        = 'z.B. 1.6';
+    if (hint('ft-hint-pfahl-laenge')) {
+      hint('ft-hint-pfahl-laenge').style.display = '';
+      hint('ft-hint-pfahl-laenge').textContent =
+        'Gemessen ab Unterkante Block — gleiche Definition wie im statischen Nachweis.';
+    }
   }
   ftUpdatePfahlPlaceholders();
 }

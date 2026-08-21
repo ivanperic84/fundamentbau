@@ -5300,10 +5300,15 @@ function _ladeScript(pfad) {
         <input class="modal-input" id="ft-prof-pfaehle" type="number" min="1" placeholder="z.B. 4" oninput="ftUpdatePfahlPlaceholders()">
       </div>
 
-      <!-- Pfahllänge / Ankerlänge -->
+      <!-- Pfahllänge / Ankerlänge.
+           Der Bezugspunkt stand nirgends: wer 6.0 m eintrug, konnte OK Block,
+           UK Block oder Terrain gemeint haben, und beide Zahlen sind plausibel.
+           BlockCalc misst die Pfahllänge beim Pfahlbock ab UK Bankett — das ist
+           UK Block. Die Beschriftung sagt es jetzt. -->
       <div class="modal-field" id="ft-wrap-pfahl-laenge">
-        <label id="ft-label-pfahl-laenge">Pfahllänge (m)</label>
+        <label id="ft-label-pfahl-laenge">Pfahllänge ab UK Block (m)</label>
         <input class="modal-input" id="ft-prof-pfahl-laenge" type="number" step="0.5" placeholder="z.B. 6.0">
+        <div class="field-hint" id="ft-hint-pfahl-laenge">Gemessen ab Unterkante Block — gleiche Definition wie im statischen Nachweis.</div>
       </div>
 
       <!-- Bohrleistung (nur für Mehrpfahl) -->

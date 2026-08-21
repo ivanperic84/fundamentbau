@@ -56,7 +56,7 @@ const FM_FELD_LABEL = {
   block:       'Blockabmessung',
   tiefe:       'Tiefe',
   pfaehle:     'Anzahl Pfähle',
-  pfahlLaenge: 'Pfahl-/Ankerlänge',
+  pfahlLaenge: 'Pfahl-/Ankerlänge',   // Pfahl: ab UK Block, wie im Nachweis
   anker:       'Ankerbolzen',
   buegel:      'Bügelbewehrung',
   bewehrung:   'Bewehrung (kg)',
