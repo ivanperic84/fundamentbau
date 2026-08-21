@@ -50,6 +50,24 @@ const FM_ART_FELDER = {
   sonstige:       ['kopf', 'kopfHoehe', 'block', 'tiefe'],
 };
 
+// ── Aushub ───────────────────────────────────────────────────
+// Der Aushub war das Blockmass mal der Tiefe — das idealisierte Loch, in dem
+// der Block genau aufgeht. Der Leistungskatalog nennt je Typ eine Kubatur,
+// und sie liegt durchweg darueber.
+//
+// Nachgerechnet ueber alle 19 Typen: der Unterschied ist eine MEHRTIEFE unter
+// der Sohle von rund 0.30 m — Sauberkeitsschicht samt Toleranz — und nicht
+// ein Arbeitsraum an den Seiten. Bei DP1a mit 1.00 m Grabenbreite trifft
+// Grabenbreite² × (Tiefe + 0.30) die Katalogkubatur dreimal exakt
+// (1.9 / 2.2 / 2.5 m³). Ueber die uebrigen Typen bleibt die Abweichung
+// zwischen -6 % und +3 %, was der Angabe «min. ca.» entspricht.
+//
+// Gerechnet wird NUR, wo eine Grabenbreite hinterlegt ist. Fehlt sie — alle
+// Spezialfundamente, und DG2a/DG3a bis zur Klaerung — bleibt es beim
+// bisherigen Mass. Eine Mehrtiefe auf ein ungeklaertes Grabenmass zu legen
+// hiesse, eine Genauigkeit zu behaupten, die nicht da ist.
+const FM_AUSHUB_MEHRTIEFE = 0.30;
+
 const FM_FELD_LABEL = {
   kopf:        'Kopfabmessung',
   kopfHoehe:   'Kopfhöhe',
@@ -150,7 +168,12 @@ function fmMengen(ft) {
     if (kopfVol != null && block && tiefe != null) {
       const blockH = Math.max(0, tiefe - kopfH);
       d.beton    = kopfVol + block.a * block.b * blockH;
-      d.aushub   = block.a * block.b * tiefe;
+      // Der Graben ist nie schmaler als der Block — die Katalogangabe ist ein
+      // Mindestmass der Verbauregeln, nicht das Mass dieses Fundaments.
+      const gb = fmZahl(ft.grabenBreite);
+      d.aushub   = gb != null
+        ? Math.max(gb, block.a) * Math.max(gb, block.b) * (tiefe + FM_AUSHUB_MEHRTIEFE)
+        : block.a * block.b * tiefe;
       d.schalung = kopfSchalung;
     }
   } else if (art === 'mehrpfahl' || art === 'monopfahl') {

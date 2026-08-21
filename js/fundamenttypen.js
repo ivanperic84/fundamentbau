@@ -38,7 +38,7 @@
 // ============================================================
 const FT_PROFIL_KEY    = () => 'sp_ft_profile__'    + _activeId;
 const FT_VERSION_KEY   = () => 'sp_ft_version__'    + _activeId;
-const DEFAULT_FT_VERSION = 16; // Erhöhen bei Änderungen an Standardtypen
+const DEFAULT_FT_VERSION = 17; // Erhöhen bei Änderungen an Standardtypen
 
 // Bauzeiten vor v16. Sie waren grob geschätzt und lagen um das Drei- bis
 // Fünffache über dem, was der Leistungskatalog hergibt — bei einem Kostenblock,
@@ -68,7 +68,7 @@ const DEFAULT_FT_PROFIL = [
   // ── DP1a — Doppelstiel klein (Block 1.0×1.0 m) ──
   { id:'ft_std_dp1a_15', name:'DP1a / 1.5', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1000×1000 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'1.5', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'1.5', grabenBreite:'1.00', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0171', schraubenArtikelNr:'371.10.07',
     vfkZeichnungsNr:'0161.1011.0190.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -80,7 +80,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dp1a', name:'DP1a / 1.8', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1000×1000 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'1.8', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'1.8', grabenBreite:'1.00', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0172', schraubenArtikelNr:'371.10.07',
     vfkZeichnungsNr:'0161.1011.0190.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -92,7 +92,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dp1a_21', name:'DP1a / 2.1', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1000×1000 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.1', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.1', grabenBreite:'1.00', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0173', schraubenArtikelNr:'371.10.07',
     vfkZeichnungsNr:'0161.1011.0190.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -104,7 +104,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dp1b', name:'DP1a / 2.4', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1000×1000 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', grabenBreite:'1.20', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0174', schraubenArtikelNr:'371.10.08',
     vfkZeichnungsNr:'0161.1011.0190.2',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -117,7 +117,7 @@ const DEFAULT_FT_PROFIL = [
   // ── DP2a — Doppelstiel mittel (Block 1.2×1.2 m) ──
   { id:'ft_std_dp2a', name:'DP2a / 2.0', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1200×1200 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.0', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.0', grabenBreite:'1.20', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0175', schraubenArtikelNr:'371.10.10',
     vfkZeichnungsNr:'0161.1011.0191.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -129,7 +129,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dp2a_24', name:'DP2a / 2.4', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1200×1200 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', ftIntervall:1.0,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', grabenBreite:'1.20', ftIntervall:1.0,
     zeichnungsNr:'0161.1011.0176', schraubenArtikelNr:'371.10.10',
     vfkZeichnungsNr:'0161.1011.0191.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -141,7 +141,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dp2b', name:'DP2a / 2.7', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1200×1200 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0177', schraubenArtikelNr:'371.10.11',
     vfkZeichnungsNr:'0161.1011.0191.2',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -154,7 +154,7 @@ const DEFAULT_FT_PROFIL = [
   // ── DG1a — Gittermast klein (Block 1.3×1.3 m) ──
   { id:'ft_std_dg1a_24', name:'DG1a / 2.4', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0178', schraubenArtikelNr:'371.10.11',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -165,7 +165,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Gittermast, Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dg1a_27', name:'DG1a / 2.7', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0179', schraubenArtikelNr:'371.10.11',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -176,7 +176,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Gittermast, Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dg1a_30', name:'DG1a / 3.0', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.0', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.0', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0180', schraubenArtikelNr:'371.10.12',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -234,7 +234,7 @@ const DEFAULT_FT_PROFIL = [
   // ── HP1a — Hoher Pied gross (Block 1.3×1.3 m) ──
   { id:'ft_std_hp1a', name:'HP1a / 2.4', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0185', schraubenArtikelNr:'371.10.11',
     vfkZeichnungsNr:'0161.1011.0192.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -246,7 +246,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_hp1a_29', name:'HP1a / 2.9', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.9', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.9', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0186', schraubenArtikelNr:'371.10.11',
     vfkZeichnungsNr:'0161.1011.0192.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -258,7 +258,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_hp1b', name:'HP1a / 3.2', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.2', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.2', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0187', schraubenArtikelNr:'371.10.12',
     vfkZeichnungsNr:'0161.1011.0192.2',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -271,7 +271,7 @@ const DEFAULT_FT_PROFIL = [
   // ── HP2a — Hoher Pied gross (Block 1.3×1.3 m) ──
   { id:'ft_std_hp2a', name:'HP2a / 2.4', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.4', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0188', schraubenArtikelNr:'371.10.10',
     vfkZeichnungsNr:'0161.1011.0193.1',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
@@ -283,7 +283,7 @@ const DEFAULT_FT_PROFIL = [
     einsatzBedingung:'Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_hp2b', name:'HP2a / 2.7', typ:'standard', fundamentArt:'blockfundament',
     kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', ftIntervall:1.5,
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.7', grabenBreite:'1.30', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0189', schraubenArtikelNr:'371.10.11',
     vfkZeichnungsNr:'0161.1011.0193.2',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
