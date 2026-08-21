@@ -1232,6 +1232,27 @@ function lkKatalogImport(input) {
 const LK_BAND_RE  = /^(.*?),?\s*Intervalldauer\s*([\d.]+)\s*h\s*bis\s*([\d.]+)\s*h/;
 const LK_BAND_MAX = 8.05;     // 8.1-9.0 h bleibt aussen vor
 
+// Aufrunden mit der Stufe nach der Grössenordnung.
+//
+// Ein Mittel über sechs Vertragsbänder ist ein Schätzwert. 1023.80 CHF
+// behauptet eine Genauigkeit, die dahinter nicht steht — und in einer
+// Kostenschätzung ist die Überschätzung der günstigere Fehler. Darum
+// AUFgerundet, nicht gerundet.
+//
+// Die Stufe wächst mit dem Betrag, damit der Aufschlag verhältnismässig
+// bleibt: 50 Franken auf 590 sind 1.7 %, 50 Franken auf 12 000 wären
+// Scheingenauigkeit in der anderen Richtung.
+//
+// NICHT angewendet auf Preise, die so im Vertrag stehen. Ein Einheitspreis
+// von 1650 CHF je Fundament ist keine Schätzung; ihn aufzurunden hiesse,
+// eine verhandelte Zahl zu verfälschen.
+function mkAufrunden(betrag) {
+  const n = Number(betrag);
+  if (!Number.isFinite(n) || n <= 0) return betrag;
+  const stufe = n < 2000 ? 50 : n < 10000 ? 100 : 500;
+  return Math.ceil(n / stufe) * stufe;
+}
+
 let _lkRollenCache = null;
 
 // Rollengruppen des Katalogs: Positionsnummer → { rolle, baender[] }.
@@ -1317,7 +1338,7 @@ function lkRollePreis(posNr, rueckfall) {
   if (!e) return rueckfall ?? null;
   const werte = e.baender.filter(b => b.von < LK_BAND_MAX).map(b => b.preis);
   if (!werte.length) return rueckfall ?? null;
-  return Math.round(werte.reduce((s, v) => s + v, 0) / werte.length);
+  return mkAufrunden(werte.reduce((s, v) => s + v, 0) / werte.length);
 }
 
 // Zuschlag einer Rolle. Er haengt NICHT immer unter der Basisposition:
@@ -1348,7 +1369,7 @@ function lkZuschlagPreis(posNr, art) {
     }
   });
   if (!werte.length) return null;
-  return Math.round(werte.reduce((s, v) => s + v, 0) / werte.length);
+  return mkAufrunden(werte.reduce((s, v) => s + v, 0) / werte.length);
 }
 
 // ── Standardbesetzung ───────────────────────────────────────
