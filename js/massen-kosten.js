@@ -112,6 +112,8 @@ const MK_HERKUENFTE = [
   { id: 'stunden',        label: 'Verrechnete Stunden' },
   { id: 'stundenNacht',   label: 'Verrechnete Stunden Nacht' },
   { id: 'stundenSonntag', label: 'Verrechnete Stunden Sonntag' },
+  { id: 'verschmutztLeicht', label: 'Aushub schwach/wenig verschmutzt' },
+  { id: 'verschmutztStark',  label: 'Aushub stark verschmutzt' },
   { id: 'installation',   label: '% der Bausumme' },
   ...MASSEN_GROESSEN.map(g => ({ id: g.id, label: g.label })),
 ];
@@ -448,6 +450,12 @@ function lvMenge(zeile, summen) {
              : (zeile.teamId ? a.total : schichtenGesamt());
     return nr * f * (zeile.herkunft.startsWith('stunden') ? mkStundenJeSchicht() : 1);
   }
+  // Verschmutzungszuschlaege sind ein ANTEIL der Fundamente, keine eigene
+  // Menge: 20 % von 25 Fundamenten sind 5 Zuschlaege. Bewusst nicht
+  // aufgerundet — in einer Schaetzung ist der Anteil die Aussage, nicht
+  // eine ganze Zahl von Loechern.
+  if (mkVerschmutzung(zeile.herkunft))
+    return (summen.anzahl || 0) * mkVerschmutzungAnteil(zeile.herkunft) / 100 * f;
   if (zeile.herkunft && summen[zeile.herkunft] != null) return summen[zeile.herkunft];
   return zeile.menge || 0;
 }
@@ -1426,6 +1434,101 @@ function besetzungStandard() {
   });
 }
 
+
+// ============================================================
+// VERSCHMUTZTER GLEISAUSHUB
+// ============================================================
+// Der Aushub eines Fundaments ist im Stückpreis enthalten — SOLANGE er
+// unverschmutzt ist. Ist er es nicht, kommt ein Zuschlag je Fundament dazu.
+//
+// ALS ANTEIL, NICHT JE STANDORT. Welches Loch welche Klasse trifft, weiss in
+// der Schätzung niemand; das zeigt erst der Aushub. Was man weiss, ist die
+// Erwartung für die Strecke: «etwa ein Fünftel schwach, ein Zehntel stark».
+// Genau so wird es erfasst — als Prozentsatz der Fundamente.
+//
+// VIER NAMEN, ZWEI PREISE. Der Katalog führt vier Klassen, aber
+// «schwach verschmutzt» und «wenig verschmutzt» kosten dasselbe, und
+// «stark verschmutzt» und «mit gefährlichen Stoffen verunreinigt» ebenso —
+// die obere Stufe liegt durchweg beim 2.85-fachen der unteren. Zwei
+// Prozentsätze reichen deshalb; ein dritter wäre eine Unterscheidung ohne
+// Unterschied.
+//
+// DER PREIS HÄNGT AM TYP. Er folgt der Aushubmenge: 165 CHF bei DP1a/1.5,
+// 540 CHF bei DG3a/3.5 in der unteren Stufe. Gerechnet wird der über die
+// Fundamentzahl gewichtete Mittelwert der Typen, die im Projekt vorkommen.
+const LK_VERSCHMUTZUNG = [
+  { id: 'verschmutztLeicht', wort: 'schwach / wenig verschmutzt',
+    muster: /Gleisaushub\s*"(schwach|wenig)\s+verschmutzt/i },
+  { id: 'verschmutztStark',  wort: 'stark verschmutzt / gefährliche Stoffe',
+    muster: /Gleisaushub\s*"(stark\s+verschmutzt|mit\s+gefährlichen)/i },
+];
+const mkVerschmutzung = id => LK_VERSCHMUTZUNG.find(k => k.id === id);
+
+// Zuschlag EINES Typs aus dem Katalog. Der Weg dorthin steht schon:
+// lkLeistungswerteZuweisen() hält je Typ die getroffene Katalogposition
+// (lkPos, z.B. 70010407 für DP1a/2.4). Die Zuschläge hängen unter derselben
+// Hauptposition, aber unter einer anderen Unterposition (…0911 statt …07) —
+// gesucht wird darum vom längsten Präfix abwärts, wie bei den Zuschlägen
+// der Besetzung auch.
+function lkVerschmutzungPreis(ftId, klasseId) {
+  const e = loadFtLeistungswerte()[ftId];
+  const katalog = loadLkKatalog();
+  const k = mkVerschmutzung(klasseId);
+  if (!e?.lkPos || !katalog || !k) return null;
+  const basis = String(e.lkPos);
+  for (let len = basis.length; len >= 6; len -= 2) {
+    const praefix = basis.slice(0, len);
+    const treffer = katalog.positionen.filter(
+      p => p.id.startsWith(praefix) && p.preis != null && k.muster.test(p.text || ''));
+    if (treffer.length) return treffer[0].preis;
+  }
+  return null;
+}
+
+// Gewichteter Mittelwert über die Typen im Projekt. Ein Projekt mit
+// zwanzig DP1a und zwei DG3a soll nicht mit dem Zuschlag des DG3a rechnen.
+function lkVerschmutzungMittel(klasseId) {
+  const ftProfile = typeof loadFtProfile === 'function' ? loadFtProfile() : [];
+  const allBp     = typeof loadAllBauprojekt === 'function' ? loadAllBauprojekt() : {};
+  const proTyp = new Map();
+  getFundamente().forEach(p => {
+    const ft = ftTypZuStandort(ftProfile, { ...p, ...(allBp[p.id] || {}) });
+    if (ft?.id) proTyp.set(ft.id, (proTyp.get(ft.id) || 0) + 1);
+  });
+  let gewicht = 0, wert = 0;
+  proTyp.forEach((n, ftId) => {
+    const pr = lkVerschmutzungPreis(ftId, klasseId);
+    if (pr != null) { wert += pr * n; gewicht += n; }
+  });
+  return gewicht ? mkAufrunden(wert / gewicht) : null;
+}
+
+// Anteil in Prozent, wie er in den Parametern steht.
+function mkVerschmutzungAnteil(klasseId) {
+  const n = Number(loadMkEinstellungen()[klasseId]);
+  return Number.isFinite(n) && n > 0 ? Math.min(100, n) : 0;
+}
+
+// Zeilen für die Zuschläge. Wie die Besetzung entstehen sie aus dem Modell
+// und nicht aus der Positionsdatenbank: es gibt keine EINE Positionsnummer
+// dafür — der Katalog führt sie je Fundamenttyp getrennt.
+function _lvVerschmutzungZeilen(liste) {
+  let neu = 0, aktualisiert = 0;
+  LK_VERSCHMUTZUNG.forEach(k => {
+    const preis = lkVerschmutzungMittel(k.id);
+    if (!(mkVerschmutzungAnteil(k.id) > 0) || preis == null) return;
+    const da = liste.find(z => z.quelle === 'verschmutzung' && z.schluessel === k.id);
+    if (da) { if (da.preis !== preis) { da.preis = preis; aktualisiert++; } return; }
+    liste.push({
+      id: 'lv_vs_' + k.id + '_' + Date.now().toString(36),
+      pos: '', text: 'Zuschlag Gleisaushub — ' + k.wort, einheit: 'ST',
+      menge: 0, preis, herkunft: k.id, quelle: 'verschmutzung', schluessel: k.id,
+    });
+    neu++;
+  });
+  return { neu, aktualisiert };
+}
+
 // ── Katalogposition ↔ Fundamenttyp ───────────────────────────
 // Der Katalog nennt die Typen im Beschrieb: «Mastfundament DP1a /1.5,
 // Kopfhoehe 100 cm …». Verglichen wird wie ueberall ueber Familie und Tiefe
@@ -1705,6 +1808,10 @@ function _mkParameterTab() {
     `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Kostenschätzung</div>`
     + feld('Unvorhergesehenes', 'mk-p-zuschlag', e.zuschlag, '1', '%', 'Zuschlag auf die Summe des Verzeichnisses')
     + feld('MWST', 'mk-p-mwst', e.mwst, '0.1', '%', '')
+    + `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 4px;">Verschmutzter Gleisaushub</div>`
+    + feld('schwach / wenig verschmutzt', 'mk-p-vs-leicht', e.verschmutztLeicht, '1', '%',
+           'Anteil der Fundamente. Der Zuschlag je Fundament kommt aus dem Katalog und hängt am Typ — gerechnet wird das gewichtete Mittel')
+    + feld('stark verschmutzt / gefährlich', 'mk-p-vs-stark', e.verschmutztStark, '1', '%', '')
     + `<div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 4px;">Schichten</div>`
     + feld('Verrechnete Stunden je Schicht', 'mk-p-stunden', mkStundenJeSchicht(), '0.5', 'h',
            'Der Baumeister rechnet die ganze Schicht ab, auch wenn das Intervall kürzer ist — gilt ebenso für Maschinen und Geräte')
@@ -1752,10 +1859,17 @@ function mkParameterSpeichern() {
   const zu = parseFloat(document.getElementById('mk-p-zuschlag')?.value);
   const mw = parseFloat(document.getElementById('mk-p-mwst')?.value);
   const st = parseFloat(document.getElementById('mk-p-stunden')?.value);
+  const anteil = id => {
+    const n = parseFloat(document.getElementById(id)?.value);
+    return Number.isFinite(n) && n > 0 ? Math.min(100, n) : 0;
+  };
   saveMkEinstellungen({
+    ...loadMkEinstellungen(),
     zuschlag:        Number.isFinite(zu) ? zu : 0,
     mwst:            Number.isFinite(mw) ? mw : 0,
     stundenJeSchicht: Number.isFinite(st) && st > 0 ? st : 8,
+    verschmutztLeicht: anteil('mk-p-vs-leicht'),
+    verschmutztStark:  anteil('mk-p-vs-stark'),
   });
   renderMassenView();
   _mkParameterTab();
@@ -1978,6 +2092,8 @@ function lvAusModell() {
   });
 
   const bes = _lvBesetzungZeilen(liste);
+  const vs  = _lvVerschmutzungZeilen(liste);
+  bes.neu += vs.neu; bes.aktualisiert += vs.aktualisiert;
 
   if (!neu && !gebunden && !bes.neu && !bes.aktualisiert) {
     ui.toast(db.length
