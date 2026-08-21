@@ -92,6 +92,43 @@ const BC_BETA = { '≤14°': 14, '14–33°': 33, '>33°': 33 };
 // fundamentArt der Bibliothek → Berechnungsmodell in BlockCalc
 const BC_MODELL = { blockfundament: 'block', mehrpfahl: 'pfahlbock' };
 // Bauweisen, die BlockCalc (noch) nicht abbildet — mit Begründung statt stummer Ablehnung.
+// ── STANDARDLASTEN ──────────────────────────────────────────
+// Vorlaeufig hier im Code statt allein in BlockCalcs Importdatei.
+//
+// Grund: der Import dort gilt pro Geraet und Browser. Fehlt er, findet
+// BlockCalc den Typenschluessel nicht und rechnet still mit seinen
+// Vorgabewerten weiter — gemessen NG 50 / MGx 40 statt der Werte des
+// Referenztyps. Solange die App in Entwicklung ist, reisen die Lasten
+// deshalb im Fall mit; BlockCalc gibt expliziten Werten Vorrang vor dem
+// Schluessel. Am Schluss wandern sie zurueck in die Importdatei.
+//
+// Quelle: 0161.1011.0002_a (ab 2019), charakteristisch, OK Fundamentkopf.
+// V=0 und V=150 unterscheiden sich NUR im NG. Deshalb steht hier je Familie
+// EIN Satz, und NG kommt aus der Bauweise:
+//     Blockfundament   NG =   0 kN
+//     Pfahlfundament   NG = 150 kN
+const BC_LASTEN = {
+  DP1a: { HGx: 5,    HGy: 5,    MGx: 40,   MGy: 40,   HWx: 5,    HWy: 5,    MWx: 40,   MWy: 40,   _masttyp: 'DP22',     _torsion: 3.3 },
+  DP2a: { HGx: 8.5,  HGy: 8.5,  MGx: 67.5, MGy: 67.5, HWx: 8.5,  HWy: 8.5,  MWx: 67.5, MWy: 67.5, _masttyp: 'DP26',     _torsion: 4.7 },
+  HP1a: { HGx: 14.5, HGy: 9.5,  MGx: 77,   MGy: 115,  HWx: 14.5, HWy: 9.5,  MWx: 77,   MWy: 115,  _masttyp: 'DPM24',    _torsion: 5.0 },
+  HP2a: { HGx: 9.5,  HGy: 14.5, MGx: 115,  MGy: 77,   HWx: 9.5,  HWy: 14.5, MWx: 115,  MWy: 77,   _masttyp: 'DPM24-P',  _torsion: 5.0 },
+  // DG1a-DG3a: Lasten noch nicht definiert. Bis dahin faellt die Bruecke fuer
+  // diese Familien auf den Typenschluessel zurueck und weist darauf hin.
+};
+const BC_NG = { block: 0, flach: 0, pfahlbock: 150 };
+
+// Lastblock des Falls. Ist die Familie hinterlegt, gehen die Werte explizit
+// mit; sonst nur der Schluessel, den BlockCalc in seiner eigenen Tabelle
+// sucht. Das Torsionsmoment reist mit, obwohl BlockCalc es nicht fuehrt —
+// es weist es dann als Hinweis aus, statt dass es stillschweigend fehlt.
+function bcLastblock(familie, modell) {
+  const vFall = (BC_NG[modell] ?? 0) > 0 ? 'max' : 'min';
+  const satz = BC_LASTEN[familie];
+  if (!satz) return { typ: familie || '', vFall };
+  const { _masttyp, _torsion, ...werte } = satz;
+  return { typ: familie, vFall, werte: { ...werte, NG: BC_NG[modell] ?? 0 }, torsion: _torsion };
+}
+
 const BC_NICHT_RECHENBAR = {
   fels:     'Verankerung im Fels wird von BlockCalc noch nicht gerechnet — der Nachweis über Anker ' +
             '(0161.1011.0601) ist dort nicht abgebildet. Nachweis separat führen.',
@@ -184,8 +221,15 @@ function bcFallBauen(pairId) {
     hinweise.push('Neigungsklasse 14–33°: konservativ mit 33° gerechnet. Der Block-GZG (Schiefstellung) ' +
                   'erreicht dort seine Modellgrenze — für ein belastbares Ergebnis den tatsächlichen ' +
                   'Böschungswinkel und, falls die Böschung endlich ist, die Böschungshöhe h_β erfassen.');
-  if (!bp.refFamilie)
+  // Referenztyp ueber den Aufloeser: er sieht auch im FT-Profil und im
+  // Typnamen nach. Das rohe Feld allein ist leer, sobald der Wert von dort
+  // kommt — und dann waeren die Lasten weg, ohne dass es jemand merkt.
+  const familie = (typeof getBpRefFamilie === 'function') ? getBpRefFamilie(bp) : (bp.refFamilie || '');
+  if (!familie)
     hinweise.push('Kein Referenztyp gesetzt — ohne ihn stehen keine Standardlasten zur Verfügung.');
+  else if (!BC_LASTEN[familie])
+    hinweise.push('Für den Referenztyp «' + familie + '» sind in der App noch keine Lasten hinterlegt — '
+                + 'BlockCalc sucht den Schlüssel in seiner eigenen Tabelle.');
 
   const phi   = bcNum(bp.bkPhi);
   const gamma = bcNum(bp.bkGamma) ?? 20;
@@ -221,7 +265,7 @@ function bcFallBauen(pairId) {
       gwTiefe: bcNum(bp.bkGrundwasserTiefe),
       neigung: { beta: BC_BETA[bp.neigung] ?? 0 }
     },
-    lasten: { typ: bp.refFamilie || '', vFall: 'max' },
+    lasten: bcLastblock(familie, BC_MODELL[art]),
     _hinweise: hinweise
   };
 }
