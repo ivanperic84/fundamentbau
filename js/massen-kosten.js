@@ -112,6 +112,9 @@ const MK_HERKUENFTE = [
   { id: 'stunden',        label: 'Verrechnete Stunden' },
   { id: 'stundenNacht',   label: 'Verrechnete Stunden Nacht' },
   { id: 'stundenSonntag', label: 'Verrechnete Stunden Sonntag' },
+  // Nur intern: die Zeile traegt zusaetzlich den Fundamenttyp, ohne den die
+  // Groesse nicht aufloesbar ist. Im Auswahlfeld waere sie darum irrefuehrend.
+  { id: 'anzahlTyp',      label: 'Fundamente dieses Typs', nurIntern: true },
   { id: 'verschmutztLeicht', label: 'Aushub schwach/wenig verschmutzt' },
   { id: 'verschmutztStark',  label: 'Aushub stark verschmutzt' },
   { id: 'installation',   label: '% der Bausumme' },
@@ -130,7 +133,7 @@ function mkHerkunftId(wert) {
 
 function _mkHerkunftOptionen(aktiv) {
   return '<option value="">von Hand</option>'
-    + MK_HERKUENFTE.map(h =>
+    + MK_HERKUENFTE.filter(h => !h.nurIntern).map(h =>
         `<option value="${h.id}"${aktiv === h.id ? ' selected' : ''}>${h.label}</option>`).join('');
 }
 
@@ -454,6 +457,8 @@ function lvMenge(zeile, summen) {
   // Menge: 20 % von 25 Fundamenten sind 5 Zuschlaege. Bewusst nicht
   // aufgerundet — in einer Schaetzung ist der Anteil die Aussage, nicht
   // eine ganze Zahl von Loechern.
+  // Fundamente GENAU DIESES Typs — die Zeile traegt ihn selbst mit.
+  if (zeile.herkunft === 'anzahlTyp') return mkAnzahlTyp(zeile.ftId) * f;
   if (mkVerschmutzung(zeile.herkunft))
     return (summen.anzahl || 0) * mkVerschmutzungAnteil(zeile.herkunft) / 100 * f;
   if (zeile.herkunft && summen[zeile.herkunft] != null) return summen[zeile.herkunft];
@@ -501,9 +506,16 @@ function schichtenAufteilung(teamId) {
   // bei null, denn geraten wird nicht.
   if (!pakete.length || mkSchichtQuelle() !== 'auto') {
     // Ein Los laesst sich ohne Bauprogramm nicht heraustrennen: die
-    // Schichtzahl von Hand gilt dem ganzen Projekt. Sie hier auszuweisen
-    // wuerde sie mit jedem weiteren Los ein zweites Mal verrechnen.
-    if (teamId) return { total: 0, nacht: 0, sonntag: 0, tage: 0, ohneTermine: true };
+    // Schichtzahl von Hand gilt dem ganzen Projekt. Sie bei jedem Los
+    // auszuweisen wuerde sie mehrfach verrechnen.
+    //
+    // AUSSER es gibt nur EINES. Dann ist das Los das Projekt, und die
+    // Schichten gehoeren ihm ganz. Ohne diese Ausnahme stand die Besetzung
+    // eines Einzellos-Projekts ohne Bauprogramm auf null — und eine
+    // definierte Besetzung machte die Schaetzung KLEINER als gar keine,
+    // weil ihre Positionen zugleich aus der Datenbankschleife fallen.
+    const _lose = (typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || [];
+    if (teamId && _lose.length > 1) return { total: 0, nacht: 0, sonntag: 0, tage: 0, ohneTermine: true };
     // Ohne Termine gibt es keine Kalendertage: dann gilt eine Schicht als
     // ein Arbeitstag. Das ist der Normalfall und nicht geraten.
     const n = schichtenGesamt();
@@ -824,7 +836,7 @@ function _mkLvTabelle(summen) {
   // die Zeile — sonst liefe der naechste Lauf gegen die Handaenderung.
   const teamName = id => ((typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || [])
                            .find(t => t.id === id)?.name || 'Los';
-  const herkunftWahl = (z) => z.quelle === 'besetzung'
+  const herkunftWahl = (z) => (z.quelle === 'besetzung' || z.quelle === 'fundament' || z.quelle === 'verschmutzung')
     ? `<span title="Aus der Besetzung von ${escHtml(teamName(z.teamId))} — dort ändern"
              style="font-size:11px;color:#6b7280;white-space:nowrap;">${escHtml(mkHerkunftLabel(z.herkunft))}${
                z.faktor > 1 ? ' × ' + z.faktor : ''}</span>`
@@ -1529,6 +1541,91 @@ function _lvVerschmutzungZeilen(liste) {
   return { neu, aktualisiert };
 }
 
+
+// ── Fundamentpositionen je Typ ──────────────────────────────
+// Der Katalog fuehrt je Fundamenttyp eine eigene Position mit eigenem Preis:
+// 1300 CHF fuer DP1a/1.5, 3875 fuer den schwersten Blocktyp. Eine
+// Sammelposition «Fundamente» an die Gesamtzahl zu binden wuerde alle mit
+// demselben Preis rechnen — bei gemischten Projekten um ein Vielfaches
+// daneben.
+//
+// Darum eine Zeile je Typ. Die Menge bleibt gebunden und nicht eingefroren:
+// die Grosse «anzahlTyp» zaehlt die Fundamente GENAU DIESES Typs, damit ein
+// spaeter zugewiesener Standort mitwaechst.
+//
+// Der Preis wird NICHT gerundet. Er steht so im Vertrag und ist keine
+// Schaetzung — anders als die gemittelten Werte der Besetzung.
+function mkAnzahlTyp(ftId) {
+  const t = mkTypenImProjekt().find(x => x.schluessel === ftId);
+  return t ? t.anzahl : 0;
+}
+
+// Die PREISZEILE zu einem Fundamenttyp.
+//
+// lkLeistungswerteZuweisen() haelt je Typ eine Katalogposition — aber die
+// FALSCHE fuer diesen Zweck: gesucht wird dort ueber den Typnamen, und der
+// steht in der Unterposition .01 («Mastfundament DP1a / 2.4, Kopfhoehe
+// 100 cm»), zusammen mit den Leistungswerten. Einen Preis traegt sie nicht.
+//
+// Der Preis steht eine Unterposition weiter, unter wechselnder Nummer —
+// .07 bei den DP-Typen, .10 bei den schweren, .06 und .08 bei anderen —
+// und heisst dort generisch «Fundament an Ort und Stelle erstellen».
+//
+// Gefunden wird sie ueber die gemeinsame Hauptposition: dieselbe
+// Positionsfamilie, Einheit ST, mit Preis, und KEIN «=>» am Zeilenanfang.
+// Das letzte Merkmal trennt sie von den Zuschlaegen (Frostschutz,
+// verschmutzter Aushub), die dieselbe Einheit tragen.
+function lkPreisPositionZuTyp(lkPos, katalog) {
+  const basis = String(lkPos || '');
+  if (!basis || !katalog) return null;
+  for (let len = basis.length - 2; len >= 6; len -= 2) {
+    const praefix = basis.slice(0, len);
+    const treffer = katalog.positionen.filter(p =>
+      p.id.startsWith(praefix) && p.preis != null
+      && /^st$/i.test(String(p.einheit || '').trim())
+      && !/^=>/.test((p.text || '').trim()));
+    if (treffer.length === 1) return treffer[0];
+    if (treffer.length > 1) return null;   // mehrdeutig — lieber nichts
+  }
+  return null;
+}
+
+function _lvFundamentZeilen(liste) {
+  const katalog = loadLkKatalog();
+  if (!katalog) return { neu: 0, aktualisiert: 0, positionen: new Set() };
+  const werte = loadFtLeistungswerte();
+  const positionen = new Set();
+  let neu = 0, aktualisiert = 0;
+
+  mkTypenImProjekt().forEach(t => {
+    const lkPos = werte[t.schluessel]?.lkPos;
+    if (!lkPos) return;                       // Typ steht nicht im Katalog
+    const pos = lkPreisPositionZuTyp(lkPos, katalog);
+    if (!pos || pos.preis == null) return;
+    positionen.add(pos.id);
+
+    const da = liste.find(z => z.quelle === 'fundament' && z.schluessel === t.schluessel);
+    if (da) {
+      if (da.preis !== pos.preis) { da.preis = pos.preis; aktualisiert++; }
+      return;
+    }
+    liste.push({
+      id: 'lv_ft_' + t.schluessel + '_' + Date.now().toString(36),
+      pos: pos.id,
+      // Der Beschrieb der Preisposition ist generisch («Fundament an Ort und
+      // Stelle erstellen») — die Typenbezeichnung steht im Katalog eine
+      // Ebene hoeher. Sie gehoert davor, sonst stehen im Verzeichnis
+      // mehrere gleichlautende Zeilen.
+      text: t.name + ' — ' + pos.text,
+      einheit: pos.einheit || 'ST', menge: 0, preis: pos.preis,
+      herkunft: 'anzahlTyp', ftId: t.schluessel,
+      quelle: 'fundament', schluessel: t.schluessel,
+    });
+    neu++;
+  });
+  return { neu, aktualisiert, positionen };
+}
+
 // ── Katalogposition ↔ Fundamenttyp ───────────────────────────
 // Der Katalog nennt die Typen im Beschrieb: «Mastfundament DP1a /1.5,
 // Kopfhoehe 100 cm …». Verglichen wird wie ueberall ueber Familie und Tiefe
@@ -1997,7 +2094,12 @@ const MK_ZUORDNUNG_REGELN = [
   { herkunft: 'bewehrung',      text: /bewehrung|armierung|betonstahl|b500|b550/, einheit: /kg/ },
   { herkunft: 'fixierung',      text: /fixier|flacheisen|schablone/ },
   { herkunft: 'schraub',        text: /schraube/ },
-  { herkunft: 'vfk',            text: /vorgefertigt|fundamentkopf|vfk/ },
+  // «Fundamentkopf» allein reicht NICHT. Der Katalog fuehrt
+  // «Spezial-Mastfundament mit Mikrobohrpfaehlen und Normfundamentkopf» —
+  // ein Pfahlfundament, das mit dieser Regel die Zahl der vorgefertigten
+  // Koepfe bekam und in einem Testprojekt mit 25 Fundamenten 18 585 CHF
+  // erfand. Verlangt wird jetzt «vorgefertigt» oder das Kuerzel selbst.
+  { herkunft: 'vfk',            text: /vorgefertigt|\bvfk\b/ },
   { herkunft: 'pfahlMeter',     text: /pfahl|bohrung/,                        einheit: /^(m|lfm)$|laufmeter/ },
   { herkunft: 'pfahlStk',       text: /pfahl/,                                einheit: /stk|stück|stueck/ },
   { herkunft: 'ankerMeter',     text: /anker/,                                einheit: /^(m|lfm)$|laufmeter/ },
@@ -2075,9 +2177,29 @@ function lvAusModell() {
   ((typeof loadProjEinst === 'function' ? loadProjEinst().teams : null) || []).forEach(t => {
     [...(t.mannschaft || []), ...(t.geraete || [])].forEach(p => { if (p.pos) inBesetzung.add(p.pos); });
   });
+  // Ist ueberhaupt eine Besetzung definiert, bestimmt SIE die Mannschaft —
+  // auch negativ. Der Katalog fuehrt die Arbeitsgruppe fuer Standard- und
+  // fuer Pfahlfundamente getrennt (100.31x und 100.33x, 2700 gegen 2965 CHF);
+  // beide binden auf die Schichtzahl, und ohne diese Regel bekaeme auch die
+  // ungenutzte Variante alle Schichten. In einem Testprojekt ohne
+  // Pfahlfundamente waren das 29 650 CHF fuer eine Mannschaft, die es
+  // nicht gibt.
+  //
+  // Gilt nur fuer ROLLENPOSITIONEN — jene mit Intervallbaendern, die
+  // lkRollen() kennt. Alles andere laeuft weiter ueber die Datenbank.
+  const besetzungDefiniert = inBesetzung.size > 0;
+
+  // Fundamentpositionen entstehen je Typ und duerfen nicht zusaetzlich als
+  // Sammelzeile ueber die Datenbank laufen — sonst stuenden die Fundamente
+  // zweimal im Verzeichnis.
+  const ausTypen = _lvFundamentZeilen([]).positionen;
+  ausTypen.forEach(p => inBesetzung.add(p));
+
+  const istFremdeRolle = pos => besetzungDefiniert && !inBesetzung.has(pos)
+    && typeof lkRollen === 'function' && lkRollen().has(String(pos));
 
   db.forEach(v => {
-    if (inBesetzung.has(v.pos)) { ausBesetzung++; return; }
+    if (inBesetzung.has(v.pos) || istFremdeRolle(v.pos)) { ausBesetzung++; return; }
     const menge = lvMenge({ herkunft: v.herkunft, menge: 0 }, summen);
     if (!(menge > 0)) { ohneMenge++; return; }
     const da = liste.find(z => z.pos === v.pos);
@@ -2093,7 +2215,9 @@ function lvAusModell() {
 
   const bes = _lvBesetzungZeilen(liste);
   const vs  = _lvVerschmutzungZeilen(liste);
-  bes.neu += vs.neu; bes.aktualisiert += vs.aktualisiert;
+  const ftz = _lvFundamentZeilen(liste);
+  bes.neu += vs.neu + ftz.neu;
+  bes.aktualisiert += vs.aktualisiert + ftz.aktualisiert;
 
   if (!neu && !gebunden && !bes.neu && !bes.aktualisiert) {
     ui.toast(db.length
