@@ -1208,33 +1208,39 @@ function _lkTypAusBeschrieb(text) {
   return m ? { familie: m[1].toLowerCase(), tiefe: parseFloat(m[2].replace(',', '.')) } : null;
 }
 
-// Aus den Schichtleistungen den Aufwandswert herleiten.
+// Aus den Schichtleistungen die Bauzeit je Fundament herleiten.
 //
 // Die Katalogzahlen sind kein Zufall: sie entstehen aus einer festen Ruestzeit
-// je Schicht und einer Arbeitszeit je Fundament. Traegt man die Intervalldauer
-// ueber die Schichtleistung auf, liegen die Punkte auf einer Geraden
+// je Schicht und einer Bauzeit je Fundament.
 //
-//     Intervalldauer = Ruestzeit + Aufwandswert × Schichtleistung
+//     Fundamente je Schicht = (Intervalldauer − Ruestzeit) / Bauzeit
 //
-// Steigung und Achsenabschnitt einer Ausgleichsgeraden liefern damit beide
-// Groessen. Fuer DP1a ergibt das rund 0.8 h je Fundament bei 1.8 h Ruestzeit.
-// Der Wert ist ein VORSCHLAG — die Katalogzahlen sind ausgehandelte
-// Mindestwerte, nicht zwingend die Planungswerte des Anwenders.
+// DIE RUESTZEIT STEHT NICHT ZUR BESTIMMUNG FREI. Frueher las eine
+// Ausgleichsgerade beide Groessen auf einmal aus den sechs Punkten. Das trug
+// nur, wo die Schichtleistungen fein genug gestuft sind: bei DP1a (3/4/5/7/8/9)
+// kam 1.79 h heraus, bei DG3a/3.5 (1/1/2/2/3/3) dagegen 2.50 h und bei
+// DG3a/3.0 nur 0.50 h. Eine Ruestzeit, die je Fundamenttyp um das Fuenffache
+// schwankt, gibt es nicht — sie gehoert zur Mannschaft und zum Gleiszugang,
+// nicht zum Fundament.
+//
+// Sie kommt darum aus dem Projekt (Abzug fuer Installation und Anfahrt), und
+// hergeleitet wird nur noch die Bauzeit. Das ist dasselbe Modell, mit dem das
+// Bauprogramm rechnet — beide Seiten kommen damit auf dieselbe Zahl.
+//
+// Nachgemessen ueber alle 19 Typen des Katalogs: bei fester Ruestzeit ist die
+// Streuung der Bauzeit ueber die sechs Intervalldauern am kleinsten (8 %).
+// Der Wert bleibt ein VORSCHLAG — die Katalogzahlen sind ausgehandelte
+// MINDESTschichtleistungen, nicht zwingend die Planungswerte des Anwenders.
 function _lwAufwandHerleiten(lw) {
-  const punkte = [];
+  const ruestzeit = mkAbzugStunden() ?? 0;
+  const werte = [];
   lw.forEach((wert, i) => {
-    if (wert != null && wert > 0) punkte.push({ x: wert, y: LK_INTERVALLE[i] });
+    const netto = LK_INTERVALLE[i] - ruestzeit;
+    if (wert != null && wert > 0 && netto > 0) werte.push(netto / wert);
   });
-  if (punkte.length < 2) return null;
-  const n  = punkte.length;
-  const mx = punkte.reduce((s, p) => s + p.x, 0) / n;
-  const my = punkte.reduce((s, p) => s + p.y, 0) / n;
-  const sxy = punkte.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0);
-  const sxx = punkte.reduce((s, p) => s + (p.x - mx) ** 2, 0);
-  if (!sxx) return null;
-  const aufwand = sxy / sxx;
-  if (!(aufwand > 0)) return null;
-  return { aufwand, ruestzeit: Math.max(0, my - aufwand * mx) };
+  if (!werte.length) return null;
+  const aufwand = werte.reduce((s, v) => s + v, 0) / werte.length;
+  return aufwand > 0 ? { aufwand, ruestzeit } : null;
 }
 
 function lkLeistungswerteZuweisen() {
