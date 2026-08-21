@@ -6,7 +6,21 @@ const SCHICHT_ZUW_KEY= () => 'sp_schicht_zuw__' + _activeId;
 
 function loadBaupakete()          { try { return jsonParse(store.getItem(BP_PAKET_KEY()))    || []; } catch { return []; } }
 function saveBaupakete(list)      { bpSnapshotBeforeChange(); store.setItem(BP_PAKET_KEY(),    JSON.stringify(list)); }
-function loadProjEinst()          { try { return jsonParse(store.getItem(PROJ_EINST_KEY()))  || {}; } catch { return {}; } }
+// Vorgabewerte des Projekts.
+//
+// Bisher lieferte die Funktion ein leeres Objekt, und der Abzug fuer
+// Installation und Anfahrt war damit still NULL — die 30 Minuten standen
+// allein im Demoprojekt. Fuer eine Gleissperrung mit Ein- und Ausgleisen,
+// Instruktion und Schutzmassnahmen ist null keine brauchbare Annahme, und
+// sie verschiebt die Bauzeit-Herleitung aus dem Leistungskatalog um rund
+// zehn Prozent: mit 30 min kommt fuer DP1a 1.03 h heraus, ohne Abzug 1.13 h.
+// Die hinterlegten Bauzeiten sind mit 30 min gerechnet.
+//
+// Eine bewusst gesetzte 0 bleibt erhalten: das Einstellungsfeld speichert
+// den leeren Wert als 0, nicht als Luecke — die Vorgabe greift also nur,
+// solange niemand die Einstellungen geoeffnet hat.
+const PROJ_EINST_VORGABE = { abzugMinuten: 30 };
+function loadProjEinst()          { try { return { ...PROJ_EINST_VORGABE, ...(jsonParse(store.getItem(PROJ_EINST_KEY())) || {}) }; } catch { return { ...PROJ_EINST_VORGABE }; } }
 function saveProjEinst(obj)       { store.setItem(PROJ_EINST_KEY(),  JSON.stringify(obj)); }
 function loadSchichtZuw()         { try { return jsonParse(store.getItem(SCHICHT_ZUW_KEY())) || {}; } catch { return {}; } }
 function saveSchichtZuw(obj)      { bpSnapshotBeforeChange(); store.setItem(SCHICHT_ZUW_KEY(), JSON.stringify(obj)); }
