@@ -38,7 +38,7 @@
 // ============================================================
 const FT_PROFIL_KEY    = () => 'sp_ft_profile__'    + _activeId;
 const FT_VERSION_KEY   = () => 'sp_ft_version__'    + _activeId;
-const DEFAULT_FT_VERSION = 17; // Erhöhen bei Änderungen an Standardtypen
+const DEFAULT_FT_VERSION = 18; // Erhöhen bei Änderungen an Standardtypen
 
 // Bauzeiten vor v16. Sie waren grob geschätzt und lagen um das Drei- bis
 // Fünffache über dem, was der Leistungskatalog hergibt — bei einem Kostenblock,
@@ -185,10 +185,10 @@ const DEFAULT_FT_PROFIL = [
     schraubenAnzahl:'4', schraubenDurchmesser:'M36', schraubenLaenge:'400',
     schraubenMaterial:'B550B / tZn',
     einsatzBedingung:'Gittermast, Hangneigung 14–33°', nachweisRequired:false, bemerkung:'' },
-  // ── DG2a — Gittermast mittel (Block 1.3×1.3 m) ──
+  // ── DG2a — Gittermast mittel (Block 1.2×1.2 m) ──
   { id:'ft_std_dg2a_25', name:'DG2a / 2.5', typ:'standard', fundamentArt:'blockfundament',
-    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1300 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.5', ftIntervall:1.5,
+    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1200×1200 mm',
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.5', grabenBreite:'1.20', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0181', schraubenArtikelNr:'371.10.11',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -197,10 +197,12 @@ const DEFAULT_FT_PROFIL = [
     schraubenAnzahl:'4', schraubenDurchmesser:'M36', schraubenLaenge:'320',
     schraubenMaterial:'B550B / tZn',
     einsatzBedingung:'Gittermast mittel', nachweisRequired:false, bemerkung:'' },
-  // ── DG3a — Gittermast gross (Block 1.5×1.5 m) ──
+  // ── DG3a — Gittermast gross (Block 1.3×1.6 m) ──
+  // Der einzige Standardtyp mit RECHTECKIGEM Querschnitt. Er ist der Grund,
+  // weshalb «grabenBreite» auch ein Paar aufnehmen kann.
   { id:'ft_std_dg3a_26', name:'DG3a / 2.6', typ:'standard', fundamentArt:'blockfundament',
-    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1500×1500 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.6', ftIntervall:1.5,
+    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1600 mm',
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'2.6', grabenBreite:'1.30 × 1.60', ftIntervall:1.5,
     zeichnungsNr:'0161.1011.0182', schraubenArtikelNr:'371.10.11',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -210,8 +212,8 @@ const DEFAULT_FT_PROFIL = [
     schraubenMaterial:'B550B / tZn',
     einsatzBedingung:'Gittermast gross, Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dg3a_30', name:'DG3a / 3.0', typ:'standard', fundamentArt:'blockfundament',
-    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1500×1500 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.0', ftIntervall:2.0,
+    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1600 mm',
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.0', grabenBreite:'1.30 × 1.60', ftIntervall:2.0,
     zeichnungsNr:'0161.1011.0183', schraubenArtikelNr:'371.10.12',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -221,8 +223,8 @@ const DEFAULT_FT_PROFIL = [
     schraubenMaterial:'B550B / tZn',
     einsatzBedingung:'Gittermast gross, Hangneigung ≤ 14°', nachweisRequired:false, bemerkung:'' },
   { id:'ft_std_dg3a_35', name:'DG3a / 3.5', typ:'standard', fundamentArt:'blockfundament',
-    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1500×1500 mm',
-    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.5', ftIntervall:3.0,
+    kopfAbmessung:'600×600 mm', kopfHoehe:'1.0', blockAbmessung:'1300×1600 mm',
+    anzahlPfaehle:'', pfahlLaenge:'', tiefe:'3.5', grabenBreite:'1.30 × 1.60', ftIntervall:3.0,
     zeichnungsNr:'0161.1011.0184', schraubenArtikelNr:'371.10.12',
     beton:'NPK F, C30/37, XC4(CH), XD3(CH), XF2(CH), Dmax 32; Cl 0.1; C3, AAR-Beständig',
     bewehrung:'B500B', bewehrungsstahl:'B500B', betondeckung:'40',
@@ -1508,13 +1510,6 @@ const FT_MATERIAL_DB = {
   'ft_std_hp2b':    { beton:'C30/37 (NPK F)', deckung:'40 mm', stahl:'B500B', quer:'2×Ø12/400 mm (371.06.161)', anker:'6×M36, L=320 cm (371.10.11, B550B/tZn)' },
 };
 
-/** Hilfsfunktion: Block-Seitenmass aus String "1000×1000 mm" → 1.0 (m) */
-function _ftParseBlockM(str) {
-  if (!str || str === '—') return null;
-  const m = str.match(/(\d+)\s*[×x]\s*(\d+)/);
-  return m ? parseInt(m[1]) / 1000 : null;
-}
-
 /** Öffnet die Parameterdatenbank und befüllt alle drei Tabs */
 function openFtDatenbank() {
   document.getElementById('ft-datenbank-modal').style.display = 'flex';
@@ -1528,18 +1523,13 @@ function openFtDatenbank() {
     const tdS = 'padding:7px 10px;white-space:nowrap;border-bottom:1px solid #f3f4f6;';
     const rowBg = (i) => i % 2 === 0 ? '#ffffff' : '#f8fafc';
     geoBody.innerHTML = types.map((t, i) => {
-      const kopfB   = 0.6;                              // immer 600×600 mm
       const kopfH   = parseFloat(t.kopfHoehe) || 1.0;
       const tiefe   = parseFloat(t.tiefe)     || 0;
-      const blockB  = _ftParseBlockM(t.blockAbmessung);
-      const blockH  = tiefe - kopfH;
-      let volStr    = '—';
-      if (blockB) {
-        const volKopf  = (kopfB * kopfB * kopfH).toFixed(2);
-        const volBlock = (blockB * blockB * blockH).toFixed(2);
-        const volGes   = (parseFloat(volKopf) + parseFloat(volBlock)).toFixed(2);
-        volStr = `${volGes} m³`;
-      }
+      // Volumen aus der gemeinsamen Formel. Hier stand die ERSTE Blockseite
+      // quadriert — bei DG3a (1.3 × 1.6 m) sind das 23 % zu wenig. Solange
+      // jeder Standardtyp quadratisch war, konnte es nicht auffallen.
+      const vol     = ftBetonVolumen(t, false);
+      const volStr  = vol ? vol.total.toFixed(2) + ' m³' : '—';
       const hangBadge = t.einsatzBedingung.includes('14–33')
         ? `<span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;border-radius:10px;padding:1px 7px;font-size:10px;">${t.einsatzBedingung}</span>`
         : `<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;padding:1px 7px;font-size:10px;">${t.einsatzBedingung}</span>`;

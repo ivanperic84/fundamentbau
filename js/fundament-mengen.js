@@ -36,6 +36,17 @@ function fmZahl(wert) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Ein Mass, das als einzelne Zahl ODER als Paar geschrieben sein darf.
+// Der Katalog nennt die Grabenmasse als Paar («Grabenbreiten min. 1.30 x
+// 1.60 m»). Bei 16 der 19 Typen sind beide Seiten gleich und das Feld traegt
+// eine Zahl; die drei DG3a-Typen haben einen rechteckigen Graben.
+function fmMass(wert) {
+  const paar = fmSeite(wert);
+  if (paar) return paar;
+  const n = fmZahl(wert);
+  return n != null ? { a: n, b: n } : null;
+}
+
 // ── Was eine Bauweise braucht ────────────────────────────────
 // Dieselbe Zuordnung, mit der der Typ-Editor die Felder ein- und ausblendet
 // (onFtArtChange in fundamenttypen.js). Ein Feld, das eine Bauweise gar nicht
@@ -170,9 +181,13 @@ function fmMengen(ft) {
       d.beton    = kopfVol + block.a * block.b * blockH;
       // Der Graben ist nie schmaler als der Block — die Katalogangabe ist ein
       // Mindestmass der Verbauregeln, nicht das Mass dieses Fundaments.
-      const gb = fmZahl(ft.grabenBreite);
-      d.aushub   = gb != null
-        ? Math.max(gb, block.a) * Math.max(gb, block.b) * (tiefe + FM_AUSHUB_MEHRTIEFE)
+      // Kurze gegen kurze, lange gegen lange Seite: welche Seite in der
+      // Bibliothek zuerst steht, ist Schreibweise und nicht Ausrichtung.
+      const gr = fmMass(ft.grabenBreite);
+      const kurz = m => Math.min(m.a, m.b);
+      const lang = m => Math.max(m.a, m.b);
+      d.aushub   = gr
+        ? Math.max(kurz(gr), kurz(block)) * Math.max(lang(gr), lang(block)) * (tiefe + FM_AUSHUB_MEHRTIEFE)
         : block.a * block.b * tiefe;
       d.schalung = kopfSchalung;
     }
