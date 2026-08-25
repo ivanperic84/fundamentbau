@@ -29,7 +29,8 @@
       "purpose": "maskable"
     }
   ],
-  "id": "./",
+  "_kommentar_id": "id wird als einziges Feld gegen die HERKUNFT aufgeloest, nicht gegen die Manifest-Adresse. Ein relatives \"./\" ergaebe hier https://ivanperic84.github.io/ und damit dieselbe Kennung wie jede andere App derselben Herkunft. Deshalb absoluter Pfad.",
+  "id": "/fundamentbau/",
   "display_override": [
     "standalone",
     "minimal-ui"
