@@ -29,9 +29,8 @@
       "purpose": "maskable"
     }
   ],
-  "id": "/",
+  "id": "./",
   "display_override": [
-    "fullscreen",
     "standalone",
     "minimal-ui"
   ]
